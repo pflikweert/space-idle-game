@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:42:23.209Z
-Source Commit: 89c73a7
+Build Timestamp (UTC): 2026-05-21T18:48:04.473Z
+Source Commit: 03680ba
 
 ## Upload Policy
 

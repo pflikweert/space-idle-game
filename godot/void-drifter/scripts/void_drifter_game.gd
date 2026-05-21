@@ -210,7 +210,7 @@ func _fire_at_nearest_enemy() -> void:
 			nearest = enemy
 			nearest_distance = enemy_distance
 
-	var direction := (nearest.position - player_position).normalized()
+	var direction: Vector2 = (nearest.position - player_position).normalized()
 	bullets.append({
 		"id": next_id,
 		"position": Vector2(player_position.x, player_position.y - player.radius),
@@ -223,7 +223,7 @@ func _fire_at_nearest_enemy() -> void:
 func _update_enemy_movement(delta: float) -> void:
 	var player_position: Vector2 = player.position
 	for enemy in enemies:
-		var direction := (player_position - enemy.position).normalized()
+		var direction: Vector2 = (player_position - enemy.position).normalized()
 		enemy.position += direction * enemy.speed * delta
 
 func _update_projectiles(delta: float) -> void:
