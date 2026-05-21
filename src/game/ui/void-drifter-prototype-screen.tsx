@@ -11,20 +11,20 @@ import {
   View,
 } from 'react-native';
 
-const PLAYER_HP = 140;
-const ENEMY_SPAWN_INTERVAL = 1500;
-const MIN_ENEMY_SPAWN_INTERVAL = 620;
-const FIRST_ENEMY_SPAWN_DELAY = 1350;
-const PLAYER_FIRE_INTERVAL = 260;
-const BULLET_SPEED = 540;
-const ENEMY_SPEED = 42;
-const ENEMY_HP = 2;
-const PLAYER_MOVE_SPEED = 470;
-const PLAYER_BOUNDS_PADDING = 10;
-const PLAYER_SPRITE_SIZE = 76;
-const PLAYER_DAMAGED_HP_THRESHOLD = 0.3;
-const PLAYER_BANKING_THRESHOLD = 1.2;
-const PARALLAX_LAYER_HEIGHT = 2048;
+import {
+  MAX_DELTA_SECONDS,
+  PARALLAX_LAYER_HEIGHT,
+  PARTICLE_LIFETIME,
+  PLAYER_BANKING_THRESHOLD,
+  PLAYER_DAMAGED_HP_THRESHOLD,
+  PLAYER_HP,
+  PLAYER_SPRITE_SIZE,
+} from '../core/constants';
+import { formatTime } from '../core/math';
+import type { PlayfieldSize, WorldInput, WorldSnapshot } from '../core/types';
+import { createInitialWorld, createWorldSnapshot } from '../runtime/createInitialWorld';
+import { updateWorld } from '../runtime/updateWorld';
+
 const PARALLAX_LAYERS = [
   {
     id: 'far-stars',
@@ -45,99 +45,6 @@ const PARALLAX_LAYERS = [
     opacity: 0.2,
   },
 ] as const;
-const DAMAGE_VALUES = {
-  bullet: 1,
-  enemyContact: 12,
-} as const;
-
-const PLAYER_RADIUS = 18;
-const MAX_DELTA_SECONDS = 0.033;
-const PARTICLE_LIFETIME = 0.42;
-const DIFFICULTY_SCALING = {
-  maxEnemiesStart: 3,
-  maxEnemiesCap: 13,
-  maxEnemiesRampSeconds: 11,
-  spawnRampMsPerSecond: 24,
-  enemySpeedRampPerSecond: 0.012,
-  enemySpeedCapMultiplier: 1.48,
-} as const;
-
-type Vector = {
-  x: number;
-  y: number;
-};
-
-type Enemy = Vector & {
-  id: number;
-  radius: number;
-  hp: number;
-  speed: number;
-  color: string;
-};
-
-type Bullet = Vector & {
-  id: number;
-  radius: number;
-  vx: number;
-  vy: number;
-  life: number;
-};
-
-type Particle = Vector & {
-  id: number;
-  radius: number;
-  vx: number;
-  vy: number;
-  life: number;
-  color: string;
-};
-
-type RunStatus = 'ready' | 'running' | 'dead';
-
-type GameState = {
-  player: Vector & {
-    hp: number;
-    radius: number;
-  };
-  playerTarget: Vector;
-  playerVelocityX: number;
-  enemies: Enemy[];
-  bullets: Bullet[];
-  particles: Particle[];
-  kills: number;
-  elapsed: number;
-  backgroundTime: number;
-  status: RunStatus;
-  spawnTimer: number;
-  fireTimer: number;
-  lastFrameTime: number | null;
-  nextId: number;
-};
-
-type Snapshot = Pick<
-  GameState,
-  | 'player'
-  | 'playerTarget'
-  | 'playerVelocityX'
-  | 'enemies'
-  | 'bullets'
-  | 'particles'
-  | 'kills'
-  | 'elapsed'
-  | 'backgroundTime'
-  | 'status'
->;
-
-type PlayfieldSize = {
-  width: number;
-  height: number;
-};
-
-const ENEMY_VARIANTS = [
-  { radius: 12, color: '#fb7185', speedMultiplier: 1.08, hp: ENEMY_HP },
-  { radius: 16, color: '#a78bfa', speedMultiplier: 0.92, hp: ENEMY_HP + 1 },
-  { radius: 10, color: '#facc15', speedMultiplier: 1.24, hp: ENEMY_HP },
-] as const;
 
 const PLAYER_SHIP_SPRITES = {
   idle: require('@/assets/images/void-drifter/player-ship/256/player_ship_idle.png'),
@@ -146,286 +53,11 @@ const PLAYER_SHIP_SPRITES = {
   damaged: require('@/assets/images/void-drifter/player-ship/256/player_ship_damaged.png'),
 } as const;
 
-function createInitialGameState(size: PlayfieldSize, status: RunStatus = 'ready'): GameState {
-  const playerStart = {
-    x: size.width / 2,
-    y: size.height * 0.68,
-  };
-
-  return {
-    player: {
-      ...playerStart,
-      radius: PLAYER_RADIUS,
-      hp: PLAYER_HP,
-    },
-    playerTarget: playerStart,
-    playerVelocityX: 0,
-    enemies: [],
-    bullets: [],
-    particles: [],
-    kills: 0,
-    elapsed: 0,
-    backgroundTime: 0,
-    status,
-    spawnTimer: FIRST_ENEMY_SPAWN_DELAY,
-    fireTimer: PLAYER_FIRE_INTERVAL * 0.6,
-    lastFrameTime: null,
-    nextId: 1,
-  };
-}
-
-function cloneSnapshot(state: GameState): Snapshot {
-  return {
-    player: { ...state.player },
-    playerTarget: { ...state.playerTarget },
-    playerVelocityX: state.playerVelocityX,
-    enemies: state.enemies.map((enemy) => ({ ...enemy })),
-    bullets: state.bullets.map((bullet) => ({ ...bullet })),
-    particles: state.particles.map((particle) => ({ ...particle })),
-    kills: state.kills,
-    elapsed: state.elapsed,
-    backgroundTime: state.backgroundTime,
-    status: state.status,
-  };
-}
-
-function distanceSquared(a: Vector, b: Vector) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return dx * dx + dy * dy;
-}
-
-function normalize(dx: number, dy: number) {
-  const length = Math.hypot(dx, dy) || 1;
-  return {
-    x: dx / length,
-    y: dy / length,
-  };
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clampPointToPlayfield(point: Vector, size: PlayfieldSize) {
-  const inset = PLAYER_RADIUS + PLAYER_BOUNDS_PADDING;
-  return {
-    x: clamp(point.x, inset, Math.max(inset, size.width - inset)),
-    y: clamp(point.y, inset, Math.max(inset, size.height - inset)),
-  };
-}
-
-function movePlayerTowardTarget(state: GameState, deltaSeconds: number, size: PlayfieldSize) {
-  const target = clampPointToPlayfield(state.playerTarget, size);
-  state.playerTarget = target;
-
-  const dx = target.x - state.player.x;
-  const dy = target.y - state.player.y;
-  const distance = Math.hypot(dx, dy);
-  if (distance < 1) {
-    state.player.x = target.x;
-    state.player.y = target.y;
-    state.playerVelocityX = 0;
-    return;
-  }
-
-  const step = Math.min(distance, PLAYER_MOVE_SPEED * deltaSeconds);
-  state.player.x += (dx / distance) * step;
-  state.player.y += (dy / distance) * step;
-  state.playerVelocityX = (dx / distance) * step;
-}
-
-function getSpawnInterval(elapsed: number) {
-  return Math.max(
-    MIN_ENEMY_SPAWN_INTERVAL,
-    ENEMY_SPAWN_INTERVAL - elapsed * DIFFICULTY_SCALING.spawnRampMsPerSecond
-  );
-}
-
-function getEnemySpeedMultiplier(elapsed: number) {
-  return Math.min(
-    DIFFICULTY_SCALING.enemySpeedCapMultiplier,
-    1 + elapsed * DIFFICULTY_SCALING.enemySpeedRampPerSecond
-  );
-}
-
-function getMaxEnemies(elapsed: number) {
-  return Math.min(
-    DIFFICULTY_SCALING.maxEnemiesCap,
-    DIFFICULTY_SCALING.maxEnemiesStart +
-      Math.floor(elapsed / DIFFICULTY_SCALING.maxEnemiesRampSeconds)
-  );
-}
-
-function advanceBackground(state: GameState, deltaSeconds: number) {
-  state.backgroundTime += deltaSeconds;
-}
-
-function spawnEnemy(state: GameState, size: PlayfieldSize) {
-  const variant = ENEMY_VARIANTS[state.nextId % ENEMY_VARIANTS.length];
-  const edge = state.nextId % 4;
-  const inset = variant.radius + 8;
-  const drift = ((state.nextId * 71) % 100) / 100;
-  let x = size.width * drift;
-  let y = size.height * drift;
-
-  if (edge === 0) y = -inset;
-  if (edge === 1) x = size.width + inset;
-  if (edge === 2) y = size.height + inset;
-  if (edge === 3) x = -inset;
-
-  state.enemies.push({
-    id: state.nextId++,
-    x,
-    y,
-    radius: variant.radius,
-    hp: variant.hp,
-    speed: ENEMY_SPEED * variant.speedMultiplier * getEnemySpeedMultiplier(state.elapsed),
-    color: variant.color,
-  });
-}
-
-function fireAtNearestEnemy(state: GameState) {
-  if (state.enemies.length === 0) {
-    return;
-  }
-
-  let nearest = state.enemies[0];
-  let nearestDistance = distanceSquared(state.player, nearest);
-  for (const enemy of state.enemies.slice(1)) {
-    const enemyDistance = distanceSquared(state.player, enemy);
-    if (enemyDistance < nearestDistance) {
-      nearest = enemy;
-      nearestDistance = enemyDistance;
-    }
-  }
-
-  const direction = normalize(nearest.x - state.player.x, nearest.y - state.player.y);
-  state.bullets.push({
-    id: state.nextId++,
-    x: state.player.x,
-    y: state.player.y - state.player.radius,
-    radius: 4,
-    vx: direction.x * BULLET_SPEED,
-    vy: direction.y * BULLET_SPEED,
-    life: 1.65,
-  });
-}
-
-function addExplosion(state: GameState, origin: Vector, color: string) {
-  for (let index = 0; index < 6; index += 1) {
-    const angle = (Math.PI * 2 * index) / 6 + state.nextId * 0.17;
-    const speed = 52 + index * 11;
-    state.particles.push({
-      id: state.nextId++,
-      x: origin.x,
-      y: origin.y,
-      radius: 2 + (index % 2),
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: PARTICLE_LIFETIME,
-      color,
-    });
-  }
-}
-
-function advanceGame(state: GameState, deltaSeconds: number, size: PlayfieldSize) {
-  const deltaMs = deltaSeconds * 1000;
-  state.elapsed += deltaSeconds;
-  movePlayerTowardTarget(state, deltaSeconds, size);
-  state.spawnTimer -= deltaMs;
-  state.fireTimer -= deltaMs;
-
-  if (state.spawnTimer <= 0 && state.enemies.length < getMaxEnemies(state.elapsed)) {
-    spawnEnemy(state, size);
-    state.spawnTimer = getSpawnInterval(state.elapsed);
-  }
-
-  if (state.fireTimer <= 0) {
-    fireAtNearestEnemy(state);
-    state.fireTimer = PLAYER_FIRE_INTERVAL;
-  }
-
-  for (const enemy of state.enemies) {
-    const direction = normalize(state.player.x - enemy.x, state.player.y - enemy.y);
-    enemy.x += direction.x * enemy.speed * deltaSeconds;
-    enemy.y += direction.y * enemy.speed * deltaSeconds;
-  }
-
-  for (const bullet of state.bullets) {
-    bullet.x += bullet.vx * deltaSeconds;
-    bullet.y += bullet.vy * deltaSeconds;
-    bullet.life -= deltaSeconds;
-  }
-
-  for (const particle of state.particles) {
-    particle.x += particle.vx * deltaSeconds;
-    particle.y += particle.vy * deltaSeconds;
-    particle.life -= deltaSeconds;
-  }
-
-  const removedBulletIds = new Set<number>();
-  const removedEnemyIds = new Set<number>();
-
-  for (const bullet of state.bullets) {
-    for (const enemy of state.enemies) {
-      if (removedEnemyIds.has(enemy.id) || removedBulletIds.has(bullet.id)) {
-        continue;
-      }
-
-      const hitDistance = bullet.radius + enemy.radius;
-      if (distanceSquared(bullet, enemy) <= hitDistance * hitDistance) {
-        enemy.hp -= DAMAGE_VALUES.bullet;
-        removedBulletIds.add(bullet.id);
-        if (enemy.hp <= 0) {
-          removedEnemyIds.add(enemy.id);
-          state.kills += 1;
-          addExplosion(state, enemy, enemy.color);
-        }
-      }
-    }
-  }
-
-  for (const enemy of state.enemies) {
-    if (removedEnemyIds.has(enemy.id)) {
-      continue;
-    }
-
-    const contactDistance = state.player.radius + enemy.radius;
-    if (distanceSquared(state.player, enemy) <= contactDistance * contactDistance) {
-      state.player.hp = Math.max(0, state.player.hp - DAMAGE_VALUES.enemyContact);
-      removedEnemyIds.add(enemy.id);
-      addExplosion(state, enemy, '#67e8f9');
-    }
-  }
-
-  state.enemies = state.enemies.filter((enemy) => !removedEnemyIds.has(enemy.id));
-  state.bullets = state.bullets.filter((bullet) => {
-    const inBounds =
-      bullet.x > -24 && bullet.x < size.width + 24 && bullet.y > -24 && bullet.y < size.height + 24;
-    return !removedBulletIds.has(bullet.id) && bullet.life > 0 && inBounds;
-  });
-  state.particles = state.particles.filter((particle) => particle.life > 0);
-
-  if (state.player.hp <= 0) {
-    state.status = 'dead';
-    state.bullets = [];
-    state.enemies = [];
-  }
-}
-
-function formatTime(seconds: number) {
-  const wholeSeconds = Math.floor(seconds);
-  const minutes = Math.floor(wholeSeconds / 60);
-  const remainingSeconds = wholeSeconds % 60;
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-}
-
 function getScore(kills: number, elapsed: number) {
   return kills * 100 + Math.floor(elapsed) * 5;
 }
 
-function getPlayerShipSprite(snapshot: Snapshot) {
+function getPlayerShipSprite(snapshot: WorldSnapshot) {
   if (snapshot.player.hp / PLAYER_HP <= PLAYER_DAMAGED_HP_THRESHOLD) {
     return PLAYER_SHIP_SPRITES.damaged;
   }
@@ -444,23 +76,29 @@ function getPlayerShipSprite(snapshot: Snapshot) {
 export function VoidDrifterPrototypeScreen() {
   const windowSize = useWindowDimensions();
   const animationFrameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
   const [playfieldSize, setPlayfieldSize] = useState<PlayfieldSize>({
     width: Math.min(windowSize.width, 980),
     height: Math.max(420, windowSize.height),
   });
-  const gameRef = useRef<GameState>(createInitialGameState(playfieldSize));
-  const [snapshot, setSnapshot] = useState<Snapshot>(() => cloneSnapshot(gameRef.current));
+  const inputRef = useRef<WorldInput>({ playerTarget: null });
+  const gameRef = useRef(createInitialWorld(playfieldSize));
+  const [snapshot, setSnapshot] = useState<WorldSnapshot>(() =>
+    createWorldSnapshot(gameRef.current)
+  );
 
   const resetToReady = useCallback(() => {
-    const freshState = createInitialGameState(playfieldSize, 'ready');
+    const freshState = createInitialWorld(playfieldSize, 'ready');
+    inputRef.current = { playerTarget: null };
     gameRef.current = freshState;
-    setSnapshot(cloneSnapshot(freshState));
+    setSnapshot(createWorldSnapshot(freshState));
   }, [playfieldSize]);
 
   const startRun = useCallback(() => {
-    const freshState = createInitialGameState(playfieldSize, 'running');
+    const freshState = createInitialWorld(playfieldSize, 'running');
+    inputRef.current = { playerTarget: null };
     gameRef.current = freshState;
-    setSnapshot(cloneSnapshot(freshState));
+    setSnapshot(createWorldSnapshot(freshState));
   }, [playfieldSize]);
 
   useEffect(() => {
@@ -469,24 +107,18 @@ export function VoidDrifterPrototypeScreen() {
 
   useEffect(() => {
     function tick(timestamp: number) {
-      const state = gameRef.current;
-      if (state.lastFrameTime === null) {
-        state.lastFrameTime = timestamp;
+      if (lastFrameTimeRef.current === null) {
+        lastFrameTimeRef.current = timestamp;
       }
 
       const deltaSeconds = Math.min(
         MAX_DELTA_SECONDS,
-        (timestamp - state.lastFrameTime) / 1000
+        (timestamp - lastFrameTimeRef.current) / 1000
       );
-      state.lastFrameTime = timestamp;
+      lastFrameTimeRef.current = timestamp;
 
-      advanceBackground(state, deltaSeconds);
-
-      if (state.status === 'running') {
-        advanceGame(state, deltaSeconds, playfieldSize);
-      }
-
-      setSnapshot(cloneSnapshot(state));
+      updateWorld(gameRef.current, inputRef.current, deltaSeconds * 1000);
+      setSnapshot(createWorldSnapshot(gameRef.current));
       animationFrameRef.current = requestAnimationFrame(tick);
     }
 
@@ -527,13 +159,12 @@ export function VoidDrifterPrototypeScreen() {
       return;
     }
 
-    gameRef.current.playerTarget = clampPointToPlayfield(
-      {
+    inputRef.current = {
+      playerTarget: {
         x: event.nativeEvent.locationX,
         y: event.nativeEvent.locationY,
       },
-      playfieldSize
-    );
+    };
   }
 
   return (

@@ -5,6 +5,7 @@
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
+- runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
 
 ## Gebouwd
 
@@ -24,6 +25,8 @@
 - Death overlay met `Signal Lost`, kills, survived time, score en restart.
 - Restart start direct een nieuwe run.
 - Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
+- Interne pure TypeScript game-runtime met centrale `WorldState`, `createInitialWorld()` en `updateWorld(world, input, deltaMs)`.
+- Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
 
 ## Nog Niet Gedaan
 
@@ -36,6 +39,7 @@
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
 - Geen Godot/heavy engine stap.
+- Geen externe game engine of ECS-framework; de runtime blijft bewust klein en intern.
 
 ## Volgende Kleine Stap
 

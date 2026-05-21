@@ -24,6 +24,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Death overlay shows kills, survived time, score
 - Restart starts a new run immediately
 - Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
+- Internal pure TypeScript game runtime under `src/game/core`, `src/game/runtime`, and `src/game/systems`
+- Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 
 ## Not Built Yet
 
@@ -36,6 +38,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
 - Godot or any heavy game-engine migration
+- External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 
 ## Next Step Options
 

@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:11:41.874Z
-Source Commit: 183fcf4
+Build Timestamp (UTC): 2026-05-21T18:20:25.253Z
+Source Commit: 494b32b
 
 ## Upload Policy
 
@@ -87,7 +87,9 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 ## Current structure
 
 - `src/app/*` is the route entry and assembly layer
-- `src/game/core/*` holds simple content and pure helpers
+- `src/game/core/*` holds VOID DRIFTER types, tuning constants, math, and collision helpers
+- `src/game/runtime/*` holds world creation and the central `updateWorld` simulation step
+- `src/game/systems/*` holds small pure-TypeScript gameplay systems
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `docs/project/*` holds game direction and MVP scope
@@ -98,6 +100,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Home route: `src/app/index.tsx`
 - VOID DRIFTER route: `src/app/void-drifter/index.tsx`
 - Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
+- Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
 
 ## What this project is not yet
@@ -199,6 +202,7 @@ Path: `docs/dev/active-context.md`
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
+- runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
 
 ## Gebouwd
 
@@ -218,6 +222,8 @@ Path: `docs/dev/active-context.md`
 - Death overlay met `Signal Lost`, kills, survived time, score en restart.
 - Restart start direct een nieuwe run.
 - Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
+- Interne pure TypeScript game-runtime met centrale `WorldState`, `createInitialWorld()` en `updateWorld(world, input, deltaMs)`.
+- Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
 
 ## Nog Niet Gedaan
 
@@ -230,6 +236,7 @@ Path: `docs/dev/active-context.md`
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
 - Geen Godot/heavy engine stap.
+- Geen externe game engine of ECS-framework; de runtime blijft bewust klein en intern.
 
 ## Volgende Kleine Stap
 
@@ -393,6 +400,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Death overlay shows kills, survived time, score
 - Restart starts a new run immediately
 - Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
+- Internal pure TypeScript game runtime under `src/game/core`, `src/game/runtime`, and `src/game/systems`
+- Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 
 ## Not Built Yet
 
@@ -405,6 +414,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
 - Godot or any heavy game-engine migration
+- External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 
 ## Next Step Options
 
@@ -424,12 +434,16 @@ Path: `src/game/README.md`
 
 This folder holds the prototype game foundation.
 
-- `core/` for pure helpers and content constants
+- `core/` for VOID DRIFTER types, tuning constants, math, and collision helpers
+- `runtime/` for world creation and the central simulation update
+- `systems/` for small pure-TypeScript gameplay systems
 - `state/` for lightweight prototype state
 - `ui/` for reusable screen-level game UI
 
 Current VOID DRIFTER playable screen:
 
 - `ui/void-drifter-prototype-screen.tsx`
+- `runtime/createInitialWorld.ts`
+- `runtime/updateWorld.ts`
 
-Keep route files thin. Prototype gameplay can stay in a single UI file while the loop is still small; extract only when it improves readability or testing.
+Keep route files thin. React Native screens own input and rendering; pure TypeScript runtime files own world state and gameplay simulation.

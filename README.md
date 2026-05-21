@@ -56,7 +56,9 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 ## Current structure
 
 - `src/app/*` is the route entry and assembly layer
-- `src/game/core/*` holds simple content and pure helpers
+- `src/game/core/*` holds VOID DRIFTER types, tuning constants, math, and collision helpers
+- `src/game/runtime/*` holds world creation and the central `updateWorld` simulation step
+- `src/game/systems/*` holds small pure-TypeScript gameplay systems
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `docs/project/*` holds game direction and MVP scope
@@ -67,6 +69,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Home route: `src/app/index.tsx`
 - VOID DRIFTER route: `src/app/void-drifter/index.tsx`
 - Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
+- Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
 
 ## What this project is not yet

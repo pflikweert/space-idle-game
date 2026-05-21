@@ -2,12 +2,16 @@
 
 This folder holds the prototype game foundation.
 
-- `core/` for pure helpers and content constants
+- `core/` for VOID DRIFTER types, tuning constants, math, and collision helpers
+- `runtime/` for world creation and the central simulation update
+- `systems/` for small pure-TypeScript gameplay systems
 - `state/` for lightweight prototype state
 - `ui/` for reusable screen-level game UI
 
 Current VOID DRIFTER playable screen:
 
 - `ui/void-drifter-prototype-screen.tsx`
+- `runtime/createInitialWorld.ts`
+- `runtime/updateWorld.ts`
 
-Keep route files thin. Prototype gameplay can stay in a single UI file while the loop is still small; extract only when it improves readability or testing.
+Keep route files thin. React Native screens own input and rendering; pure TypeScript runtime files own world state and gameplay simulation.
