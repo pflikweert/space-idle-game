@@ -1,7 +1,8 @@
 import { DAMAGE_VALUES } from '../core/constants';
 import { circlesOverlap } from '../core/collision';
 import type { WorldState } from '../core/types';
-import { addExplosion } from './effectsSystem';
+import { addEnemyDeathVfx, addExplosion } from './effectsSystem';
+import { markEnemyHit } from './enemyMovementSystem';
 import { removeExpiredProjectiles } from './projectileSystem';
 
 export function resolveCombatCollisions(world: WorldState) {
@@ -16,11 +17,13 @@ export function resolveCombatCollisions(world: WorldState) {
 
       if (circlesOverlap(bullet, enemy)) {
         enemy.hp -= DAMAGE_VALUES.bullet;
+        markEnemyHit(enemy);
         removedBulletIds.add(bullet.id);
         if (enemy.hp <= 0) {
           removedEnemyIds.add(enemy.id);
           world.kills += 1;
           world.score += enemy.scoreReward;
+          addEnemyDeathVfx(world, enemy);
           addExplosion(world, enemy, '#f97316');
         }
       }

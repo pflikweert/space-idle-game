@@ -11,7 +11,8 @@ Use for stateful UI, repeated logic, helpers, or files that are starting to grow
 2. Put stateful prototype hooks in `src/game/state/*`.
 3. Put reusable screen-level UI in `src/game/ui/*`.
 4. Keep route files focused on wiring and composition.
-5. Extract only when it improves readability, reuse, or testability right now.
+5. For VOID DRIFTER enemies, keep TypeScript definitions data-driven and mirror the same small shape in Godot.
+6. Extract only when it improves readability, reuse, or testability right now.
 
 # Do not
 - Do not add abstraction layers without a concrete need.

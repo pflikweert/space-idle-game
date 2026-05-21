@@ -21,12 +21,13 @@ import {
   PLAYER_HP,
   PLAYER_SPRITE_SIZE,
 } from '../core/constants';
+import { getEnemyFrameSource, SHARED_ENEMY_VFX } from '../core/enemyAssets';
 import { formatTime } from '../core/math';
 import type { PlayfieldSize, WorldInput, WorldSnapshot } from '../core/types';
 import { createInitialWorld, createWorldSnapshot } from '../runtime/createInitialWorld';
 import { updateWorld } from '../runtime/updateWorld';
 
-const ENEMY_SPRITE_SIZE = 68;
+const ENEMY_SPRITE_SCALE = 3.9;
 
 const PARALLAX_LAYERS = [
   {
@@ -54,13 +55,6 @@ const PLAYER_SHIP_SPRITES = {
   bankLeft: require('@/assets/images/void-drifter/player-ship/256/player_ship_bank_left.png'),
   bankRight: require('@/assets/images/void-drifter/player-ship/256/player_ship_bank_right.png'),
   damaged: require('@/assets/images/void-drifter/player-ship/256/player_ship_damaged.png'),
-} as const;
-
-const RED_SCOUT_DRONE_FRAMES = {
-  'move-down': require('@/assets/game/enemies/red-scout-drone/frames/move-down.png'),
-  'move-up': require('@/assets/game/enemies/red-scout-drone/frames/move-up.png'),
-  'move-left': require('@/assets/game/enemies/red-scout-drone/frames/move-left.png'),
-  'move-right': require('@/assets/game/enemies/red-scout-drone/frames/move-right.png'),
 } as const;
 
 function getScore(score: number, elapsed: number) {
@@ -257,23 +251,53 @@ export function VoidDrifterPrototypeScreen() {
 
           <View style={styles.scanLine} />
 
-          {snapshot.particles.map((particle) => (
-            <View
-              key={particle.id}
-              style={[
-                styles.particle,
-                {
-                  backgroundColor: particle.color,
-                  left: particle.x - particle.radius,
-                  top: particle.y - particle.radius,
-                  width: particle.radius * 2,
-                  height: particle.radius * 2,
-                  borderRadius: particle.radius,
-                  opacity: Math.max(0, particle.life / PARTICLE_LIFETIME),
-                },
-              ]}
-            />
-          ))}
+          {snapshot.particles.map((particle) => {
+            if (particle.assetId?.startsWith('enemy-death-')) {
+              const size = particle.size ?? 74;
+              const opacity = Math.max(0, particle.life / (particle.maxLife ?? particle.life));
+              const source =
+                particle.assetId === 'enemy-death-large'
+                  ? SHARED_ENEMY_VFX.deathLarge
+                  : particle.assetId === 'enemy-death-medium'
+                    ? SHARED_ENEMY_VFX.deathMedium
+                    : SHARED_ENEMY_VFX.deathSmall;
+              return (
+                <Image
+                  contentFit="contain"
+                  key={particle.id}
+                  source={source}
+                  style={[
+                    styles.vfxSprite,
+                    {
+                      left: particle.x - size / 2,
+                      top: particle.y - size / 2,
+                      width: size,
+                      height: size,
+                      opacity,
+                    },
+                  ]}
+                />
+              );
+            }
+
+            return (
+              <View
+                key={particle.id}
+                style={[
+                  styles.particle,
+                  {
+                    backgroundColor: particle.color,
+                    left: particle.x - particle.radius,
+                    top: particle.y - particle.radius,
+                    width: particle.radius * 2,
+                    height: particle.radius * 2,
+                    borderRadius: particle.radius,
+                    opacity: Math.max(0, particle.life / PARTICLE_LIFETIME),
+                  },
+                ]}
+              />
+            );
+          })}
 
           {snapshot.bullets.map((bullet) => (
             <View
@@ -291,25 +315,29 @@ export function VoidDrifterPrototypeScreen() {
             />
           ))}
 
-          {snapshot.enemies.map((enemy) => (
-            <View
-              key={enemy.id}
-              style={[
-                styles.enemySpriteWrap,
-                {
-                  left: enemy.x - ENEMY_SPRITE_SIZE / 2,
-                  top: enemy.y - ENEMY_SPRITE_SIZE / 2,
-                  width: ENEMY_SPRITE_SIZE,
-                  height: ENEMY_SPRITE_SIZE,
-                },
-              ]}>
-              <Image
-                contentFit="contain"
-                source={RED_SCOUT_DRONE_FRAMES[enemy.movementFrame]}
-                style={styles.enemySprite}
-              />
-            </View>
-          ))}
+          {snapshot.enemies.map((enemy) => {
+            const spriteSize = enemy.radius * ENEMY_SPRITE_SCALE;
+
+            return (
+              <View
+                key={enemy.id}
+                style={[
+                  styles.enemySpriteWrap,
+                  {
+                    left: enemy.x - spriteSize / 2,
+                    top: enemy.y - spriteSize / 2,
+                    width: spriteSize,
+                    height: spriteSize,
+                  },
+                ]}>
+                <Image
+                  contentFit="contain"
+                  source={getEnemyFrameSource(enemy.typeId, enemy.visualState, enemy.direction)}
+                  style={styles.enemySprite}
+                />
+              </View>
+            );
+          })}
 
           <View
             testID="void-drifter-player"
@@ -528,10 +556,13 @@ const styles = StyleSheet.create({
     opacity: 0.94,
   },
   enemySprite: {
-    width: ENEMY_SPRITE_SIZE,
-    height: ENEMY_SPRITE_SIZE,
+    width: '100%',
+    height: '100%',
   },
   particle: {
+    position: 'absolute',
+  },
+  vfxSprite: {
     position: 'absolute',
   },
   player: {

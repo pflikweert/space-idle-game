@@ -16,6 +16,7 @@ Use when asked to test, inspect, open, screenshot, or click a local web route su
 5. For VOID DRIFTER, verify both routes when relevant:
    - `http://localhost:8081/void-drifter`
    - `http://localhost:8081/void-drifter-expo`
+   Prefer `/void-drifter` for primary gameplay checks because it embeds the Godot game.
 6. If the local browser runtime is unavailable, state that explicitly and use fallback checks such as `curl`, export/build commands, and route availability. Do not call that a visual browser check.
 
 # Do Not

@@ -26,7 +26,7 @@ offset_left = 146.0
 offset_top = 518.0
 offset_right = 284.0
 offset_bottom = 556.0
-text = "Enemies"
+text = "Enemy Codex"
 
 [node name="HeaderRestartButton" type="Button" parent="."]
 layout_mode = 0

@@ -3,7 +3,8 @@ import {
   ENEMY_SPAWN_INTERVAL,
   MIN_ENEMY_SPAWN_INTERVAL,
 } from '../core/constants';
-import { getEnemyMovementFrame, getEnemyStats, getRunLevel } from '../core/enemies';
+import { chooseEnemyTypeIdForSpawn, getEnemyStats, getRunLevel } from '../core/enemies';
+import type { EnemyDirection } from '../core/enemyDirection';
 import type { WorldState } from '../core/types';
 
 function getSpawnInterval(elapsed: number) {
@@ -30,22 +31,37 @@ function getMaxEnemies(elapsed: number) {
 
 function spawnEnemy(world: WorldState) {
   const runLevel = getRunLevel(world.elapsed);
-  const stats = getEnemyStats('red_scout_drone', runLevel);
+  const typeId = chooseEnemyTypeIdForSpawn(runLevel, world.nextId * 97);
+  const stats = getEnemyStats(typeId, runLevel);
   const edgeIndex = world.nextId % 4;
   const spawnEdge = (['top', 'right', 'bottom', 'left'] as const)[edgeIndex];
   const inset = stats.radius + 8;
   const drift = ((world.nextId * 71) % 100) / 100;
   let x = world.playfieldSize.width * drift;
   let y = world.playfieldSize.height * drift;
+  let direction: EnemyDirection = 'down';
 
-  if (spawnEdge === 'top') y = -inset;
-  if (spawnEdge === 'right') x = world.playfieldSize.width + inset;
-  if (spawnEdge === 'bottom') y = world.playfieldSize.height + inset;
-  if (spawnEdge === 'left') x = -inset;
+  if (spawnEdge === 'top') {
+    y = -inset;
+    direction = 'down';
+  }
+  if (spawnEdge === 'right') {
+    x = world.playfieldSize.width + inset;
+    direction = 'left';
+  }
+  if (spawnEdge === 'bottom') {
+    y = world.playfieldSize.height + inset;
+    direction = 'up';
+  }
+  if (spawnEdge === 'left') {
+    x = -inset;
+    direction = 'right';
+  }
 
   world.enemies.push({
     id: world.nextId++,
-    typeId: 'red_scout_drone',
+    typeId,
+    spawnEdge,
     x,
     y,
     radius: stats.radius,
@@ -55,8 +71,11 @@ function spawnEnemy(world: WorldState) {
     contactDamage: stats.contactDamage,
     xpReward: stats.xpReward,
     scoreReward: stats.scoreReward,
-    spawnEdge,
-    movementFrame: getEnemyMovementFrame(spawnEdge),
+    vx: 0,
+    vy: 0,
+    direction,
+    visualState: 'idle',
+    hitTimer: 0,
   });
 }
 

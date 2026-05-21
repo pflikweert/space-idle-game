@@ -1,4 +1,5 @@
-import type { EnemyMovementFrame, EnemySpawnEdge, EnemyTypeId } from './enemies';
+import type { EnemyTypeId } from './enemies';
+import type { EnemyDirection } from './enemyDirection';
 
 export type Vector = {
   x: number;
@@ -10,9 +11,12 @@ export type PlayfieldSize = {
   height: number;
 };
 
+export type EnemyVisualState = 'idle' | 'thrust' | 'attack' | 'hit';
+
 export type Enemy = Vector & {
   id: number;
   typeId: EnemyTypeId;
+  spawnEdge: 'top' | 'right' | 'bottom' | 'left';
   radius: number;
   hp: number;
   maxHp: number;
@@ -20,8 +24,11 @@ export type Enemy = Vector & {
   contactDamage: number;
   xpReward: number;
   scoreReward: number;
-  spawnEdge: EnemySpawnEdge;
-  movementFrame: EnemyMovementFrame;
+  vx: number;
+  vy: number;
+  direction: EnemyDirection;
+  visualState: EnemyVisualState;
+  hitTimer: number;
 };
 
 export type Bullet = Vector & {
@@ -39,6 +46,9 @@ export type Particle = Vector & {
   vy: number;
   life: number;
   color: string;
+  assetId?: 'enemy-death-small' | 'enemy-death-medium' | 'enemy-death-large';
+  size?: number;
+  maxLife?: number;
 };
 
 export type Player = Vector & {

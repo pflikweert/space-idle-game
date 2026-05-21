@@ -25,10 +25,20 @@ This is inspiration, not a direct Star Trek copy. Do not use Star Trek marks, ic
 - Keep gameplay readable first.
 - Use semi-transparent panels; never cover the playfield with large opaque blocks.
 - HUD should stay compact, roughly 15% of the screen where possible.
-- Top HUD: score/time/enemy or wave information.
+- Top HUD: sector, wave, time, score, kills, and enemy count presentation.
 - Bottom HUD: hull/health and compact status/weapon information.
+- Weapon strips may show locked/loadout placeholders, but they must be clearly non-interactive until upgrades and inventory are actually implemented.
 - Text is small, uppercase, and high contrast.
 - Use cyan for player/system info, magenta for special/progression, orange for danger, teal for positive status.
+
+## MVP Visual Direction
+
+- The playfield should read as a dark sector frame with bright pixel/neon combat feedback.
+- Keep the center darker than the edges so player, drones, bullets, and VFX stay readable.
+- Player plasma should use short cyan/blue trails and glow, not long opaque beams.
+- Red Scout Drone readability comes from subtle red aura/outline, hit flash, and small HP feedback rather than larger hitboxes.
+- Deaths should feel punchier through explosion sprite bursts plus small debris particles.
+- Player contact damage may use `shield_impact` as feedback only; do not imply a real shield mechanic until one exists.
 
 ## Components
 

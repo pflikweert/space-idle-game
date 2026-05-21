@@ -16,3 +16,14 @@ These sprites are cropped from `source/vfx_sheet_luma_2026.png` with `scripts/go
 - `levelup_burst.png` - future level-up or power-up flash
 
 All sprites are runtime assets, but only the current Core Fun effects are wired into gameplay.
+
+## Enemy Visual States
+
+`assets/enemies/red_scout_drone/` contains the red scout's movement, attack, hit, projectile-preview, and death-vfx sprites. The current Godot MVP uses these as visual layers:
+
+- movement sprite: semi-transparent base body
+- attack sprite/projectile: short visual telegraph when close to the player
+- hit sprite: quick opacity pulse on bullet impact
+- death-vfx sprite: red/orange burst when destroyed
+
+The attack/projectile visuals do not add enemy projectile gameplay yet.

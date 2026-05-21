@@ -27,6 +27,7 @@ For the integrated Expo + Godot web flow, install Godot 4.x and its Web export t
 Then export the Godot build into Expo's public folder:
 
 ```bash
+npm run godot:check
 npm run godot:export:web
 ```
 
@@ -61,6 +62,7 @@ If `godot` is not available in PATH, set `GODOT_BIN=/path/to/Godot` before runni
 ## Verify commands
 
 ```bash
+npm run godot:check
 npm run lint
 npm run typecheck
 ```
@@ -86,6 +88,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
 - `godot/void-drifter/assets/player_ship/*` holds the current Luma-derived player ship sprites
 - `godot/void-drifter/assets/vfx/*` holds cropped projectile, trail, spark, and explosion sprites
+- `godot/void-drifter/assets/backgrounds/*` holds the current sector, parallax, midfield, and foreground environment layers
 - `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `scripts/godot/extract-void-drifter-sheets.gd` extracts the current player/VFX sheets into runtime sprites
@@ -100,8 +103,9 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Expo fallback route: `src/app/void-drifter-expo/index.tsx`
 - Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
-- Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+- Current gameplay: dark sector-framed playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, simple enemy projectiles, Red Surge bonus waves every 12 Red Scout Drone kills, plasma bolt trails, hit sparks, enemy explosions/debris, player damage feedback, death overlay, restart.
 - Current Godot start flow: `/void-drifter` shows the Godot ready screen, `Start Run` starts the run, `Restart` is hidden until running/death states, and the Enemies entry navigates to `/void-drifter/enemies`.
+- Current Godot HUD direction: sector/wave/time/score top bar plus hull and non-interactive weapon-strip placeholders at the bottom. The wave module shows Red Surge status during surge events; sector/loadout labels stay presentation-only until real progression systems exist.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
 - UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 

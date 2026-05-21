@@ -3,9 +3,8 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getEnemyPreviewSource } from '../core/enemyAssets';
 import { ENEMY_DEFINITIONS } from '../core/enemies';
-
-const RED_SCOUT_DRONE_PREVIEW = require('@/assets/game/enemies/red-scout-drone/frames/move-down.png');
 
 function formatStatLabel(label: string) {
   return label.replace(/([A-Z])/g, ' $1').trim();
@@ -22,7 +21,7 @@ export function EnemyOverviewScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.kicker}>VOID DRIFTER</Text>
-            <Text style={styles.title}>Enemies</Text>
+            <Text style={styles.title}>Enemy Codex</Text>
           </View>
           <Link href="/void-drifter" asChild>
             <Pressable style={styles.headerButton}>
@@ -36,10 +35,23 @@ export function EnemyOverviewScreen() {
             <View key={enemy.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.previewFrame}>
-                  <Image contentFit="contain" source={RED_SCOUT_DRONE_PREVIEW} style={styles.preview} />
+                  <Image
+                    contentFit="contain"
+                    source={getEnemyPreviewSource(enemy.id)}
+                    style={styles.preview}
+                  />
                 </View>
                 <View style={styles.enemyIntro}>
-                  <Text style={styles.enemyName}>{enemy.name}</Text>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.enemyName}>{enemy.name}</Text>
+                    <View
+                      style={[
+                        styles.statusPill,
+                        enemy.status === 'active' ? styles.statusActive : styles.statusLocked,
+                      ]}>
+                      <Text style={styles.statusText}>{enemy.status}</Text>
+                    </View>
+                  </View>
                   <Text style={styles.enemyRole}>{enemy.role}</Text>
                   <Text style={styles.enemyDescription}>{enemy.description}</Text>
                 </View>
@@ -71,12 +83,18 @@ export function EnemyOverviewScreen() {
                 <View style={styles.panel}>
                   <Text style={styles.sectionTitle}>Spawn</Text>
                   <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Weight</Text>
-                    <Text style={styles.statValue}>{enemy.spawn.weight}</Text>
+                    <Text style={styles.statLabel}>XP / Score</Text>
+                    <Text style={styles.statValue}>
+                      {enemy.baseStats.xpReward} / {enemy.baseStats.scoreReward}
+                    </Text>
                   </View>
                   <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Min Run Level</Text>
-                    <Text style={styles.statValue}>{enemy.spawn.minRunLevel}</Text>
+                    <Text style={styles.statLabel}>Run Level</Text>
+                    <Text style={styles.statValue}>{enemy.spawn.minRunLevel}+</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>Weight</Text>
+                    <Text style={styles.statValue}>{enemy.spawn.weight}</Text>
                   </View>
                 </View>
 
@@ -170,17 +188,43 @@ const styles = StyleSheet.create({
   },
   preview: {
     width: 96,
-    height: 108,
+    height: 96,
   },
   enemyIntro: {
     flex: 1,
     minWidth: 220,
     gap: 6,
   },
+  titleRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   enemyName: {
     color: '#f8fafc',
     fontSize: 24,
     fontWeight: '900',
+  },
+  statusPill: {
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  statusActive: {
+    borderColor: 'rgba(34, 197, 94, 0.5)',
+    backgroundColor: 'rgba(22, 101, 52, 0.34)',
+  },
+  statusLocked: {
+    borderColor: 'rgba(148, 163, 184, 0.32)',
+    backgroundColor: 'rgba(51, 65, 85, 0.42)',
+  },
+  statusText: {
+    color: '#f8fafc',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   enemyRole: {
     color: '#fca5a5',

@@ -80,7 +80,7 @@ export function VoidDrifterGodotScreen() {
           </Link>
           <Link href="/void-drifter/enemies" asChild>
             <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Enemies</Text>
+              <Text style={styles.secondaryButtonText}>Enemy Codex</Text>
             </Pressable>
           </Link>
         </View>
