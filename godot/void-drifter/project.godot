@@ -1,0 +1,22 @@
+; Engine configuration file.
+; Open this folder in Godot 4.x to run the VOID DRIFTER MVP scene.
+
+config_version=5
+
+[application]
+
+config/name="VOID DRIFTER MVP"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3")
+config/icon="res://assets/player_ship/player_ship_idle.png"
+
+[display]
+
+window/size/viewport_width=430
+window/size/viewport_height=760
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[rendering]
+
+renderer/rendering_method="mobile"

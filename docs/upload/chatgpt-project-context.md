@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:20:25.253Z
-Source Commit: 494b32b
+Build Timestamp (UTC): 2026-05-21T18:35:44.112Z
+Source Commit: 4fabb01
 
 ## Upload Policy
 
@@ -44,6 +44,7 @@ Create a lean prototype base that can evolve toward a pixel / 2.5D-inspired spac
 - Expo Router
 - TypeScript
 - npm
+- Godot 4.x prototype port under `godot/void-drifter`
 
 ## Local commands
 
@@ -69,6 +70,14 @@ http://localhost:8081/void-drifter
 
 The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
 
+Open the Godot port:
+
+```bash
+godot --path godot/void-drifter
+```
+
+If `godot` is not available in PATH, open the `godot/void-drifter` folder from the Godot project manager.
+
 ## Verify commands
 
 ```bash
@@ -92,6 +101,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/systems/*` holds small pure-TypeScript gameplay systems
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
+- `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 
@@ -102,6 +112,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+- Godot port: `godot/void-drifter/scenes/main.tscn`
 
 ## What this project is not yet
 
@@ -110,7 +121,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - not a Supabase or OpenAI project
 - not a monetized product
 - not a store-ready release
-- not a heavy 3D or dedicated game-engine setup
+- not a final heavy 3D production setup
 - not using final game art, final enemies, upgrades, XP, procedural maps, audio, or persistence
 
 ---
@@ -203,6 +214,7 @@ Path: `docs/dev/active-context.md`
 - entry vanaf home: `Open VOID DRIFTER`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
+- Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter`
 
 ## Gebouwd
 
@@ -224,6 +236,8 @@ Path: `docs/dev/active-context.md`
 - Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
 - Interne pure TypeScript game-runtime met centrale `WorldState`, `createInitialWorld()` en `updateWorld(world, input, deltaMs)`.
 - Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
+- Godot 4.x project met `project.godot`, `scenes/main.tscn`, GDScript gameplay loop en gekopieerde bestaande player/background assets.
+- Godot-port bevat dezelfde Core Fun: start, movement, enemies, auto-shooting, collisions, HP/kills/time HUD, death en restart.
 
 ## Nog Niet Gedaan
 
@@ -235,16 +249,17 @@ Path: `docs/dev/active-context.md`
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
-- Geen Godot/heavy engine stap.
-- Geen externe game engine of ECS-framework; de runtime blijft bewust klein en intern.
+- Geen Godot-export pipeline, platform builds of editor-verified import metadata.
+- Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
+- Geen externe ECS-framework.
 
 ## Volgende Kleine Stap
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: kleine visual clarity pass voor enemy silhouettes tegen de nieuwe achtergrond
-- optie B: eerste pickup/XP placeholder na kills
-- optie C: 30-seconden tuning review met Pieter's speelervaring
+- optie A: open de Godot-port in de editor en verify de Core Fun run hands-on
+- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie C: beslis of Expo prototype bevroren wordt of alleen als referentie blijft
 
 ---
 
@@ -402,6 +417,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
 - Internal pure TypeScript game runtime under `src/game/core`, `src/game/runtime`, and `src/game/systems`
 - Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
+- First Godot 4.x MVP port under `godot/void-drifter`
+- Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
 
 ## Not Built Yet
 
@@ -413,16 +430,17 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
-- Godot or any heavy game-engine migration
+- Godot export/build pipeline, editor import metadata verification, or platform packaging
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
+- Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Improve visual readability for enemy silhouettes against the parallax background.
-2. Add the first pickup/XP placeholder after enemy kills.
-3. Do a focused 30-second tuning review after hands-on play.
+1. Open the Godot port in the editor and verify the Core Fun run hands-on.
+2. Improve visual readability for enemy silhouettes against the parallax background.
+3. Decide whether the Expo prototype is frozen as reference or kept in parallel.
 
-Default recommendation: improve enemy readability before adding progression.
+Default recommendation: verify the Godot port manually before adding progression.
 
 ---
 

@@ -13,6 +13,7 @@ Create a lean prototype base that can evolve toward a pixel / 2.5D-inspired spac
 - Expo Router
 - TypeScript
 - npm
+- Godot 4.x prototype port under `godot/void-drifter`
 
 ## Local commands
 
@@ -38,6 +39,14 @@ http://localhost:8081/void-drifter
 
 The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
 
+Open the Godot port:
+
+```bash
+godot --path godot/void-drifter
+```
+
+If `godot` is not available in PATH, open the `godot/void-drifter` folder from the Godot project manager.
+
 ## Verify commands
 
 ```bash
@@ -61,6 +70,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/systems/*` holds small pure-TypeScript gameplay systems
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
+- `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 
@@ -71,6 +81,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+- Godot port: `godot/void-drifter/scenes/main.tscn`
 
 ## What this project is not yet
 
@@ -79,5 +90,5 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - not a Supabase or OpenAI project
 - not a monetized product
 - not a store-ready release
-- not a heavy 3D or dedicated game-engine setup
+- not a final heavy 3D production setup
 - not using final game art, final enemies, upgrades, XP, procedural maps, audio, or persistence

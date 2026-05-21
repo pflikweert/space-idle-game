@@ -26,6 +26,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
 - Internal pure TypeScript game runtime under `src/game/core`, `src/game/runtime`, and `src/game/systems`
 - Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
+- First Godot 4.x MVP port under `godot/void-drifter`
+- Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
 
 ## Not Built Yet
 
@@ -37,13 +39,14 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
-- Godot or any heavy game-engine migration
+- Godot export/build pipeline, editor import metadata verification, or platform packaging
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
+- Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Improve visual readability for enemy silhouettes against the parallax background.
-2. Add the first pickup/XP placeholder after enemy kills.
-3. Do a focused 30-second tuning review after hands-on play.
+1. Open the Godot port in the editor and verify the Core Fun run hands-on.
+2. Improve visual readability for enemy silhouettes against the parallax background.
+3. Decide whether the Expo prototype is frozen as reference or kept in parallel.
 
-Default recommendation: improve enemy readability before adding progression.
+Default recommendation: verify the Godot port manually before adding progression.

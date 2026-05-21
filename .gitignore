@@ -9,6 +9,10 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Godot
+godot/**/.godot/
+godot/**/*.tmp
+
 # Native
 .kotlin/
 *.orig.*
