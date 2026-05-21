@@ -890,6 +890,7 @@ const styles = StyleSheet.create({
   playerSprite: {
     width: PLAYER_SPRITE_SIZE,
     height: PLAYER_SPRITE_SIZE,
+    transform: [{ rotate: '180deg' }],
   },
   startOverlay: {
     position: 'absolute',
