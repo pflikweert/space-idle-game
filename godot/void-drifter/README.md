@@ -4,22 +4,23 @@ First Godot 4.x port of the VOID DRIFTER Core Fun prototype.
 
 ## Run
 
-Open this folder in Godot:
-
-```text
-godot/void-drifter
-```
-
-Run the main scene:
-
-```text
-res://scenes/main.tscn
-```
-
-If Godot is available from the terminal:
+The preferred local flow is through Expo:
 
 ```bash
-godot --path godot/void-drifter
+npm run godot:export:web
+npm run web
+```
+
+Then open:
+
+```text
+http://localhost:8081/void-drifter
+```
+
+This requires Godot 4.x and Web export templates. If Godot is not in PATH, set `GODOT_BIN`:
+
+```bash
+GODOT_BIN=/Applications/Godot.app/Contents/MacOS/Godot npm run godot:export:web
 ```
 
 ## Included

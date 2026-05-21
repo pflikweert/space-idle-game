@@ -6,7 +6,7 @@
 - entry vanaf home: `Open VOID DRIFTER`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
-- Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter`
+- Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
 
 ## Gebouwd
 
@@ -30,6 +30,9 @@
 - Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
 - Godot 4.x project met `project.godot`, `scenes/main.tscn`, GDScript gameplay loop en gekopieerde bestaande player/background assets.
 - Godot-port bevat dezelfde Core Fun: start, movement, enemies, auto-shooting, collisions, HP/kills/time HUD, death en restart.
+- Expo route `/void-drifter` is nu de Godot embed shell.
+- Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
+- Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
 
 ## Nog Niet Gedaan
 
@@ -41,7 +44,9 @@
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
-- Geen Godot-export pipeline, platform builds of editor-verified import metadata.
+- Geen gecommit Godot web-export output; `public/godot/void-drifter` is lokaal/generated.
+- Geen native mobile Godot-in-Expo integratie; de integratie is web-first via Expo route + Godot HTML export.
+- Geen editor-verified import metadata in deze Codex sessie, omdat Godot hier niet geinstalleerd is.
 - Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
 - Geen externe ECS-framework.
 
@@ -49,6 +54,6 @@
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: open de Godot-port in de editor en verify de Core Fun run hands-on
-- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
-- optie C: beslis of Expo prototype bevroren wordt of alleen als referentie blijft
+- optie A: installeer Godot 4.x + export templates en draai `npm run godot:export:web`
+- optie B: test `/void-drifter` via Expo met de embedded Godot build
+- optie C: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond

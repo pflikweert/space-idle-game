@@ -1,5 +1,5 @@
-import { VoidDrifterPrototypeScreen } from '@/game/ui/void-drifter-prototype-screen';
+import { VoidDrifterGodotScreen } from '@/game/ui/void-drifter-godot-screen';
 
 export default function VoidDrifterRoute() {
-  return <VoidDrifterPrototypeScreen />;
+  return <VoidDrifterGodotScreen />;
 }

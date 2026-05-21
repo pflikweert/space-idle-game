@@ -28,6 +28,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 - First Godot 4.x MVP port under `godot/void-drifter`
 - Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
+- Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
+- Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
+- `npm run godot:export:web` exports the Godot build into Expo's public folder
 
 ## Not Built Yet
 
@@ -39,14 +42,16 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
-- Godot export/build pipeline, editor import metadata verification, or platform packaging
+- Committed Godot web export output; the export is local/generated and ignored
+- Native mobile Godot embedding inside Expo
+- Editor import metadata verification in Codex; Godot is not installed in this environment
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 - Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Open the Godot port in the editor and verify the Core Fun run hands-on.
-2. Improve visual readability for enemy silhouettes against the parallax background.
-3. Decide whether the Expo prototype is frozen as reference or kept in parallel.
+1. Install Godot 4.x + Web export templates, then run `npm run godot:export:web`.
+2. Test `/void-drifter` through Expo with the embedded Godot web build.
+3. Improve visual readability for enemy silhouettes against the parallax background.
 
-Default recommendation: verify the Godot port manually before adding progression.
+Default recommendation: verify the embedded Godot route before adding progression.

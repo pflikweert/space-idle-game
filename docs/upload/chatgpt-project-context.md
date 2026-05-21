@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:35:44.112Z
-Source Commit: 4fabb01
+Build Timestamp (UTC): 2026-05-21T18:42:23.209Z
+Source Commit: 89c73a7
 
 ## Upload Policy
 
@@ -54,15 +54,26 @@ Install dependencies:
 npm install
 ```
 
-Start locally when needed:
+For the integrated Expo + Godot web flow, install Godot 4.x and its Web export templates first.
+Then export the Godot build into Expo's public folder:
+
+```bash
+npm run godot:export:web
+```
+
+Start Expo web:
 
 ```bash
 npm run web
-npm run ios
-npm run android
 ```
 
-Open the current VOID DRIFTER prototype on web:
+Or export Godot and start Expo web in one command:
+
+```bash
+npm run godot:web
+```
+
+Open VOID DRIFTER through Expo:
 
 ```text
 http://localhost:8081/void-drifter
@@ -70,13 +81,13 @@ http://localhost:8081/void-drifter
 
 The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
 
-Open the Godot port:
+The old React Native prototype remains available as a fallback/reference:
 
-```bash
-godot --path godot/void-drifter
+```text
+http://localhost:8081/void-drifter-expo
 ```
 
-If `godot` is not available in PATH, open the `godot/void-drifter` folder from the Godot project manager.
+If `godot` is not available in PATH, set `GODOT_BIN=/path/to/Godot` before running `npm run godot:export:web`.
 
 ## Verify commands
 
@@ -102,14 +113,16 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
+- `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 
 ## Current prototype
 
 - Home route: `src/app/index.tsx`
-- VOID DRIFTER route: `src/app/void-drifter/index.tsx`
-- Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
+- VOID DRIFTER route: `src/app/void-drifter/index.tsx` embeds the Godot web build when exported
+- Expo fallback route: `src/app/void-drifter-expo/index.tsx`
+- Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
@@ -214,7 +227,7 @@ Path: `docs/dev/active-context.md`
 - entry vanaf home: `Open VOID DRIFTER`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
-- Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter`
+- Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
 
 ## Gebouwd
 
@@ -238,6 +251,9 @@ Path: `docs/dev/active-context.md`
 - Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
 - Godot 4.x project met `project.godot`, `scenes/main.tscn`, GDScript gameplay loop en gekopieerde bestaande player/background assets.
 - Godot-port bevat dezelfde Core Fun: start, movement, enemies, auto-shooting, collisions, HP/kills/time HUD, death en restart.
+- Expo route `/void-drifter` is nu de Godot embed shell.
+- Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
+- Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
 
 ## Nog Niet Gedaan
 
@@ -249,7 +265,9 @@ Path: `docs/dev/active-context.md`
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
-- Geen Godot-export pipeline, platform builds of editor-verified import metadata.
+- Geen gecommit Godot web-export output; `public/godot/void-drifter` is lokaal/generated.
+- Geen native mobile Godot-in-Expo integratie; de integratie is web-first via Expo route + Godot HTML export.
+- Geen editor-verified import metadata in deze Codex sessie, omdat Godot hier niet geinstalleerd is.
 - Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
 - Geen externe ECS-framework.
 
@@ -257,9 +275,9 @@ Path: `docs/dev/active-context.md`
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: open de Godot-port in de editor en verify de Core Fun run hands-on
-- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
-- optie C: beslis of Expo prototype bevroren wordt of alleen als referentie blijft
+- optie A: installeer Godot 4.x + export templates en draai `npm run godot:export:web`
+- optie B: test `/void-drifter` via Expo met de embedded Godot build
+- optie C: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
 
 ---
 
@@ -419,6 +437,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 - First Godot 4.x MVP port under `godot/void-drifter`
 - Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
+- Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
+- Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
+- `npm run godot:export:web` exports the Godot build into Expo's public folder
 
 ## Not Built Yet
 
@@ -430,17 +451,19 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
-- Godot export/build pipeline, editor import metadata verification, or platform packaging
+- Committed Godot web export output; the export is local/generated and ignored
+- Native mobile Godot embedding inside Expo
+- Editor import metadata verification in Codex; Godot is not installed in this environment
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 - Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Open the Godot port in the editor and verify the Core Fun run hands-on.
-2. Improve visual readability for enemy silhouettes against the parallax background.
-3. Decide whether the Expo prototype is frozen as reference or kept in parallel.
+1. Install Godot 4.x + Web export templates, then run `npm run godot:export:web`.
+2. Test `/void-drifter` through Expo with the embedded Godot web build.
+3. Improve visual readability for enemy silhouettes against the parallax background.
 
-Default recommendation: verify the Godot port manually before adding progression.
+Default recommendation: verify the embedded Godot route before adding progression.
 
 ---
 

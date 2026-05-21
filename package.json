@@ -8,6 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "godot:export:web": "node ./scripts/godot/export-web.mjs",
+    "godot:web": "npm run godot:export:web && npm run web",
     "docs:bundle": "node ./scripts/docs/build-docs-upload.mjs",
     "docs:bundle:verify": "node ./scripts/docs/build-docs-upload.mjs --check",
     "docs:upload": "node ./scripts/docs/build-docs-upload.mjs",
