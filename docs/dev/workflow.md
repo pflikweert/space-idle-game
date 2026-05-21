@@ -19,3 +19,15 @@
 - `npm run typecheck`
 
 If a command does not exist, note that clearly and keep the next change cheap.
+
+## Docs handoff
+
+Use this when preparing project context for ChatGPT upload:
+
+```bash
+npm run docs:upload
+```
+
+The script creates one generated upload bundle at `docs/upload/chatgpt-project-context.md`.
+
+`docs/upload/**` is not canonical source. Edit source docs and regenerate the bundle.

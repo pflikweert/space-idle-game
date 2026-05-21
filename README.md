@@ -30,12 +30,28 @@ npm run ios
 npm run android
 ```
 
+Open the current VOID DRIFTER prototype on web:
+
+```text
+http://localhost:8081/void-drifter
+```
+
+The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
+
 ## Verify commands
 
 ```bash
 npm run lint
 npm run typecheck
 ```
+
+Prepare a small docs upload bundle for ChatGPT:
+
+```bash
+npm run docs:upload
+```
+
+This writes one generated upload bundle at `docs/upload/chatgpt-project-context.md`.
 
 ## Current structure
 
@@ -46,11 +62,19 @@ npm run typecheck
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 
+## Current prototype
+
+- Home route: `src/app/index.tsx`
+- VOID DRIFTER route: `src/app/void-drifter/index.tsx`
+- Playable screen: `src/game/ui/void-drifter-prototype-screen.tsx`
+- Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+
 ## What this project is not yet
 
-- not a full gameplay implementation
+- not a full gameplay implementation or balanced run
 - not a backend-enabled app
 - not a Supabase or OpenAI project
 - not a monetized product
 - not a store-ready release
 - not a heavy 3D or dedicated game-engine setup
+- not using final game art, final enemies, upgrades, XP, procedural maps, audio, or persistence

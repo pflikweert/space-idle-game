@@ -2,16 +2,20 @@
 
 ## Goal
 
-Build one playable prototype screen that proves the basic tone and interaction shape.
+Build one playable VOID DRIFTER web prototype screen that proves whether one simple run can feel fun before expanding scope.
 
 ## Included
 
-- one main screen
-- visible spaceship presence
-- simple resource counter
-- one upgrade button
-- one scan action
-- one simple wave, timer, or encounter placeholder
+- one isolated playable route
+- visible controllable player ship
+- dark space playfield
+- enemies spawning from edges
+- enemies moving toward the player
+- auto-shooting
+- bullet/enemy collisions
+- player damage
+- HUD for HP, kills, elapsed time, and enemy count
+- death and restart
 
 ## Explicitly not in MVP
 
@@ -21,3 +25,8 @@ Build one playable prototype screen that proves the basic tone and interaction s
 - real procedural universe generation
 - app store release work
 - heavy 3D or dedicated game-engine integration
+- final art pipeline
+- final ship/enemy assets
+- upgrades, XP, pickups, or meta-progression
+- audio
+- multiplayer

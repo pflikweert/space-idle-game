@@ -1,3 +1,4 @@
+import { Link } from 'expo-router';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -41,6 +42,12 @@ export function SpaceIdleHomeScreen() {
         </View>
 
         <View style={styles.actions}>
+          <Link href="/void-drifter" asChild>
+            <Pressable style={styles.voidButton}>
+              <Text style={styles.voidButtonText}>Open VOID DRIFTER</Text>
+            </Pressable>
+          </Link>
+
           <Pressable style={styles.primaryButton} onPress={scanSector}>
             <Text style={styles.primaryButtonText}>{GAME_COPY.scanLabel}</Text>
           </Pressable>
@@ -178,6 +185,17 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 14,
+  },
+  voidButton: {
+    backgroundColor: '#22d3ee',
+    borderRadius: 18,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  voidButtonText: {
+    color: '#082f49',
+    fontSize: 16,
+    fontWeight: '800',
   },
   primaryButton: {
     backgroundColor: '#e879f9',

@@ -8,6 +8,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "docs:bundle": "node ./scripts/docs/build-docs-upload.mjs",
+    "docs:bundle:verify": "node ./scripts/docs/build-docs-upload.mjs --check",
+    "docs:upload": "node ./scripts/docs/build-docs-upload.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

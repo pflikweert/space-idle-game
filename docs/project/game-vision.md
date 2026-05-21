@@ -2,11 +2,11 @@
 
 ## Working title
 
-`space-idle-game`
+`VOID DRIFTER`
 
 ## Concept status
 
-This project is in concept phase. The direction below is a working prototype brief, not locked product truth.
+This project is in prototype phase. The direction below is a working prototype brief, not locked product truth.
 
 ## Core fantasy
 
@@ -27,4 +27,10 @@ This is a provisional idea for players who like approachable idle progression, l
 
 ## Provisional loop
 
-`scan -> mine/collect -> upgrade -> defend -> travel`
+Current Core Fun test:
+
+`move -> dodge -> auto-shoot -> survive -> restart`
+
+Possible later loop:
+
+`scan -> fight -> collect -> upgrade -> travel`

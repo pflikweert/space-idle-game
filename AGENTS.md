@@ -11,6 +11,8 @@ Use this order:
 
 Read only task-relevant files. Do not adopt a "read everything" workflow.
 
+`docs/upload/**` is generated upload output for ChatGPT handoff, not canonical source.
+
 ## Scope guardrails
 
 - This repo is a lightweight prototype foundation for `space-idle-game`.
@@ -33,6 +35,7 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - Do not start a long-lived dev server unless explicitly asked.
 - After relevant code changes, run `npm run lint` and `npm run typecheck` when available.
 - If a verification command does not exist, say so clearly instead of pretending it ran.
+- After docs changes that affect ChatGPT handoff context, run `npm run docs:upload` and optionally `npm run docs:bundle:verify`.
 
 ## Security
 
