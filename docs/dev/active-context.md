@@ -10,7 +10,8 @@
 
 - Geisoleerde Expo Router route voor VOID DRIFTER.
 - Browser-speelveld met dark space achtergrond en star dots.
-- Player ship placeholder in neon/pixelachtige stijl.
+- Player ship gebruikt echte VOID DRIFTER PNG sprites uit de MVP asset pack.
+- Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
 - Click/touch-drag movement: ship vliegt smooth naar target.
 - Enemies spawnen vanaf randen en bewegen naar de actuele player positie.
 - Auto-shooting met bullets richting dichtstbijzijnde enemy.
@@ -25,7 +26,8 @@
 
 ## Nog Niet Gedaan
 
-- Geen final ship asset of uploaded reference-art implementatie.
+- Boost sprite is aanwezig als asset, maar nog niet gekoppeld omdat er geen boost-trigger bestaat.
+- Enemies zijn nog placeholder shapes, geen final enemy assets.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
@@ -37,6 +39,6 @@
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: eerste pickup/XP placeholder na kills
-- optie B: kleine visual clarity pass voor ship/enemy silhouettes
+- optie A: kleine visual clarity pass voor enemy silhouettes
+- optie B: eerste pickup/XP placeholder na kills
 - optie C: 30-seconden tuning review met Pieter's speelervaring

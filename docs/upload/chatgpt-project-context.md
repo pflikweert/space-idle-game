@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T17:01:39.114Z
-Source Commit: 80cb026
+Build Timestamp (UTC): 2026-05-21T18:02:26.741Z
+Source Commit: 2c66460
 
 ## Upload Policy
 
@@ -204,7 +204,8 @@ Path: `docs/dev/active-context.md`
 
 - Geisoleerde Expo Router route voor VOID DRIFTER.
 - Browser-speelveld met dark space achtergrond en star dots.
-- Player ship placeholder in neon/pixelachtige stijl.
+- Player ship gebruikt echte VOID DRIFTER PNG sprites uit de MVP asset pack.
+- Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
 - Click/touch-drag movement: ship vliegt smooth naar target.
 - Enemies spawnen vanaf randen en bewegen naar de actuele player positie.
 - Auto-shooting met bullets richting dichtstbijzijnde enemy.
@@ -219,7 +220,8 @@ Path: `docs/dev/active-context.md`
 
 ## Nog Niet Gedaan
 
-- Geen final ship asset of uploaded reference-art implementatie.
+- Boost sprite is aanwezig als asset, maar nog niet gekoppeld omdat er geen boost-trigger bestaat.
+- Enemies zijn nog placeholder shapes, geen final enemy assets.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
@@ -231,8 +233,8 @@ Path: `docs/dev/active-context.md`
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: eerste pickup/XP placeholder na kills
-- optie B: kleine visual clarity pass voor ship/enemy silhouettes
+- optie A: kleine visual clarity pass voor enemy silhouettes
+- optie B: eerste pickup/XP placeholder na kills
 - optie C: 30-seconden tuning review met Pieter's speelervaring
 
 ---
@@ -374,7 +376,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Isolated web route: `/void-drifter`
 - Home entry button: `Open VOID DRIFTER`
 - Dark cosmic playfield with star dots
-- Placeholder player ship with engine glow/trail
+- Player ship PNG sprites from the MVP asset pack
+- Ship sprite-state switching for idle, bank-left, bank-right, and low-HP damaged
 - Click/touch-drag ship movement
 - Start overlay with `Start Run` and controls hint
 - Run stays enemy-free until started
@@ -390,7 +393,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Not Built Yet
 
-- Final player ship sprite or imported/generated game assets
+- Boost sprite behavior; the boost PNG exists but is not wired because there is no boost trigger yet
+- Final enemy sprites or imported/generated enemy assets
 - Player upgrades, XP, pickups, or level-up choices
 - Full enemy wave design or complete balance pass
 - Keyboard controls
@@ -400,11 +404,11 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Next Step Options
 
-1. Add the first pickup/XP placeholder after enemy kills.
-2. Improve visual readability for ship/enemy silhouettes.
+1. Improve visual readability for enemy silhouettes.
+2. Add the first pickup/XP placeholder after enemy kills.
 3. Do a focused 30-second tuning review after hands-on play.
 
-Default recommendation: improve visual readability before adding progression.
+Default recommendation: improve enemy readability before adding progression.
 
 ---
 

@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   GestureResponderEvent,
@@ -20,6 +21,9 @@ const ENEMY_SPEED = 42;
 const ENEMY_HP = 2;
 const PLAYER_MOVE_SPEED = 470;
 const PLAYER_BOUNDS_PADDING = 10;
+const PLAYER_SPRITE_SIZE = 76;
+const PLAYER_DAMAGED_HP_THRESHOLD = 0.3;
+const PLAYER_BANKING_THRESHOLD = 1.2;
 const DAMAGE_VALUES = {
   bullet: 1,
   enemyContact: 12,
@@ -111,6 +115,13 @@ const ENEMY_VARIANTS = [
   { radius: 16, color: '#a78bfa', speedMultiplier: 0.92, hp: ENEMY_HP + 1 },
   { radius: 10, color: '#facc15', speedMultiplier: 1.24, hp: ENEMY_HP },
 ] as const;
+
+const PLAYER_SHIP_SPRITES = {
+  idle: require('@/assets/images/void-drifter/player-ship/256/player_ship_idle.png'),
+  bankLeft: require('@/assets/images/void-drifter/player-ship/256/player_ship_bank_left.png'),
+  bankRight: require('@/assets/images/void-drifter/player-ship/256/player_ship_bank_right.png'),
+  damaged: require('@/assets/images/void-drifter/player-ship/256/player_ship_damaged.png'),
+} as const;
 
 const STAR_DOTS = Array.from({ length: 86 }, (_, index) => ({
   id: index,
@@ -393,6 +404,22 @@ function getScore(kills: number, elapsed: number) {
   return kills * 100 + Math.floor(elapsed) * 5;
 }
 
+function getPlayerShipSprite(snapshot: Snapshot) {
+  if (snapshot.player.hp / PLAYER_HP <= PLAYER_DAMAGED_HP_THRESHOLD) {
+    return PLAYER_SHIP_SPRITES.damaged;
+  }
+
+  if (snapshot.playerVelocityX < -PLAYER_BANKING_THRESHOLD) {
+    return PLAYER_SHIP_SPRITES.bankLeft;
+  }
+
+  if (snapshot.playerVelocityX > PLAYER_BANKING_THRESHOLD) {
+    return PLAYER_SHIP_SPRITES.bankRight;
+  }
+
+  return PLAYER_SHIP_SPRITES.idle;
+}
+
 export function VoidDrifterPrototypeScreen() {
   const windowSize = useWindowDimensions();
   const animationFrameRef = useRef<number | null>(null);
@@ -471,7 +498,7 @@ export function VoidDrifterPrototypeScreen() {
   }
 
   const hpPercent = Math.max(0, Math.min(100, (snapshot.player.hp / PLAYER_HP) * 100));
-  const playerTilt = clamp(snapshot.playerVelocityX * 26, -12, 12);
+  const playerShipSprite = getPlayerShipSprite(snapshot);
 
   function updatePlayerTarget(event: GestureResponderEvent) {
     if (gameRef.current.status !== 'running') {
@@ -607,17 +634,18 @@ export function VoidDrifterPrototypeScreen() {
             style={[
               styles.player,
               {
-                left: snapshot.player.x - snapshot.player.radius,
-                top: snapshot.player.y - snapshot.player.radius,
-                width: snapshot.player.radius * 2,
-                height: snapshot.player.radius * 2,
-                transform: [{ rotate: `${playerTilt}deg` }],
+                left: snapshot.player.x - PLAYER_SPRITE_SIZE / 2,
+                top: snapshot.player.y - PLAYER_SPRITE_SIZE / 2,
+                width: PLAYER_SPRITE_SIZE,
+                height: PLAYER_SPRITE_SIZE,
               },
             ]}>
-            <View style={styles.playerTrail} />
-            <View style={styles.playerDiamond} />
-            <View style={styles.playerNose} />
-            <View style={styles.playerEngine} />
+            <Image
+              contentFit="contain"
+              source={playerShipSprite}
+              style={styles.playerSprite}
+              testID="void-drifter-player-sprite"
+            />
           </View>
 
           {snapshot.status === 'ready' && (
@@ -810,44 +838,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playerTrail: {
-    position: 'absolute',
-    bottom: -14,
-    width: 14,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#22d3ee',
-    opacity: 0.28,
-  },
-  playerDiamond: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#67e8f9',
-    backgroundColor: '#0f172a',
-    transform: [{ rotate: '45deg' }],
-  },
-  playerNose: {
-    position: 'absolute',
-    top: -2,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 7,
-    borderRightWidth: 7,
-    borderBottomWidth: 16,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: '#e879f9',
-  },
-  playerEngine: {
-    position: 'absolute',
-    bottom: -3,
-    width: 8,
-    height: 12,
-    borderRadius: 8,
-    backgroundColor: '#38bdf8',
-    opacity: 0.86,
+  playerSprite: {
+    width: PLAYER_SPRITE_SIZE,
+    height: PLAYER_SPRITE_SIZE,
   },
   startOverlay: {
     position: 'absolute',
