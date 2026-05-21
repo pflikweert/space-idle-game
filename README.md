@@ -65,6 +65,8 @@ npm run lint
 npm run typecheck
 ```
 
+For local visual checks, use the Codex Browser Use in-app browser against the Expo route. The workflow is documented in `docs/dev/local-browser-testing.md`; fallback `curl` checks are useful, but they are not a replacement for visual browser verification.
+
 Prepare a small docs upload bundle for ChatGPT:
 
 ```bash
@@ -86,6 +88,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
+- `docs/dev/local-browser-testing.md` defines the required local browser verification flow for localhost/Expo routes
 
 ## Current prototype
 

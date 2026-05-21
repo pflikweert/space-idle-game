@@ -7,6 +7,7 @@
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
 - Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
+- lokale browsercheck: voortaan Browser Use proberen volgens `docs/dev/local-browser-testing.md`; als de runtime niet beschikbaar is, expliciet melden en alleen fallback smoke checks gebruiken
 
 ## Gebouwd
 
@@ -36,6 +37,7 @@
 - LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
 - Luma UI reference assets staan in `godot/void-drifter/assets/ui/luma_reference/`.
 - Godot HUD/start/death UI gebruikt LCARS-neon panels, meters, chips, scanlines en gestylede buttons.
+- Lokale browser-verificatieafspraak is vastgelegd in `docs/dev/local-browser-testing.md` en `.agents/skills/local-browser-testing/SKILL.md`.
 
 ## Nog Niet Gedaan
 

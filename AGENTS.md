@@ -29,6 +29,7 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - Reuse existing Expo and React Native patterns before adding new ones.
 - Keep route files thin and let `src/game/*` hold prototype-specific UI, state, and core helpers.
 - For primary VOID DRIFTER UI, update `godot/void-drifter` first; keep `/void-drifter-expo` as fallback/reference unless explicitly asked.
+- For localhost/browser verification, use `.agents/skills/local-browser-testing` and `docs/dev/local-browser-testing.md`: prefer Browser Use, search for the Node REPL `js` tool if needed, and never claim a visual browser check without a screenshot, DOM snapshot, or console log inspection.
 - For larger changes, start with a short plan or checklist.
 - Prefer small, reviewable edits over broad refactors.
 

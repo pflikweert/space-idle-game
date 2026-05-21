@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T19:03:19.558Z
-Source Commit: 7ff5cb9
+Build Timestamp (UTC): 2026-05-21T19:07:25.651Z
+Source Commit: 66a7a39
 
 ## Upload Policy
 
@@ -17,6 +17,7 @@ Source Commit: 7ff5cb9
 - `AGENTS.md`
 - `docs/README.md`
 - `docs/dev/active-context.md`
+- `docs/dev/local-browser-testing.md`
 - `docs/dev/workflow.md`
 - `docs/project/game-vision.md`
 - `docs/project/mvp-scope.md`
@@ -97,6 +98,8 @@ npm run lint
 npm run typecheck
 ```
 
+For local visual checks, use the Codex Browser Use in-app browser against the Expo route. The workflow is documented in `docs/dev/local-browser-testing.md`; fallback `curl` checks are useful, but they are not a replacement for visual browser verification.
+
 Prepare a small docs upload bundle for ChatGPT:
 
 ```bash
@@ -118,6 +121,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
+- `docs/dev/local-browser-testing.md` defines the required local browser verification flow for localhost/Expo routes
 
 ## Current prototype
 
@@ -177,6 +181,7 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - Reuse existing Expo and React Native patterns before adding new ones.
 - Keep route files thin and let `src/game/*` hold prototype-specific UI, state, and core helpers.
 - For primary VOID DRIFTER UI, update `godot/void-drifter` first; keep `/void-drifter-expo` as fallback/reference unless explicitly asked.
+- For localhost/browser verification, use `.agents/skills/local-browser-testing` and `docs/dev/local-browser-testing.md`: prefer Browser Use, search for the Node REPL `js` tool if needed, and never claim a visual browser check without a screenshot, DOM snapshot, or console log inspection.
 - For larger changes, start with a short plan or checklist.
 - Prefer small, reviewable edits over broad refactors.
 
@@ -233,6 +238,7 @@ Path: `docs/dev/active-context.md`
 - laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
 - Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
+- lokale browsercheck: voortaan Browser Use proberen volgens `docs/dev/local-browser-testing.md`; als de runtime niet beschikbaar is, expliciet melden en alleen fallback smoke checks gebruiken
 
 ## Gebouwd
 
@@ -262,6 +268,7 @@ Path: `docs/dev/active-context.md`
 - LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
 - Luma UI reference assets staan in `godot/void-drifter/assets/ui/luma_reference/`.
 - Godot HUD/start/death UI gebruikt LCARS-neon panels, meters, chips, scanlines en gestylede buttons.
+- Lokale browser-verificatieafspraak is vastgelegd in `docs/dev/local-browser-testing.md` en `.agents/skills/local-browser-testing/SKILL.md`.
 
 ## Nog Niet Gedaan
 
@@ -286,6 +293,60 @@ Maak de volgende Core Fun stap klein en toetsbaar:
 - optie A: test `/void-drifter` via Expo met de embedded Godot build
 - optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
 - optie C: eerste upgrade/shop screen pas plannen nadat de run visueel klopt
+
+---
+
+# Source: Docs Dev Local Browser Testing
+
+Path: `docs/dev/local-browser-testing.md`
+
+# Local Browser Testing
+
+Use the Codex Browser Use in-app browser for local visual verification whenever a task asks to test, inspect, click, or screenshot a localhost route.
+
+## Preferred Flow
+
+1. Confirm the app is running or start it only when requested.
+2. Use Browser Use with the in-app browser backend for `localhost`, `127.0.0.1`, or Expo web routes.
+3. If the Browser Use command is not visible, search tools for:
+   - `node_repl js`
+   - `mcp__node_repl__js`
+   - `browser-client`
+4. Bootstrap the Browser Use runtime with the plugin `browser-client.mjs` and backend `iab`.
+5. Navigate to the target route, then inspect at least one of:
+   - screenshot
+   - DOM snapshot
+   - browser console logs
+
+## VOID DRIFTER Checks
+
+Primary route:
+
+```text
+http://localhost:8081/void-drifter
+```
+
+Fallback route:
+
+```text
+http://localhost:8081/void-drifter-expo
+```
+
+For gameplay UI work, verify that the Godot embed loads, the start overlay is visible, HUD text is readable, controls respond, and console logs do not show runtime errors.
+
+## Fallback Rule
+
+If the local browser runtime is unavailable, say so plainly. Then use fallback checks such as:
+
+```bash
+curl -I http://localhost:8081/void-drifter
+curl -I http://localhost:8081/void-drifter-expo
+npm run godot:export:web
+npm run typecheck
+npm run lint
+```
+
+Do not describe fallback checks as a visual browser test.
 
 ---
 
