@@ -1,10 +1,9 @@
 import {
   DIFFICULTY_SCALING,
   ENEMY_SPAWN_INTERVAL,
-  ENEMY_SPEED,
-  ENEMY_VARIANTS,
   MIN_ENEMY_SPAWN_INTERVAL,
 } from '../core/constants';
+import { getEnemyMovementFrame, getEnemyStats, getRunLevel } from '../core/enemies';
 import type { WorldState } from '../core/types';
 
 function getSpawnInterval(elapsed: number) {
@@ -30,26 +29,34 @@ function getMaxEnemies(elapsed: number) {
 }
 
 function spawnEnemy(world: WorldState) {
-  const variant = ENEMY_VARIANTS[world.nextId % ENEMY_VARIANTS.length];
-  const edge = world.nextId % 4;
-  const inset = variant.radius + 8;
+  const runLevel = getRunLevel(world.elapsed);
+  const stats = getEnemyStats('red_scout_drone', runLevel);
+  const edgeIndex = world.nextId % 4;
+  const spawnEdge = (['top', 'right', 'bottom', 'left'] as const)[edgeIndex];
+  const inset = stats.radius + 8;
   const drift = ((world.nextId * 71) % 100) / 100;
   let x = world.playfieldSize.width * drift;
   let y = world.playfieldSize.height * drift;
 
-  if (edge === 0) y = -inset;
-  if (edge === 1) x = world.playfieldSize.width + inset;
-  if (edge === 2) y = world.playfieldSize.height + inset;
-  if (edge === 3) x = -inset;
+  if (spawnEdge === 'top') y = -inset;
+  if (spawnEdge === 'right') x = world.playfieldSize.width + inset;
+  if (spawnEdge === 'bottom') y = world.playfieldSize.height + inset;
+  if (spawnEdge === 'left') x = -inset;
 
   world.enemies.push({
     id: world.nextId++,
+    typeId: 'red_scout_drone',
     x,
     y,
-    radius: variant.radius,
-    hp: variant.hp,
-    speed: ENEMY_SPEED * variant.speedMultiplier * getEnemySpeedMultiplier(world.elapsed),
-    color: variant.color,
+    radius: stats.radius,
+    hp: stats.hp,
+    maxHp: stats.hp,
+    speed: stats.speed * getEnemySpeedMultiplier(world.elapsed),
+    contactDamage: stats.contactDamage,
+    xpReward: stats.xpReward,
+    scoreReward: stats.scoreReward,
+    spawnEdge,
+    movementFrame: getEnemyMovementFrame(spawnEdge),
   });
 }
 

@@ -1,0 +1,29 @@
+# Void Drifter — VFX Asset Sheet Guide
+
+## Layout: 5×2 Grid (left to right, top to bottom)
+
+### Row 1 — Projectiles & Beams
+| Cell | Frame ID | Effect | Color | Usage |
+|------|----------|--------|-------|-------|
+| 1 | player_plasma_bolt | Cyan plasma projectile | Cyan/white | Player primary weapon shot |
+| 2 | player_laser_beam | Blue-white beam segment | Blue-white | Player laser weapon |
+| 3 | enemy_red_bullet | Red/orange energy orb | Red/orange | Basic enemy projectile |
+| 4 | enemy_purple_shot | Magenta plasma shot | Purple/magenta | Elite enemy projectile |
+| 5 | hit_spark | White/cyan impact flash | White/cyan | Bullet-on-hull hit feedback |
+
+### Row 2 — Explosions & Effects
+| Cell | Frame ID | Effect | Color | Usage |
+|------|----------|--------|-------|-------|
+| 6 | small_explosion | Compact arcade burst | Orange/cyan | Small enemy death, asteroid break |
+| 7 | enemy_death_explosion | Large dramatic explosion | Orange/magenta/cyan | Medium/large enemy death |
+| 8 | shield_impact | Circular energy ripple | Cyan hex rings | Shield absorbs hit |
+| 9 | engine_trail | Thruster flame plume | White-cyan to blue | Attached to ship engine nozzle |
+| 10 | levelup_burst | Radial energy flash | Cyan/purple rays | Level-up / power-up moment |
+
+## Technical Info
+- **Format:** PNG with alpha transparency
+- **Background:** Transparent
+- **Resolution:** 1024×1024 total sheet
+- **Cell size:** ~205×512 per effect (5 cols × 2 rows)
+- **Integration:** Crop each cell, import as individual sprite in Godot
+- **Blending:** Use additive blending in Godot for glow effects (CanvasItemMaterial → Blend Mode: Add)

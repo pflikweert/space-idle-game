@@ -1,3 +1,5 @@
+import type { EnemyMovementFrame, EnemySpawnEdge, EnemyTypeId } from './enemies';
+
 export type Vector = {
   x: number;
   y: number;
@@ -10,10 +12,16 @@ export type PlayfieldSize = {
 
 export type Enemy = Vector & {
   id: number;
+  typeId: EnemyTypeId;
   radius: number;
   hp: number;
+  maxHp: number;
   speed: number;
-  color: string;
+  contactDamage: number;
+  xpReward: number;
+  scoreReward: number;
+  spawnEdge: EnemySpawnEdge;
+  movementFrame: EnemyMovementFrame;
 };
 
 export type Bullet = Vector & {
@@ -49,6 +57,7 @@ export type WorldState = {
   bullets: Bullet[];
   particles: Particle[];
   kills: number;
+  score: number;
   elapsed: number;
   backgroundTime: number;
   status: RunStatus;
@@ -67,6 +76,7 @@ export type WorldSnapshot = Pick<
   | 'bullets'
   | 'particles'
   | 'kills'
+  | 'score'
   | 'elapsed'
   | 'backgroundTime'
   | 'status'

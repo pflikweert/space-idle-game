@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T19:07:25.651Z
-Source Commit: 66a7a39
+Build Timestamp (UTC): 2026-05-21T19:26:58.022Z
+Source Commit: 3d06cdc
 
 ## Upload Policy
 
@@ -117,8 +117,11 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
+- `godot/void-drifter/assets/player_ship/*` holds the current Luma-derived player ship sprites
+- `godot/void-drifter/assets/vfx/*` holds cropped projectile, trail, spark, and explosion sprites
 - `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
+- `scripts/godot/extract-void-drifter-sheets.gd` extracts the current player/VFX sheets into runtime sprites
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 - `docs/dev/local-browser-testing.md` defines the required local browser verification flow for localhost/Expo routes
@@ -131,6 +134,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+- Current Godot start flow: `/void-drifter` shows the Godot ready screen, `Start Run` starts the run, `Restart` is hidden until running/death states, and the Enemies entry navigates to `/void-drifter/enemies`.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
 - UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 
@@ -231,13 +235,14 @@ Path: `docs/dev/active-context.md`
 
 # Active Context
 
-- status: first playable web prototype exists
+- status: first playable web prototype exists with first real enemy type
 - huidige focus: VOID DRIFTER Core Fun
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
-- laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
+- laatste verificatie: Godot headless scene-load, `npm run godot:export:web`, `npm run typecheck`, `npm run lint`, Expo static export en `npm run docs:bundle:verify` groen; browser-smoke via `curl` kon niet omdat `localhost:8081` niet draaide
 - runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
 - Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
+- enemy status: Red Scout Drone is toegevoegd als eerste echte enemy type met data-driven stats en sprite frames
 - lokale browsercheck: voortaan Browser Use proberen volgens `docs/dev/local-browser-testing.md`; als de runtime niet beschikbaar is, expliciet melden en alleen fallback smoke checks gebruiken
 
 ## Gebouwd
@@ -245,10 +250,17 @@ Path: `docs/dev/active-context.md`
 - Geisoleerde Expo Router route voor VOID DRIFTER.
 - Browser-speelveld met drie VOID DRIFTER parallax background layers.
 - Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec.
-- Player ship gebruikt echte VOID DRIFTER PNG sprites uit de MVP asset pack.
+- Player ship gebruikt nieuwe Luma VOID DRIFTER PNG sprites uit de gameplay sheet.
+- Godot player sheet output bevat idle, bank-left, bank-right, boost, damaged, shield en icon sprites.
 - Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
+- Godot bullets, hit sparks, engine trail en enemy death bursts gebruiken uitgesneden VFX sheet sprites.
+- Overige VFX sprites staan alvast import-ready klaar: player laser beam, enemy red bullet, enemy purple shot, shield impact en level-up burst.
+- Script `scripts/godot/extract-void-drifter-sheets.gd` snijdt de player/VFX sheets opnieuw uit.
 - Click/touch-drag movement: ship vliegt smooth naar target.
-- Enemies spawnen vanaf randen en bewegen naar de actuele player positie.
+- Red Scout Drone enemies spawnen vanaf randen en bewegen naar de actuele player positie.
+- Enemy registry toegevoegd in Expo/TypeScript voor data-driven stats, overzicht en fallback/reference gameplay.
+- Enemy stats schalen via simpele `runLevel = 1 + floor(elapsed / 30)`.
+- Enemy overview route `/void-drifter/enemies` toont Red Scout Drone stats, scaling, spawn info, abilities en sprite preview.
 - Auto-shooting met bullets richting dichtstbijzijnde enemy.
 - Bullet/enemy collisions, kills, eenvoudige explosion particles.
 - Enemy/player collisions met HP damage.
@@ -263,6 +275,7 @@ Path: `docs/dev/active-context.md`
 - Godot 4.x project met `project.godot`, `scenes/main.tscn`, GDScript gameplay loop en gekopieerde bestaande player/background assets.
 - Godot-port bevat dezelfde Core Fun: start, movement, enemies, auto-shooting, collisions, HP/kills/time HUD, death en restart.
 - Expo route `/void-drifter` is nu de Godot embed shell.
+- `/void-drifter` startscherm-regressie is gefixt: het Godot script parse't weer, `Start Run` koppelt opnieuw aan de run-state, `Restart` is niet zichtbaar op ready, en de Enemies entry zit in de Godot ready-flow in plaats van als losse Expo iframe-overlay.
 - Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
 - Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
 - LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
@@ -272,8 +285,8 @@ Path: `docs/dev/active-context.md`
 
 ## Nog Niet Gedaan
 
-- Boost sprite is aanwezig als asset, maar nog niet gekoppeld omdat er geen boost-trigger bestaat.
-- Enemies zijn nog placeholder shapes, geen final enemy assets.
+- Boost en shield sprites zijn aanwezig als assets, maar nog niet gekoppeld omdat er geen boost/shield-trigger bestaat.
+- Alleen Red Scout Drone gebruikt echte enemy art; andere enemy types zijn nog niet gebouwd.
 - Background asteroids zijn alleen visueel; geen collision/hazards.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
@@ -290,8 +303,8 @@ Path: `docs/dev/active-context.md`
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: test `/void-drifter` via Expo met de embedded Godot build
-- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie A: start `npm run web` en test `/void-drifter` visueel in de browser met de embedded Godot build
+- optie B: kleine visual clarity pass voor Red Scout Drone sprite leesbaarheid tegen de parallax achtergrond
 - optie C: eerste upgrade/shop screen pas plannen nadat de run visueel klopt
 
 ---
@@ -488,13 +501,20 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Home entry button: `Open VOID DRIFTER`
 - Three-layer parallax space background
 - Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec
-- Player ship PNG sprites from the MVP asset pack
+- Player ship PNG sprites from the current Luma gameplay sheet
+- Player sheet extraction keeps idle, bank-left, bank-right, boost, damaged, shield, and icon sprites under `godot/void-drifter/assets/player_ship/`
 - Ship sprite-state switching for idle, bank-left, bank-right, and low-HP damaged
+- Godot bullets, hit sparks, engine trail, and enemy death bursts use cropped VFX sheet sprites from `godot/void-drifter/assets/vfx/`
+- Future VFX assets are also cropped and import-ready: player laser beam, enemy red bullet, enemy purple shot, shield impact, and level-up burst
+- Sheet extraction helper exists at `scripts/godot/extract-void-drifter-sheets.gd`
 - Click/touch-drag ship movement
 - Start overlay with `Start Run` and controls hint
 - Run stays enemy-free until started
-- Enemies spawn from playfield edges
+- Red Scout Drone added as the first real enemy type
+- Enemy registry added for data-driven stats, overview data, and React Native fallback/reference gameplay
+- Red Scout Drone enemies spawn from playfield edges
 - Enemies chase the player position
+- Enemy stats now scale through simple run-level progression: `1 + floor(elapsed / 30)`
 - Player auto-shoots at nearest enemy
 - Bullets can kill enemies
 - Enemies can damage the player
@@ -506,7 +526,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 - First Godot 4.x MVP port under `godot/void-drifter`
 - Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
+- Godot start screen regression is fixed: script parse/load is clean, `Start Run` starts the run, `Restart` is hidden in ready state, and the Enemies entry belongs to the ready overlay instead of the Expo iframe shell
 - Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
+- Expo route `/void-drifter/enemies` shows the Red Scout Drone overview with stats, scaling, spawn info, abilities, and sprite preview
 - Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
 - `npm run godot:export:web` exports the Godot build into Expo's public folder
 - LCARS-neon UI style guide under `docs/project/void-drifter-ui-style-guide.md`
@@ -515,8 +537,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Not Built Yet
 
-- Boost sprite behavior; the boost PNG exists but is not wired because there is no boost trigger yet
-- Final enemy sprites or imported/generated enemy assets
+- Boost and shield ship sprites exist as assets, but boost/shield gameplay behavior is not wired because there is no trigger/system yet
+- Additional enemy sprites or enemy types beyond Red Scout Drone
 - Background asteroid collision or hazards; parallax is visual only
 - Player upgrades, XP, pickups, or level-up choices
 - Upgrade/shop UI implementation; the Luma upgrade mockup is reference only
@@ -531,8 +553,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Next Step Options
 
-1. Test `/void-drifter` through Expo with the embedded Godot web build.
-2. Improve visual readability for enemy silhouettes against the parallax background.
+1. Start `npm run web` and visually test `/void-drifter` through Expo with the embedded Godot web build.
+2. Improve visual readability for the Red Scout Drone sprite against the parallax background.
 3. Plan the first upgrade/shop screen only after the run reads well.
 
 Default recommendation: verify the LCARS-neon Godot run before adding progression.

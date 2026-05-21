@@ -78,6 +78,11 @@ export function VoidDrifterGodotScreen() {
               <Text style={styles.secondaryButtonText}>Open Expo fallback</Text>
             </Pressable>
           </Link>
+          <Link href="/void-drifter/enemies" asChild>
+            <Pressable style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>Enemies</Text>
+            </Pressable>
+          </Link>
         </View>
       </SafeAreaView>
     </View>

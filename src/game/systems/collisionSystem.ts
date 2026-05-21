@@ -20,7 +20,8 @@ export function resolveCombatCollisions(world: WorldState) {
         if (enemy.hp <= 0) {
           removedEnemyIds.add(enemy.id);
           world.kills += 1;
-          addExplosion(world, enemy, enemy.color);
+          world.score += enemy.scoreReward;
+          addExplosion(world, enemy, '#f97316');
         }
       }
     }
@@ -32,7 +33,7 @@ export function resolveCombatCollisions(world: WorldState) {
     }
 
     if (circlesOverlap(world.player, enemy)) {
-      world.player.hp = Math.max(0, world.player.hp - DAMAGE_VALUES.enemyContact);
+      world.player.hp = Math.max(0, world.player.hp - enemy.contactDamage);
       removedEnemyIds.add(enemy.id);
       addExplosion(world, enemy, '#67e8f9');
     }

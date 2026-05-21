@@ -84,8 +84,11 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
+- `godot/void-drifter/assets/player_ship/*` holds the current Luma-derived player ship sprites
+- `godot/void-drifter/assets/vfx/*` holds cropped projectile, trail, spark, and explosion sprites
 - `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
+- `scripts/godot/extract-void-drifter-sheets.gd` extracts the current player/VFX sheets into runtime sprites
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
 - `docs/dev/local-browser-testing.md` defines the required local browser verification flow for localhost/Expo routes
@@ -98,6 +101,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
+- Current Godot start flow: `/void-drifter` shows the Godot ready screen, `Start Run` starts the run, `Restart` is hidden until running/death states, and the Enemies entry navigates to `/void-drifter/enemies`.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
 - UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 

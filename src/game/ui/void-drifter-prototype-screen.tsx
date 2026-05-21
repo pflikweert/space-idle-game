@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GestureResponderEvent,
@@ -24,6 +25,8 @@ import { formatTime } from '../core/math';
 import type { PlayfieldSize, WorldInput, WorldSnapshot } from '../core/types';
 import { createInitialWorld, createWorldSnapshot } from '../runtime/createInitialWorld';
 import { updateWorld } from '../runtime/updateWorld';
+
+const ENEMY_SPRITE_SIZE = 68;
 
 const PARALLAX_LAYERS = [
   {
@@ -53,8 +56,15 @@ const PLAYER_SHIP_SPRITES = {
   damaged: require('@/assets/images/void-drifter/player-ship/256/player_ship_damaged.png'),
 } as const;
 
-function getScore(kills: number, elapsed: number) {
-  return kills * 100 + Math.floor(elapsed) * 5;
+const RED_SCOUT_DRONE_FRAMES = {
+  'move-down': require('@/assets/game/enemies/red-scout-drone/frames/move-down.png'),
+  'move-up': require('@/assets/game/enemies/red-scout-drone/frames/move-up.png'),
+  'move-left': require('@/assets/game/enemies/red-scout-drone/frames/move-left.png'),
+  'move-right': require('@/assets/game/enemies/red-scout-drone/frames/move-right.png'),
+} as const;
+
+function getScore(score: number, elapsed: number) {
+  return score + Math.floor(elapsed) * 5;
 }
 
 function getPlayerShipSprite(snapshot: WorldSnapshot) {
@@ -175,11 +185,18 @@ export function VoidDrifterPrototypeScreen() {
             <Text style={styles.kicker}>VOID DRIFTER</Text>
             <Text style={styles.title}>Core Fun Prototype</Text>
           </View>
-          {snapshot.status !== 'ready' && (
-            <Pressable style={styles.headerButton} onPress={startRun}>
-              <Text style={styles.headerButtonText}>Restart</Text>
-            </Pressable>
-          )}
+          <View style={styles.headerActions}>
+            <Link href="/void-drifter/enemies" asChild>
+              <Pressable style={styles.headerButton}>
+                <Text style={styles.headerButtonText}>Enemies</Text>
+              </Pressable>
+            </Link>
+            {snapshot.status !== 'ready' && (
+              <Pressable style={styles.headerButton} onPress={startRun}>
+                <Text style={styles.headerButtonText}>Restart</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         <View style={styles.hud}>
@@ -278,17 +295,19 @@ export function VoidDrifterPrototypeScreen() {
             <View
               key={enemy.id}
               style={[
-                styles.enemy,
+                styles.enemySpriteWrap,
                 {
-                  left: enemy.x - enemy.radius,
-                  top: enemy.y - enemy.radius,
-                  width: enemy.radius * 2,
-                  height: enemy.radius * 2,
-                  borderRadius: enemy.radius * 0.45,
-                  backgroundColor: enemy.color,
+                  left: enemy.x - ENEMY_SPRITE_SIZE / 2,
+                  top: enemy.y - ENEMY_SPRITE_SIZE / 2,
+                  width: ENEMY_SPRITE_SIZE,
+                  height: ENEMY_SPRITE_SIZE,
                 },
               ]}>
-              <View style={styles.enemyCore} />
+              <Image
+                contentFit="contain"
+                source={RED_SCOUT_DRONE_FRAMES[enemy.movementFrame]}
+                style={styles.enemySprite}
+              />
             </View>
           ))}
 
@@ -345,7 +364,7 @@ export function VoidDrifterPrototypeScreen() {
                 <View style={styles.deathStat}>
                   <Text style={styles.deathStatLabel}>Score</Text>
                   <Text style={styles.deathStatValue}>
-                    {getScore(snapshot.kills, snapshot.elapsed)}
+                    {getScore(snapshot.score, snapshot.elapsed)}
                   </Text>
                 </View>
               </View>
@@ -387,6 +406,12 @@ const styles = StyleSheet.create({
     color: '#f8fafc',
     fontSize: 24,
     fontWeight: '800',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   headerButton: {
     borderWidth: 1,
@@ -496,19 +521,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ecfeff',
   },
-  enemy: {
+  enemySpriteWrap: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
     opacity: 0.94,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
   },
-  enemyCore: {
-    width: '38%',
-    height: '38%',
-    borderRadius: 99,
-    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+  enemySprite: {
+    width: ENEMY_SPRITE_SIZE,
+    height: ENEMY_SPRITE_SIZE,
   },
   particle: {
     position: 'absolute',

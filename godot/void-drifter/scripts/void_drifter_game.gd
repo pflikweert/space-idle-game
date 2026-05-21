@@ -6,17 +6,19 @@ const MIN_ENEMY_SPAWN_INTERVAL := 620.0
 const FIRST_ENEMY_SPAWN_DELAY := 1350.0
 const PLAYER_FIRE_INTERVAL := 260.0
 const BULLET_SPEED := 540.0
-const ENEMY_SPEED := 42.0
-const ENEMY_HP := 2
 const PLAYER_MOVE_SPEED := 470.0
 const PLAYER_BOUNDS_PADDING := 10.0
 const PLAYER_RADIUS := 18.0
-const PLAYER_SPRITE_SIZE := 76.0
+const PLAYER_SPRITE_HEIGHT := 88.0
 const PLAYER_DAMAGED_HP_THRESHOLD := 0.3
 const PLAYER_BANKING_THRESHOLD := 1.2
 const PARTICLE_LIFETIME := 0.42
+const SPRITE_PARTICLE_LIFETIME := 0.34
+const BULLET_SPRITE_HEIGHT := 34.0
+const ENGINE_TRAIL_HEIGHT := 52.0
+const EXPLOSION_SPRITE_HEIGHT := 74.0
+const HIT_SPARK_SPRITE_HEIGHT := 30.0
 const DAMAGE_BULLET := 1
-const DAMAGE_ENEMY_CONTACT := 12
 const MAX_DELTA_SECONDS := 0.033
 const UI_CYAN := Color("#00E5FF")
 const UI_PLAYER_BLUE := Color("#1565C0")
@@ -39,11 +41,39 @@ const DIFFICULTY_SCALING := {
 	"enemy_speed_cap_multiplier": 1.48,
 }
 
-const ENEMY_VARIANTS := [
-	{ "radius": 12.0, "color": Color("#fb7185"), "speed_multiplier": 1.08, "hp": ENEMY_HP },
-	{ "radius": 16.0, "color": Color("#a78bfa"), "speed_multiplier": 0.92, "hp": ENEMY_HP + 1 },
-	{ "radius": 10.0, "color": Color("#facc15"), "speed_multiplier": 1.24, "hp": ENEMY_HP },
-]
+const RED_SCOUT_DRONE_ID := "red_scout_drone"
+const ENEMY_DEFINITIONS := {
+	"red_scout_drone": {
+		"id": "red_scout_drone",
+		"name": "Red Scout Drone",
+		"role": "Basic hostile drone",
+		"description": "Fast red hostile scout drone that enters from screen edges and chases the player.",
+		"base_stats": {
+			"hp": 16,
+			"speed": 52.0,
+			"contact_damage": 10,
+			"xp_reward": 4,
+			"score_reward": 10,
+			"radius": 18.0,
+		},
+		"scaling": {
+			"hp_per_level": 3,
+			"speed_per_level": 1.5,
+			"damage_per_level": 1,
+		},
+		"spawn": {
+			"weight": 100,
+			"min_run_level": 1,
+		},
+		"abilities": ["chase_player", "contact_damage", "red_projectile_later"],
+	},
+}
+const ENEMY_MOVEMENT_FRAMES_BY_EDGE := {
+	"top": "move-down",
+	"bottom": "move-up",
+	"left": "move-right",
+	"right": "move-left",
+}
 
 const PARALLAX_LAYERS := [
 	{ "id": "far", "path": "res://assets/backgrounds/bg_far_stars.png", "speed": 12.0, "opacity": 0.72 },
@@ -53,8 +83,11 @@ const PARALLAX_LAYERS := [
 
 @onready var action_button: Button = $ActionButton
 @onready var header_restart_button: Button = $HeaderRestartButton
+@onready var enemies_button: Button = $EnemiesButton
 
 var ship_textures := {}
+var enemy_textures := {}
+var vfx_textures := {}
 var background_textures: Array[Texture2D] = []
 var status := "ready"
 var player := {}
@@ -64,23 +97,47 @@ var enemies: Array[Dictionary] = []
 var bullets: Array[Dictionary] = []
 var particles: Array[Dictionary] = []
 var kills := 0
+var score := 0
 var elapsed := 0.0
 var background_time := 0.0
 var spawn_timer := FIRST_ENEMY_SPAWN_DELAY
 var fire_timer := PLAYER_FIRE_INTERVAL * 0.6
 var next_id := 1
 var pointer_down := false
+var action_button_style_key := ""
+var header_button_style_key := ""
+var enemies_button_style_key := ""
 
 func _ready() -> void:
 	set_process(true)
 	action_button.pressed.connect(_on_action_button_pressed)
 	header_restart_button.pressed.connect(start_run)
+	enemies_button.pressed.connect(_on_enemies_button_pressed)
 	_style_buttons()
 	ship_textures = {
 		"idle": load("res://assets/player_ship/player_ship_idle.png"),
 		"bank_left": load("res://assets/player_ship/player_ship_bank_left.png"),
 		"bank_right": load("res://assets/player_ship/player_ship_bank_right.png"),
+		"boost": load("res://assets/player_ship/player_ship_boost.png"),
 		"damaged": load("res://assets/player_ship/player_ship_damaged.png"),
+	}
+	vfx_textures = {
+		"player_plasma_bolt": load("res://assets/vfx/player_plasma_bolt.png"),
+		"player_laser_beam": load("res://assets/vfx/player_laser_beam.png"),
+		"enemy_red_bullet": load("res://assets/vfx/enemy_red_bullet.png"),
+		"enemy_purple_shot": load("res://assets/vfx/enemy_purple_shot.png"),
+		"engine_trail": load("res://assets/vfx/engine_trail.png"),
+		"small_explosion": load("res://assets/vfx/small_explosion.png"),
+		"enemy_death_explosion": load("res://assets/vfx/enemy_death_explosion.png"),
+		"shield_impact": load("res://assets/vfx/shield_impact.png"),
+		"levelup_burst": load("res://assets/vfx/levelup_burst.png"),
+		"hit_spark": load("res://assets/vfx/hit_spark.png"),
+	}
+	enemy_textures = {
+		"move-down": load("res://assets/enemies/red_scout_drone/move-down.png"),
+		"move-up": load("res://assets/enemies/red_scout_drone/move-up.png"),
+		"move-left": load("res://assets/enemies/red_scout_drone/move-left.png"),
+		"move-right": load("res://assets/enemies/red_scout_drone/move-right.png"),
 	}
 	for layer in PARALLAX_LAYERS:
 		background_textures.append(load(layer.path))
@@ -132,6 +189,7 @@ func reset_world(next_status: String) -> void:
 	bullets = []
 	particles = []
 	kills = 0
+	score = 0
 	elapsed = 0.0
 	background_time = 0.0
 	spawn_timer = FIRST_ENEMY_SPAWN_DELAY
@@ -178,28 +236,36 @@ func _update_enemy_spawning(delta_ms: float) -> void:
 
 func _spawn_enemy() -> void:
 	var size := get_viewport_rect().size
-	var variant = ENEMY_VARIANTS[next_id % ENEMY_VARIANTS.size()]
-	var edge := next_id % 4
-	var inset: float = variant.radius + 8.0
+	var run_level := _get_run_level(elapsed)
+	var stats := _get_enemy_stats(RED_SCOUT_DRONE_ID, run_level)
+	var spawn_edges := ["top", "right", "bottom", "left"]
+	var spawn_edge: String = spawn_edges[next_id % spawn_edges.size()]
+	var inset: float = stats.radius + 8.0
 	var drift := float((next_id * 71) % 100) / 100.0
 	var position := Vector2(size.x * drift, size.y * drift)
 
-	if edge == 0:
+	if spawn_edge == "top":
 		position.y = -inset
-	elif edge == 1:
+	elif spawn_edge == "right":
 		position.x = size.x + inset
-	elif edge == 2:
+	elif spawn_edge == "bottom":
 		position.y = size.y + inset
 	else:
 		position.x = -inset
 
 	enemies.append({
 		"id": next_id,
+		"type_id": RED_SCOUT_DRONE_ID,
 		"position": position,
-		"radius": variant.radius,
-		"hp": variant.hp,
-		"speed": ENEMY_SPEED * variant.speed_multiplier * _get_enemy_speed_multiplier(elapsed),
-		"color": variant.color,
+		"radius": stats.radius,
+		"hp": stats.hp,
+		"max_hp": stats.hp,
+		"speed": stats.speed * _get_enemy_speed_multiplier(elapsed),
+		"contact_damage": stats.contact_damage,
+		"xp_reward": stats.xp_reward,
+		"score_reward": stats.score_reward,
+		"spawn_edge": spawn_edge,
+		"movement_frame": _get_enemy_movement_frame(spawn_edge),
 	})
 	next_id += 1
 
@@ -245,7 +311,8 @@ func _update_projectiles(delta: float) -> void:
 
 func _update_effects(delta: float) -> void:
 	for particle in particles:
-		particle.position += particle.velocity * delta
+		if particle.has("velocity"):
+			particle.position += particle.velocity * delta
 		particle.life -= delta
 	particles = particles.filter(func(particle): return particle.life > 0.0)
 
@@ -264,16 +331,19 @@ func _resolve_collisions() -> void:
 				if enemy.hp <= 0:
 					removed_enemy_ids[enemy.id] = true
 					kills += 1
-					_add_explosion(enemy.position, enemy.color)
+					score += enemy.score_reward
+					_add_explosion(enemy.position, Color("#f97316"), true)
+				else:
+					_add_hit_spark(bullet.position)
 
 	for enemy in enemies:
 		if removed_enemy_ids.has(enemy.id):
 			continue
 
 		if _circles_overlap(player.position, player.radius, enemy.position, enemy.radius):
-			player.hp = maxi(0, player.hp - DAMAGE_ENEMY_CONTACT)
+			player.hp = maxi(0, player.hp - enemy.contact_damage)
 			removed_enemy_ids[enemy.id] = true
-			_add_explosion(enemy.position, Color("#67e8f9"))
+			_add_explosion(enemy.position, Color("#67e8f9"), false)
 
 	enemies = enemies.filter(func(enemy): return not removed_enemy_ids.has(enemy.id))
 	_remove_expired_projectiles(removed_bullet_ids)
@@ -291,7 +361,18 @@ func _remove_expired_projectiles(removed_bullet_ids: Dictionary) -> void:
 		return not removed_bullet_ids.has(bullet.id) and bullet.life > 0.0 and in_bounds
 	)
 
-func _add_explosion(origin: Vector2, color: Color) -> void:
+func _add_explosion(origin: Vector2, color: Color, large: bool) -> void:
+	particles.append({
+		"id": next_id,
+		"position": origin,
+		"life": SPRITE_PARTICLE_LIFETIME,
+		"max_life": SPRITE_PARTICLE_LIFETIME,
+		"texture_key": "enemy_death_explosion" if large else "small_explosion",
+		"height": EXPLOSION_SPRITE_HEIGHT if large else EXPLOSION_SPRITE_HEIGHT * 0.72,
+		"rotation": float(next_id % 12) * 0.12,
+	})
+	next_id += 1
+
 	for index in range(6):
 		var angle := TAU * float(index) / 6.0 + float(next_id) * 0.17
 		var speed := 52.0 + float(index) * 11.0
@@ -304,6 +385,18 @@ func _add_explosion(origin: Vector2, color: Color) -> void:
 			"color": color,
 		})
 		next_id += 1
+
+func _add_hit_spark(origin: Vector2) -> void:
+	particles.append({
+		"id": next_id,
+		"position": origin,
+		"life": SPRITE_PARTICLE_LIFETIME * 0.62,
+		"max_life": SPRITE_PARTICLE_LIFETIME * 0.62,
+		"texture_key": "hit_spark",
+		"height": HIT_SPARK_SPRITE_HEIGHT,
+		"rotation": float(next_id % 10) * 0.2,
+	})
+	next_id += 1
 
 func _draw() -> void:
 	var size := get_viewport_rect().size
@@ -334,50 +427,72 @@ func _draw_background(size: Vector2) -> void:
 	draw_rect(Rect2(0.0, size.y * 0.68, size.x, 1.0), _with_alpha(UI_CYAN, 0.18))
 
 func _draw_hud(size: Vector2) -> void:
-	var top_rect := Rect2(14, 14, size.x - 28, 58)
-	_draw_lcars_panel(top_rect, UI_CYAN, "VOID DRIFTER")
-	draw_string(get_theme_default_font(), top_rect.position + Vector2(24, 24), "SCORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_CYAN)
-	draw_string(get_theme_default_font(), top_rect.position + Vector2(24, 48), "%06d" % _get_score(), HORIZONTAL_ALIGNMENT_LEFT, -1, 25, UI_CYAN)
-	_draw_hud_chip(Vector2(size.x - 176, top_rect.position.y + 12), "TIME", _format_time(elapsed), UI_TEAL)
-	_draw_hud_chip(Vector2(size.x - 92, top_rect.position.y + 12), "EN", str(enemies.size()), UI_MAGENTA)
+	var top_margin := 16.0
+	var top_height := 48.0
+	var right_width := 132.0
+	var score_width := clampf(size.x * 0.34, 184.0, 296.0)
+	if size.x < 520.0:
+		score_width = minf(score_width, size.x - right_width - 48.0)
+	var score_rect := Rect2(top_margin, top_margin, score_width, top_height)
+	var right_rect := Rect2(size.x - right_width - top_margin, top_margin, right_width, top_height)
+	var rail_start := score_rect.position.x + score_rect.size.x + 10.0
+	var rail_end := right_rect.position.x - 10.0
+	_draw_cockpit_rail(Rect2(rail_start, top_margin + 5.0, maxf(0.0, rail_end - rail_start), top_height - 10.0))
+	_draw_score_module(score_rect)
+	_draw_time_module(right_rect)
 
-	var bottom_width := minf(336.0, maxf(220.0, size.x - 154.0))
-	var bottom_rect := Rect2(14, size.y - 92, bottom_width, 76)
-	_draw_lcars_panel(bottom_rect, UI_CYAN, "HULL")
+	var bottom_width := minf(282.0, maxf(210.0, size.x - 142.0))
+	var bottom_rect := Rect2(16, size.y - 82, bottom_width, 62)
 	var hp_percent := clampf(float(player.hp) / float(PLAYER_HP), 0.0, 1.0)
-	_draw_lcars_meter(Rect2(bottom_rect.position.x + 24, bottom_rect.position.y + 27, bottom_rect.size.x - 48, 15), hp_percent, UI_CYAN, "HULL", str(player.hp))
-	_draw_lcars_meter(Rect2(bottom_rect.position.x + 24, bottom_rect.position.y + 52, bottom_rect.size.x - 48, 11), 0.72, UI_TEAL, "SHLD", "72%")
+	_draw_status_module(bottom_rect, hp_percent)
 
-	var status_rect := Rect2(size.x - 120, size.y - 92, 106, 76)
-	_draw_lcars_panel(status_rect, UI_MAGENTA, "CORE")
-	draw_arc(status_rect.position + Vector2(53, 42), 22.0, -PI * 0.45, PI * 1.28, 28, _with_alpha(UI_MAGENTA, 0.82), 5.0)
-	draw_circle(status_rect.position + Vector2(53, 42), 14.0, _with_alpha(UI_MAGENTA, 0.16))
-	draw_string(get_theme_default_font(), status_rect.position + Vector2(33, 67), "AUTO", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_MAGENTA)
+	var core_size := 86.0
+	var core_rect := Rect2(size.x - core_size - 16.0, size.y - core_size - 18.0, core_size, core_size)
+	_draw_core_module(core_rect)
 
 func _draw_particles() -> void:
 	for particle in particles:
+		if particle.has("texture_key"):
+			var texture: Texture2D = vfx_textures.get(particle.texture_key)
+			var max_life: float = particle.max_life
+			var progress := 1.0 - clampf(particle.life / max_life, 0.0, 1.0)
+			var alpha := clampf(particle.life / max_life, 0.0, 1.0)
+			var height: float = particle.height * lerpf(0.72, 1.18, progress)
+			_draw_centered_texture(texture, particle.position, height, particle.rotation, Color(1, 1, 1, alpha))
+			continue
+
 		var color: Color = particle.color
 		color.a = clampf(particle.life / PARTICLE_LIFETIME, 0.0, 1.0)
 		draw_circle(particle.position, particle.radius, color)
 
 func _draw_bullets() -> void:
 	for bullet in bullets:
-		draw_circle(bullet.position, bullet.radius + 2.0, Color(0.4, 0.91, 0.98, 0.22))
-		draw_circle(bullet.position, bullet.radius, Color("#67e8f9"))
-		draw_arc(bullet.position, bullet.radius + 1.0, 0.0, TAU, 12, Color("#ecfeff"), 1.0)
+		var texture: Texture2D = vfx_textures.get("player_plasma_bolt")
+		if texture:
+			var velocity: Vector2 = bullet.velocity
+			var rotation: float = velocity.angle() + PI / 2.0
+			_draw_centered_texture(texture, bullet.position, BULLET_SPRITE_HEIGHT, rotation, Color(1, 1, 1, 0.94))
+		else:
+			draw_circle(bullet.position, bullet.radius + 2.0, Color(0.4, 0.91, 0.98, 0.22))
+			draw_circle(bullet.position, bullet.radius, Color("#67e8f9"))
+			draw_arc(bullet.position, bullet.radius + 1.0, 0.0, TAU, 12, Color("#ecfeff"), 1.0)
 
 func _draw_enemies() -> void:
 	for enemy in enemies:
-		var rect := Rect2(enemy.position - Vector2.ONE * enemy.radius, Vector2.ONE * enemy.radius * 2.0)
-		draw_rect(rect, enemy.color)
-		draw_rect(rect, Color(1, 1, 1, 0.35), false, 1.0)
-		draw_circle(enemy.position, enemy.radius * 0.38, Color(0.06, 0.09, 0.16, 0.72))
+		var texture: Texture2D = enemy_textures.get(enemy.movement_frame, enemy_textures["move-down"])
+		var visual_size: float = enemy.radius * 3.8
+		var rect := Rect2(
+			enemy.position - Vector2.ONE * visual_size / 2.0,
+			Vector2.ONE * visual_size
+		)
+		draw_texture_rect(texture, rect, false)
 
 func _draw_player() -> void:
 	var texture: Texture2D = _get_player_ship_texture()
-	draw_set_transform(player.position, PI, Vector2.ONE)
-	draw_texture_rect(texture, Rect2(Vector2.ONE * -PLAYER_SPRITE_SIZE / 2.0, Vector2.ONE * PLAYER_SPRITE_SIZE), false)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	var trail_texture: Texture2D = vfx_textures.get("engine_trail")
+	var trail_alpha := 0.58 if status == "running" else 0.34
+	_draw_centered_texture(trail_texture, player.position + Vector2(0, PLAYER_SPRITE_HEIGHT * 0.34), ENGINE_TRAIL_HEIGHT, 0.0, Color(1, 1, 1, trail_alpha))
+	_draw_centered_texture(texture, player.position, PLAYER_SPRITE_HEIGHT, 0.0, Color.WHITE)
 
 func _draw_ready_overlay(size: Vector2) -> void:
 	var rect := Rect2(22, size.y * 0.24, size.x - 44, 224)
@@ -388,13 +503,22 @@ func _draw_ready_overlay(size: Vector2) -> void:
 	_draw_lcars_meter(Rect2(rect.position.x + 30, rect.position.y + 158, rect.size.x - 60, 9), 0.82, UI_TEAL, "SIGNAL", "82%")
 
 func _draw_death_overlay(size: Vector2) -> void:
-	var rect := Rect2(22, size.y * 0.26, size.x - 44, 236)
-	_draw_lcars_panel(rect, UI_ORANGE, "RUN ENDED")
-	draw_string(get_theme_default_font(), rect.position + Vector2(30, 62), "Signal Lost", HORIZONTAL_ALIGNMENT_LEFT, -1, 31, UI_TEXT)
-	_draw_stat_block(Rect2(rect.position.x + 30, rect.position.y + 92, 88, 52), "KILLS", str(kills), UI_MAGENTA)
-	_draw_stat_block(Rect2(rect.position.x + 124, rect.position.y + 92, 94, 52), "TIME", _format_time(elapsed), UI_CYAN)
-	_draw_stat_block(Rect2(rect.position.x + 224, rect.position.y + 92, rect.size.x - 254, 52), "SCORE", str(_get_score()), UI_TEAL)
-	_draw_lcars_meter(Rect2(rect.position.x + 30, rect.position.y + 158, rect.size.x - 60, 10), 0.18, UI_ORANGE, "SIGNAL", "LOST")
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.015, 0.006, 0.018, 0.34))
+	var rect := _get_death_card_rect(size)
+	_draw_glass_panel(rect, UI_ORANGE, "", 0.34)
+	_draw_lcars_block(Rect2(rect.position.x + 24, rect.position.y, 120, 7), UI_ORANGE, 0.72)
+	_draw_lcars_block(Rect2(rect.position.x + 150, rect.position.y, 11, 7), UI_ORANGE, 0.32)
+	draw_string(get_theme_default_font(), rect.position + Vector2(28, 38), "RUN ENDED", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_ORANGE)
+	draw_string(get_theme_default_font(), rect.position + Vector2(28, 78), "SIGNAL LOST", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 30, UI_TEXT)
+	draw_line(rect.position + Vector2(28, 96), rect.position + Vector2(rect.size.x - 28, 96), _with_alpha(UI_ORANGE, 0.28), 1.0)
+
+	var stat_gap := 8.0
+	var stat_width := (rect.size.x - 56.0 - stat_gap * 2.0) / 3.0
+	var stat_y := rect.position.y + 118.0
+	_draw_stat_pill(Rect2(rect.position.x + 28.0, stat_y, stat_width, 54.0), "KILLS", str(kills), UI_MAGENTA)
+	_draw_stat_pill(Rect2(rect.position.x + 28.0 + stat_width + stat_gap, stat_y, stat_width, 54.0), "TIME", _format_time(elapsed), UI_CYAN)
+	_draw_stat_pill(Rect2(rect.position.x + 28.0 + (stat_width + stat_gap) * 2.0, stat_y, stat_width, 54.0), "SCORE", str(_get_score()), UI_TEAL)
+	_draw_signal_loss_bar(Rect2(rect.position.x + 30.0, rect.position.y + 198.0, rect.size.x - 60.0, 8.0))
 
 func _draw_panel(rect: Rect2, fill: Color, stroke: Color) -> void:
 	draw_rect(rect, fill)
@@ -416,6 +540,45 @@ func _draw_lcars_panel(rect: Rect2, accent: Color, label := "") -> void:
 func _draw_lcars_block(rect: Rect2, color: Color, alpha := 1.0) -> void:
 	draw_rect(rect, _with_alpha(color, alpha))
 
+func _draw_cockpit_rail(rect: Rect2) -> void:
+	if rect.size.x <= 0.0:
+		return
+	var center_y := rect.position.y + rect.size.y / 2.0
+	draw_line(Vector2(rect.position.x, center_y), Vector2(rect.position.x + rect.size.x, center_y), _with_alpha(UI_CYAN, 0.18), 1.0)
+	draw_line(Vector2(rect.position.x + rect.size.x * 0.28, rect.position.y), Vector2(rect.position.x + rect.size.x * 0.72, rect.position.y), _with_alpha(UI_CYAN, 0.09), 1.0)
+	draw_line(Vector2(rect.position.x + rect.size.x * 0.36, rect.position.y + rect.size.y), Vector2(rect.position.x + rect.size.x * 0.64, rect.position.y + rect.size.y), _with_alpha(UI_MAGENTA, 0.08), 1.0)
+	var mark_x := rect.position.x + rect.size.x / 2.0
+	draw_rect(Rect2(mark_x - 18.0, rect.position.y + 2.0, 36.0, 3.0), _with_alpha(UI_CYAN, 0.20))
+	draw_rect(Rect2(mark_x - 4.0, rect.position.y + 2.0, 8.0, 3.0), _with_alpha(UI_MAGENTA, 0.32))
+
+func _draw_score_module(rect: Rect2) -> void:
+	_draw_glass_panel(rect, UI_CYAN, "", 0.26)
+	_draw_lcars_block(Rect2(rect.position.x + 18, rect.position.y, rect.size.x * 0.58, 6), UI_CYAN, 0.64)
+	_draw_lcars_block(Rect2(rect.position.x + rect.size.x * 0.62, rect.position.y, 8, 6), UI_CYAN, 0.30)
+	draw_string(get_theme_default_font(), rect.position + Vector2(24, 17), "SCORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_CYAN)
+	draw_string(get_theme_default_font(), rect.position + Vector2(24, 40), "%06d" % _get_score(), HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 40, 22, UI_CYAN)
+
+func _draw_time_module(rect: Rect2) -> void:
+	_draw_glass_panel(rect, UI_CYAN, "", 0.16)
+	_draw_compact_chip(Rect2(rect.position.x + 10, rect.position.y + 9, 72, 30), "TIME", _format_time(elapsed), UI_TEAL)
+	_draw_compact_chip(Rect2(rect.position.x + 88, rect.position.y + 9, 34, 30), "EN", str(enemies.size()), UI_MAGENTA)
+
+func _draw_status_module(rect: Rect2, hp_percent: float) -> void:
+	_draw_glass_panel(rect, UI_CYAN, "", 0.18)
+	draw_string(get_theme_default_font(), rect.position + Vector2(22, 18), "STATUS", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_CYAN)
+	_draw_compact_meter(Rect2(rect.position.x + 22, rect.position.y + 25, rect.size.x - 44, 10), hp_percent, UI_TEAL, "HULL", str(player.hp))
+	_draw_compact_meter(Rect2(rect.position.x + 22, rect.position.y + 45, rect.size.x - 44, 9), 0.72, UI_PLAYER_BLUE, "SHLD", "72%")
+
+func _draw_core_module(rect: Rect2) -> void:
+	_draw_glass_panel(rect, UI_MAGENTA, "", 0.25)
+	var center := rect.position + rect.size / 2.0 + Vector2(0, 3)
+	draw_string(get_theme_default_font(), rect.position + Vector2(18, 22), "CORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_MAGENTA)
+	draw_circle(center, 24.0, _with_alpha(UI_MAGENTA, 0.07))
+	draw_circle(center, 13.0, _with_alpha(UI_PURPLE, 0.34))
+	draw_arc(center, 25.0, -PI * 0.42, PI * 0.86, 32, _with_alpha(UI_MAGENTA, 0.84), 5.0)
+	draw_arc(center, 32.0, PI * 0.08, PI * 0.62, 18, _with_alpha(UI_CYAN, 0.18), 1.0)
+	draw_string(get_theme_default_font(), rect.position + Vector2(24, rect.size.y - 12), "AUTO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_MAGENTA)
+
 func _draw_lcars_meter(rect: Rect2, percent: float, fill_color: Color, label: String, value: String) -> void:
 	var clamped := clampf(percent, 0.0, 1.0)
 	draw_string(get_theme_default_font(), rect.position + Vector2(0, -5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, fill_color)
@@ -432,6 +595,50 @@ func _draw_hud_chip(position: Vector2, label: String, value: String, accent: Col
 	draw_string(get_theme_default_font(), position + Vector2(11, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
 	draw_string(get_theme_default_font(), position + Vector2(11, 30), value, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, accent)
 
+func _draw_glass_panel(rect: Rect2, accent: Color, label := "", intensity := 0.22) -> void:
+	draw_rect(rect.grow(8.0), _with_alpha(accent, intensity * 0.16))
+	draw_rect(rect, Color(0.025, 0.032, 0.075, 0.62))
+	draw_rect(Rect2(rect.position, Vector2(rect.size.x, rect.size.y * 0.42)), Color(0.06, 0.08, 0.16, 0.28))
+	draw_rect(rect, _with_alpha(accent, intensity), false, 1.0)
+	_draw_corner_accents(rect, accent, minf(18.0, rect.size.y * 0.28))
+	if label != "":
+		draw_string(get_theme_default_font(), rect.position + Vector2(18, 22), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, accent)
+
+func _draw_corner_accents(rect: Rect2, accent: Color, length: float) -> void:
+	var color := _with_alpha(accent, 0.62)
+	draw_line(rect.position, rect.position + Vector2(length, 0), color, 1.5)
+	draw_line(rect.position, rect.position + Vector2(0, length), color, 1.5)
+	draw_line(rect.position + Vector2(rect.size.x, 0), rect.position + Vector2(rect.size.x - length, 0), color, 1.5)
+	draw_line(rect.position + Vector2(rect.size.x, 0), rect.position + Vector2(rect.size.x, length), color, 1.5)
+	draw_line(rect.position + Vector2(0, rect.size.y), rect.position + Vector2(length, rect.size.y), _with_alpha(accent, 0.34), 1.0)
+	draw_line(rect.position + Vector2(rect.size.x, rect.size.y), rect.position + Vector2(rect.size.x - length, rect.size.y), _with_alpha(accent, 0.34), 1.0)
+
+func _draw_compact_chip(rect: Rect2, label: String, value: String, accent: Color) -> void:
+	_draw_capsule(rect, _with_alpha(UI_PANEL_MID, 0.46))
+	_draw_capsule_outline(rect, _with_alpha(accent, 0.30), 1.0)
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 11), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, UI_TEXT_DIM)
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 25), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 18, 13, accent)
+
+func _draw_compact_meter(rect: Rect2, percent: float, fill_color: Color, label: String, value: String) -> void:
+	var clamped := clampf(percent, 0.0, 1.0)
+	draw_string(get_theme_default_font(), rect.position + Vector2(0, -3), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 7, fill_color)
+	draw_string(get_theme_default_font(), rect.position + Vector2(rect.size.x - 48, -3), value, HORIZONTAL_ALIGNMENT_RIGHT, 48, 7, UI_TEXT)
+	_draw_capsule(rect, _with_alpha(UI_BG, 0.60))
+	_draw_capsule(Rect2(rect.position, Vector2(maxf(rect.size.y, rect.size.x * clamped), rect.size.y)), _with_alpha(fill_color, 0.78))
+	_draw_capsule_outline(rect, _with_alpha(fill_color, 0.34), 1.0)
+
+func _draw_stat_pill(rect: Rect2, label: String, value: String, accent: Color) -> void:
+	_draw_glass_panel(rect, accent, "", 0.20)
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 19), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_TEXT_DIM)
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 43), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 17, accent)
+
+func _draw_signal_loss_bar(rect: Rect2) -> void:
+	draw_string(get_theme_default_font(), rect.position + Vector2(0, -8), "SIGNAL", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, UI_ORANGE)
+	draw_string(get_theme_default_font(), rect.position + Vector2(rect.size.x - 38, -8), "LOST", HORIZONTAL_ALIGNMENT_RIGHT, 38, 8, UI_TEXT_DIM)
+	_draw_capsule(rect, _with_alpha(UI_ORANGE, 0.12))
+	_draw_capsule(Rect2(rect.position, Vector2(rect.size.x * 0.22, rect.size.y)), _with_alpha(UI_ORANGE, 0.82))
+	_draw_capsule_outline(rect, _with_alpha(UI_ORANGE, 0.48), 1.0)
+
 func _draw_stat_block(rect: Rect2, label: String, value: String, accent: Color) -> void:
 	_draw_panel(rect, _with_alpha(UI_PANEL_MID, 0.72), _with_alpha(accent, 0.34))
 	draw_string(get_theme_default_font(), rect.position + Vector2(10, 20), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
@@ -443,9 +650,27 @@ func _draw_capsule(rect: Rect2, color: Color) -> void:
 	draw_circle(rect.position + Vector2(radius, radius), radius, color)
 	draw_circle(rect.position + Vector2(rect.size.x - radius, radius), radius, color)
 
+func _draw_capsule_outline(rect: Rect2, color: Color, width: float) -> void:
+	var radius := rect.size.y / 2.0
+	var left_center := rect.position + Vector2(radius, radius)
+	var right_center := rect.position + Vector2(rect.size.x - radius, radius)
+	draw_line(rect.position + Vector2(radius, 0), rect.position + Vector2(rect.size.x - radius, 0), color, width)
+	draw_line(rect.position + Vector2(radius, rect.size.y), rect.position + Vector2(rect.size.x - radius, rect.size.y), color, width)
+	draw_arc(left_center, radius, PI * 0.5, PI * 1.5, 12, color, width)
+	draw_arc(right_center, radius, -PI * 0.5, PI * 0.5, 12, color, width)
+
 func _draw_scanlines(size: Vector2) -> void:
 	for y in range(0, int(size.y), 6):
 		draw_line(Vector2(0, y), Vector2(size.x, y), Color(1, 1, 1, 0.018), 1.0)
+
+func _draw_centered_texture(texture: Texture2D, center: Vector2, height: float, rotation := 0.0, modulate := Color.WHITE) -> void:
+	if texture == null:
+		return
+
+	var width := height * float(texture.get_width()) / maxf(1.0, float(texture.get_height()))
+	draw_set_transform(center, rotation, Vector2.ONE)
+	draw_texture_rect(texture, Rect2(Vector2(-width / 2.0, -height / 2.0), Vector2(width, height)), false, modulate)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _with_alpha(color: Color, alpha: float) -> Color:
 	var next := color
@@ -453,49 +678,84 @@ func _with_alpha(color: Color, alpha: float) -> Color:
 	return next
 
 func _layout_buttons() -> void:
+	if not is_instance_valid(action_button) or not is_instance_valid(header_restart_button) or not is_instance_valid(enemies_button):
+		return
+
 	var size := get_viewport_rect().size
-	action_button.size = Vector2(170, 50)
 	if status == "dead":
-		action_button.position = Vector2((size.x - action_button.size.x) / 2.0, size.y * 0.26 + 180)
+		var death_rect := _get_death_card_rect(size)
+		action_button.size = Vector2(minf(176.0, death_rect.size.x - 72.0), 46.0)
+		action_button.position = death_rect.position + Vector2((death_rect.size.x - action_button.size.x) / 2.0, 226.0)
+		enemies_button.size = Vector2(0, 0)
 	else:
+		action_button.size = Vector2(170, 50)
 		action_button.position = Vector2((size.x - action_button.size.x) / 2.0, size.y * 0.24 + 176)
-	header_restart_button.size = Vector2(82, 36)
-	header_restart_button.position = Vector2(size.x - 100, 18)
+		enemies_button.size = Vector2(138, 38)
+		enemies_button.position = Vector2((size.x - enemies_button.size.x) / 2.0, action_button.position.y + 58.0)
+	header_restart_button.size = Vector2(78, 28)
+	header_restart_button.position = Vector2(size.x - header_restart_button.size.x - 16.0, 70.0)
 
 func _update_buttons() -> void:
 	_layout_buttons()
-	header_restart_button.visible = status != "ready"
+	header_restart_button.visible = status == "running"
 	action_button.visible = status == "ready" or status == "dead"
+	enemies_button.visible = status == "ready"
 	action_button.text = "Start Run" if status == "ready" else "Restart Run"
+	enemies_button.text = "Enemies"
+	var next_action_key := "dead" if status == "dead" else "ready"
+	if action_button_style_key != next_action_key:
+		_apply_button_style(action_button, UI_ORANGE if status == "dead" else UI_CYAN, false)
+		action_button_style_key = next_action_key
+	if header_button_style_key != "running-tab":
+		_apply_button_style(header_restart_button, UI_MAGENTA, true)
+		header_button_style_key = "running-tab"
+	if enemies_button_style_key != "ready-link":
+		_apply_button_style(enemies_button, UI_TEAL, true)
+		enemies_button_style_key = "ready-link"
 
 func _on_action_button_pressed() -> void:
 	start_run()
 
-func _style_buttons() -> void:
-	_apply_button_style(action_button, UI_CYAN)
-	_apply_button_style(header_restart_button, UI_MAGENTA)
+func _on_enemies_button_pressed() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.parent.location.href = '/void-drifter/enemies';", true)
+	else:
+		OS.shell_open("http://localhost:8081/void-drifter/enemies")
 
-func _apply_button_style(button: Button, accent: Color) -> void:
-	button.add_theme_stylebox_override("normal", _make_button_style(_with_alpha(UI_PANEL_MID, 0.86), accent, 0.78))
-	button.add_theme_stylebox_override("hover", _make_button_style(_with_alpha(accent, 0.20), accent, 1.0))
-	button.add_theme_stylebox_override("pressed", _make_button_style(_with_alpha(accent, 0.34), accent, 1.0))
+func _style_buttons() -> void:
+	_apply_button_style(action_button, UI_CYAN, false)
+	action_button_style_key = "ready"
+	_apply_button_style(header_restart_button, UI_MAGENTA, true)
+	header_button_style_key = "running-tab"
+	_apply_button_style(enemies_button, UI_TEAL, true)
+	enemies_button_style_key = "ready-link"
+
+func _apply_button_style(button: Button, accent: Color, compact: bool) -> void:
+	button.add_theme_stylebox_override("normal", _make_button_style(_with_alpha(UI_PANEL_MID, 0.70), accent, 0.58, compact))
+	button.add_theme_stylebox_override("hover", _make_button_style(_with_alpha(accent, 0.18), accent, 0.92, compact))
+	button.add_theme_stylebox_override("pressed", _make_button_style(_with_alpha(accent, 0.30), accent, 1.0, compact))
 	button.add_theme_color_override("font_color", UI_TEXT)
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
 	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_font_size_override("font_size", 15)
+	button.add_theme_font_size_override("font_size", 12 if compact else 15)
 
-func _make_button_style(fill: Color, border: Color, border_alpha: float) -> StyleBoxFlat:
+func _make_button_style(fill: Color, border: Color, border_alpha: float, compact: bool) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = _with_alpha(border, border_alpha)
 	style.set_border_width_all(1)
-	style.corner_radius_top_left = 18
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_right = 18
-	style.corner_radius_bottom_left = 8
-	style.shadow_color = _with_alpha(border, 0.20)
-	style.shadow_size = 8
+	style.corner_radius_top_left = 16 if compact else 18
+	style.corner_radius_top_right = 7 if compact else 8
+	style.corner_radius_bottom_right = 16 if compact else 18
+	style.corner_radius_bottom_left = 7 if compact else 8
+	style.shadow_color = _with_alpha(border, 0.18)
+	style.shadow_size = 5 if compact else 10
 	return style
+
+func _get_death_card_rect(size: Vector2) -> Rect2:
+	var card_width := minf(420.0, size.x - 40.0)
+	var card_height := 292.0
+	return Rect2((size.x - card_width) / 2.0, maxf(92.0, size.y * 0.22), card_width, card_height)
 
 func _clamp_player_to_viewport() -> void:
 	if player.is_empty():
@@ -536,6 +796,30 @@ func _get_enemy_speed_multiplier(seconds: float) -> float:
 		1.0 + seconds * DIFFICULTY_SCALING.enemy_speed_ramp_per_second
 	)
 
+func _get_run_level(seconds: float) -> int:
+	return 1 + int(floor(seconds / 30.0))
+
+func _get_enemy_definition(enemy_type_id: String) -> Dictionary:
+	return ENEMY_DEFINITIONS[enemy_type_id]
+
+func _get_enemy_stats(enemy_type_id: String, level: int) -> Dictionary:
+	var definition := _get_enemy_definition(enemy_type_id)
+	var base_stats: Dictionary = definition.base_stats
+	var scaling: Dictionary = definition.scaling
+	var level_offset := maxi(0, level - 1)
+	return {
+		"level": level,
+		"hp": base_stats.hp + scaling.hp_per_level * level_offset,
+		"speed": base_stats.speed + scaling.speed_per_level * level_offset,
+		"contact_damage": base_stats.contact_damage + scaling.damage_per_level * level_offset,
+		"xp_reward": base_stats.xp_reward,
+		"score_reward": base_stats.score_reward,
+		"radius": base_stats.radius,
+	}
+
+func _get_enemy_movement_frame(spawn_edge: String) -> String:
+	return ENEMY_MOVEMENT_FRAMES_BY_EDGE.get(spawn_edge, "move-down")
+
 func _get_max_enemies(seconds: float) -> int:
 	return mini(
 		DIFFICULTY_SCALING.max_enemies_cap,
@@ -549,4 +833,4 @@ func _format_time(seconds: float) -> String:
 	return "%d:%02d" % [minutes, remaining_seconds]
 
 func _get_score() -> int:
-	return kills * 100 + int(floor(elapsed)) * 5
+	return score + int(floor(elapsed)) * 5
