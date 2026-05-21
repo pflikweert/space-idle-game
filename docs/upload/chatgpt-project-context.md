@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:48:04.473Z
-Source Commit: 03680ba
+Build Timestamp (UTC): 2026-05-21T19:03:19.558Z
+Source Commit: 7ff5cb9
 
 ## Upload Policy
 
@@ -21,6 +21,7 @@ Source Commit: 03680ba
 - `docs/project/game-vision.md`
 - `docs/project/mvp-scope.md`
 - `docs/project/void-drifter-prototype-plan.md`
+- `docs/project/void-drifter-ui-style-guide.md`
 - `src/game/README.md`
 
 ---
@@ -113,6 +114,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
+- `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
@@ -126,6 +128,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
+- UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 
 ## What this project is not yet
 
@@ -166,12 +169,14 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - MVP scope stays narrow: one playable prototype screen, placeholder progression, no production systems.
 - Do not add backend, Supabase, OpenAI, monetization, account systems, analytics, live ops, or store-release work unless explicitly requested in a later phase.
 - Do not swap to a heavy game engine without an explicit decision.
+- VOID DRIFTER UI must follow `docs/project/void-drifter-ui-style-guide.md`: LCARS-inspired, neon, semi-transparent, arcade-readable, and Godot-first for the primary route.
 
 ## Working style
 
 - Analyze the existing code before changing structure.
 - Reuse existing Expo and React Native patterns before adding new ones.
 - Keep route files thin and let `src/game/*` hold prototype-specific UI, state, and core helpers.
+- For primary VOID DRIFTER UI, update `godot/void-drifter` first; keep `/void-drifter-expo` as fallback/reference unless explicitly asked.
 - For larger changes, start with a short plan or checklist.
 - Prefer small, reviewable edits over broad refactors.
 
@@ -254,6 +259,9 @@ Path: `docs/dev/active-context.md`
 - Expo route `/void-drifter` is nu de Godot embed shell.
 - Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
 - Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
+- LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
+- Luma UI reference assets staan in `godot/void-drifter/assets/ui/luma_reference/`.
+- Godot HUD/start/death UI gebruikt LCARS-neon panels, meters, chips, scanlines en gestylede buttons.
 
 ## Nog Niet Gedaan
 
@@ -264,10 +272,10 @@ Path: `docs/dev/active-context.md`
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
+- Geen upgrade/shop UI implementatie; Luma upgrade mockup is alleen referentie.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
 - Geen gecommit Godot web-export output; `public/godot/void-drifter` is lokaal/generated.
 - Geen native mobile Godot-in-Expo integratie; de integratie is web-first via Expo route + Godot HTML export.
-- Geen editor-verified import metadata in deze Codex sessie, omdat Godot hier niet geinstalleerd is.
 - Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
 - Geen externe ECS-framework.
 
@@ -275,9 +283,9 @@ Path: `docs/dev/active-context.md`
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: installeer Godot 4.x + export templates en draai `npm run godot:export:web`
-- optie B: test `/void-drifter` via Expo met de embedded Godot build
-- optie C: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie A: test `/void-drifter` via Expo met de embedded Godot build
+- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie C: eerste upgrade/shop screen pas plannen nadat de run visueel klopt
 
 ---
 
@@ -440,6 +448,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
 - Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
 - `npm run godot:export:web` exports the Godot build into Expo's public folder
+- LCARS-neon UI style guide under `docs/project/void-drifter-ui-style-guide.md`
+- Luma reference UI assets under `godot/void-drifter/assets/ui/luma_reference/`
+- Godot HUD/start/death UI uses LCARS-neon panels, compact meters, chips, scanlines, and styled neon buttons
 
 ## Not Built Yet
 
@@ -447,23 +458,79 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Final enemy sprites or imported/generated enemy assets
 - Background asteroid collision or hazards; parallax is visual only
 - Player upgrades, XP, pickups, or level-up choices
+- Upgrade/shop UI implementation; the Luma upgrade mockup is reference only
 - Full enemy wave design or complete balance pass
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
 - Committed Godot web export output; the export is local/generated and ignored
 - Native mobile Godot embedding inside Expo
-- Editor import metadata verification in Codex; Godot is not installed in this environment
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 - Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Install Godot 4.x + Web export templates, then run `npm run godot:export:web`.
-2. Test `/void-drifter` through Expo with the embedded Godot web build.
-3. Improve visual readability for enemy silhouettes against the parallax background.
+1. Test `/void-drifter` through Expo with the embedded Godot web build.
+2. Improve visual readability for enemy silhouettes against the parallax background.
+3. Plan the first upgrade/shop screen only after the run reads well.
 
-Default recommendation: verify the embedded Godot route before adding progression.
+Default recommendation: verify the LCARS-neon Godot run before adding progression.
+
+---
+
+# Source: Docs Project Void Drifter Ui Style Guide
+
+Path: `docs/project/void-drifter-ui-style-guide.md`
+
+# VOID DRIFTER UI Style Guide
+
+## Direction
+
+VOID DRIFTER uses an LCARS-inspired mobile arcade interface: modular sci-fi panels, rounded asymmetric blocks, neon edge glow, transparent overlays, and compact information density.
+
+This is inspiration, not a direct Star Trek copy. Do not use Star Trek marks, iconography, Federation colors, or references.
+
+## Palette
+
+- Primary cyan: `#00E5FF`
+- Player blue: `#1565C0`
+- Magenta accent: `#FF00FF`
+- Purple panel: `#6A1B9A`
+- Warning orange: `#FF6D00`
+- Health teal: `#00E676`
+- Background dark: `#0A0A14`
+- Panel dark: `#121228`
+- Panel mid: `#1A1A3E`
+- Text primary: `#E0E0FF`
+- Text secondary: `#6070A0`
+
+## Gameplay HUD Rules
+
+- Keep gameplay readable first.
+- Use semi-transparent panels; never cover the playfield with large opaque blocks.
+- HUD should stay compact, roughly 15% of the screen where possible.
+- Top HUD: score/time/enemy or wave information.
+- Bottom HUD: hull/health and compact status/weapon information.
+- Text is small, uppercase, and high contrast.
+- Use cyan for player/system info, magenta for special/progression, orange for danger, teal for positive status.
+
+## Components
+
+- Panels: LCARS-like asymmetric rounded panels, dark translucent fill, colored header block, subtle glow border.
+- Buttons: cyan/magenta neon panel buttons, no native platform look.
+- Bars/meters: capsule or LCARS bars with glowing fills and dark tracks.
+- Overlays: central LCARS frames for start, pause, death, or run summary.
+- Effects: scanlines, subtle flicker/glow, and chromatic-neon feeling are preferred over flat UI.
+
+## Assets
+
+Luma reference assets live under:
+
+```text
+godot/void-drifter/assets/ui/luma_reference/
+```
+
+These files are source inspiration and review references. Runtime UI should remain scalable Godot drawing or properly sliced future UI sprites, not full-screen mockup images pasted over gameplay.
 
 ---
 

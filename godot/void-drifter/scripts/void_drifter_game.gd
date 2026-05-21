@@ -18,6 +18,17 @@ const PARTICLE_LIFETIME := 0.42
 const DAMAGE_BULLET := 1
 const DAMAGE_ENEMY_CONTACT := 12
 const MAX_DELTA_SECONDS := 0.033
+const UI_CYAN := Color("#00E5FF")
+const UI_PLAYER_BLUE := Color("#1565C0")
+const UI_MAGENTA := Color("#FF00FF")
+const UI_PURPLE := Color("#6A1B9A")
+const UI_ORANGE := Color("#FF6D00")
+const UI_TEAL := Color("#00E676")
+const UI_BG := Color("#0A0A14")
+const UI_PANEL := Color("#121228")
+const UI_PANEL_MID := Color("#1A1A3E")
+const UI_TEXT := Color("#E0E0FF")
+const UI_TEXT_DIM := Color("#6070A0")
 
 const DIFFICULTY_SCALING := {
 	"max_enemies_start": 3,
@@ -64,6 +75,7 @@ func _ready() -> void:
 	set_process(true)
 	action_button.pressed.connect(_on_action_button_pressed)
 	header_restart_button.pressed.connect(start_run)
+	_style_buttons()
 	ship_textures = {
 		"idle": load("res://assets/player_ship/player_ship_idle.png"),
 		"bank_left": load("res://assets/player_ship/player_ship_bank_left.png"),
@@ -318,25 +330,29 @@ func _draw_background(size: Vector2) -> void:
 			var rect := Rect2(0.0, offset + float(tile_index) * tile_height, size.x, tile_height)
 			draw_texture_rect(texture, rect, false, color)
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.008, 0.024, 0.09, 0.38))
-	draw_rect(Rect2(0.0, size.y * 0.68, size.x, 1.0), Color(0.13, 0.83, 0.93, 0.18))
+	_draw_scanlines(size)
+	draw_rect(Rect2(0.0, size.y * 0.68, size.x, 1.0), _with_alpha(UI_CYAN, 0.18))
 
 func _draw_hud(size: Vector2) -> void:
-	var top := 18.0
-	draw_string(get_theme_default_font(), Vector2(18, top + 10), "VOID DRIFTER", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#22d3ee"))
-	draw_string(get_theme_default_font(), Vector2(18, top + 34), "Core Fun Prototype", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color("#f8fafc"))
-	var hud_y := 74.0
-	_draw_panel(Rect2(18, hud_y, size.x - 36, 54), Color(0.06, 0.09, 0.16, 0.82), Color(0.58, 0.64, 0.72, 0.22))
+	var top_rect := Rect2(14, 14, size.x - 28, 58)
+	_draw_lcars_panel(top_rect, UI_CYAN, "VOID DRIFTER")
+	draw_string(get_theme_default_font(), top_rect.position + Vector2(24, 24), "SCORE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, UI_CYAN)
+	draw_string(get_theme_default_font(), top_rect.position + Vector2(24, 48), "%06d" % _get_score(), HORIZONTAL_ALIGNMENT_LEFT, -1, 25, UI_CYAN)
+	_draw_hud_chip(Vector2(size.x - 176, top_rect.position.y + 12), "TIME", _format_time(elapsed), UI_TEAL)
+	_draw_hud_chip(Vector2(size.x - 92, top_rect.position.y + 12), "EN", str(enemies.size()), UI_MAGENTA)
+
+	var bottom_width := minf(336.0, maxf(220.0, size.x - 154.0))
+	var bottom_rect := Rect2(14, size.y - 92, bottom_width, 76)
+	_draw_lcars_panel(bottom_rect, UI_CYAN, "HULL")
 	var hp_percent := clampf(float(player.hp) / float(PLAYER_HP), 0.0, 1.0)
-	draw_string(get_theme_default_font(), Vector2(34, hud_y + 22), "HP", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#94a3b8"))
-	draw_rect(Rect2(34, hud_y + 30, 130, 7), Color(0.06, 0.09, 0.16, 0.94))
-	draw_rect(Rect2(34, hud_y + 30, 130 * hp_percent, 7), Color("#22c55e"))
-	draw_string(get_theme_default_font(), Vector2(180, hud_y + 35), str(player.hp), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("#f8fafc"))
-	draw_string(get_theme_default_font(), Vector2(230, hud_y + 22), "KILLS", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#94a3b8"))
-	draw_string(get_theme_default_font(), Vector2(230, hud_y + 42), str(kills), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("#f8fafc"))
-	draw_string(get_theme_default_font(), Vector2(298, hud_y + 22), "TIME", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#94a3b8"))
-	draw_string(get_theme_default_font(), Vector2(298, hud_y + 42), _format_time(elapsed), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("#f8fafc"))
-	draw_string(get_theme_default_font(), Vector2(size.x - 88, hud_y + 22), "ENEMIES", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#94a3b8"))
-	draw_string(get_theme_default_font(), Vector2(size.x - 88, hud_y + 42), str(enemies.size()), HORIZONTAL_ALIGNMENT_LEFT, -1, 17, Color("#f8fafc"))
+	_draw_lcars_meter(Rect2(bottom_rect.position.x + 24, bottom_rect.position.y + 27, bottom_rect.size.x - 48, 15), hp_percent, UI_CYAN, "HULL", str(player.hp))
+	_draw_lcars_meter(Rect2(bottom_rect.position.x + 24, bottom_rect.position.y + 52, bottom_rect.size.x - 48, 11), 0.72, UI_TEAL, "SHLD", "72%")
+
+	var status_rect := Rect2(size.x - 120, size.y - 92, 106, 76)
+	_draw_lcars_panel(status_rect, UI_MAGENTA, "CORE")
+	draw_arc(status_rect.position + Vector2(53, 42), 22.0, -PI * 0.45, PI * 1.28, 28, _with_alpha(UI_MAGENTA, 0.82), 5.0)
+	draw_circle(status_rect.position + Vector2(53, 42), 14.0, _with_alpha(UI_MAGENTA, 0.16))
+	draw_string(get_theme_default_font(), status_rect.position + Vector2(33, 67), "AUTO", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI_MAGENTA)
 
 func _draw_particles() -> void:
 	for particle in particles:
@@ -364,28 +380,85 @@ func _draw_player() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 func _draw_ready_overlay(size: Vector2) -> void:
-	var rect := Rect2(18, size.y * 0.26, size.x - 36, 190)
-	_draw_panel(rect, Color(0.008, 0.024, 0.09, 0.90), Color(0.13, 0.83, 0.93, 0.42))
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 42, rect.position.y + 48), "VOID DRIFTER", HORIZONTAL_ALIGNMENT_LEFT, -1, 34, Color("#f8fafc"))
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 32, rect.position.y + 86), "Survive the sector. Your ship fires automatically.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 64, 15, Color("#cbd5e1"))
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 32, rect.position.y + 116), "Click or drag to steer. Weapons auto-target the nearest enemy.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 64, 13, Color("#67e8f9"))
+	var rect := Rect2(22, size.y * 0.24, size.x - 44, 224)
+	_draw_lcars_panel(rect, UI_CYAN, "SYSTEM READY")
+	draw_string(get_theme_default_font(), rect.position + Vector2(28, 62), "VOID DRIFTER", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 56, 34, UI_TEXT)
+	draw_string(get_theme_default_font(), rect.position + Vector2(30, 101), "Survive the sector. Your ship fires automatically.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 60, 15, UI_TEXT)
+	draw_string(get_theme_default_font(), rect.position + Vector2(30, 131), "Click or drag to steer. Weapons auto-target the nearest enemy.", HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 60, 13, UI_CYAN)
+	_draw_lcars_meter(Rect2(rect.position.x + 30, rect.position.y + 158, rect.size.x - 60, 9), 0.82, UI_TEAL, "SIGNAL", "82%")
 
 func _draw_death_overlay(size: Vector2) -> void:
-	var rect := Rect2(18, size.y * 0.28, size.x - 36, 210)
-	_draw_panel(rect, Color(0.008, 0.024, 0.09, 0.92), Color(0.97, 0.44, 0.44, 0.42))
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 32, rect.position.y + 34), "RUN ENDED", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#fca5a5"))
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 32, rect.position.y + 70), "Signal Lost", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color("#f8fafc"))
-	var stats := "Kills %s     Survived %s     Score %s" % [kills, _format_time(elapsed), _get_score()]
-	draw_string(get_theme_default_font(), Vector2(rect.position.x + 32, rect.position.y + 112), stats, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 64, 16, Color("#cbd5e1"))
+	var rect := Rect2(22, size.y * 0.26, size.x - 44, 236)
+	_draw_lcars_panel(rect, UI_ORANGE, "RUN ENDED")
+	draw_string(get_theme_default_font(), rect.position + Vector2(30, 62), "Signal Lost", HORIZONTAL_ALIGNMENT_LEFT, -1, 31, UI_TEXT)
+	_draw_stat_block(Rect2(rect.position.x + 30, rect.position.y + 92, 88, 52), "KILLS", str(kills), UI_MAGENTA)
+	_draw_stat_block(Rect2(rect.position.x + 124, rect.position.y + 92, 94, 52), "TIME", _format_time(elapsed), UI_CYAN)
+	_draw_stat_block(Rect2(rect.position.x + 224, rect.position.y + 92, rect.size.x - 254, 52), "SCORE", str(_get_score()), UI_TEAL)
+	_draw_lcars_meter(Rect2(rect.position.x + 30, rect.position.y + 158, rect.size.x - 60, 10), 0.18, UI_ORANGE, "SIGNAL", "LOST")
 
 func _draw_panel(rect: Rect2, fill: Color, stroke: Color) -> void:
 	draw_rect(rect, fill)
 	draw_rect(rect, stroke, false, 1.0)
 
+func _draw_lcars_panel(rect: Rect2, accent: Color, label := "") -> void:
+	draw_rect(rect.grow(5.0), _with_alpha(accent, 0.07))
+	draw_rect(rect, _with_alpha(UI_PANEL, 0.78))
+	draw_rect(rect, _with_alpha(accent, 0.36), false, 1.4)
+	draw_rect(rect.grow(-3.0), _with_alpha(accent, 0.20), false, 1.0)
+	var header_width := minf(rect.size.x * 0.44, 152.0)
+	_draw_lcars_block(Rect2(rect.position.x, rect.position.y, header_width, 10), accent, 0.62)
+	_draw_lcars_block(Rect2(rect.position.x + header_width + 6, rect.position.y, 8, 10), accent, 0.36)
+	draw_arc(rect.position + Vector2(18, 18), 17.0, PI, PI * 1.5, 10, _with_alpha(accent, 0.72), 1.5)
+	draw_arc(rect.position + Vector2(rect.size.x - 18, 18), 17.0, PI * 1.5, TAU, 10, _with_alpha(accent, 0.72), 1.5)
+	if label != "":
+		draw_string(get_theme_default_font(), rect.position + Vector2(18, 24), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, accent)
+
+func _draw_lcars_block(rect: Rect2, color: Color, alpha := 1.0) -> void:
+	draw_rect(rect, _with_alpha(color, alpha))
+
+func _draw_lcars_meter(rect: Rect2, percent: float, fill_color: Color, label: String, value: String) -> void:
+	var clamped := clampf(percent, 0.0, 1.0)
+	draw_string(get_theme_default_font(), rect.position + Vector2(0, -5), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, fill_color)
+	draw_string(get_theme_default_font(), rect.position + Vector2(rect.size.x - 42, -5), value, HORIZONTAL_ALIGNMENT_RIGHT, 42, 9, UI_TEXT)
+	_draw_capsule(rect.grow(1.0), _with_alpha(fill_color, 0.24))
+	var fill_width := maxf(rect.size.y, rect.size.x * clamped)
+	_draw_capsule(Rect2(rect.position, Vector2(fill_width, rect.size.y)), _with_alpha(fill_color, 0.88))
+	draw_rect(rect, _with_alpha(fill_color, 0.70), false, 1.0)
+
+func _draw_hud_chip(position: Vector2, label: String, value: String, accent: Color) -> void:
+	var rect := Rect2(position, Vector2(72, 36))
+	_draw_capsule(rect, _with_alpha(UI_PANEL_MID, 0.72))
+	draw_rect(rect, _with_alpha(accent, 0.42), false, 1.0)
+	draw_string(get_theme_default_font(), position + Vector2(11, 13), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	draw_string(get_theme_default_font(), position + Vector2(11, 30), value, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, accent)
+
+func _draw_stat_block(rect: Rect2, label: String, value: String, accent: Color) -> void:
+	_draw_panel(rect, _with_alpha(UI_PANEL_MID, 0.72), _with_alpha(accent, 0.34))
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 20), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, UI_TEXT_DIM)
+	draw_string(get_theme_default_font(), rect.position + Vector2(10, 43), value, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 20, 18, accent)
+
+func _draw_capsule(rect: Rect2, color: Color) -> void:
+	var radius := rect.size.y / 2.0
+	draw_rect(Rect2(rect.position + Vector2(radius, 0), Vector2(maxf(0.0, rect.size.x - radius * 2.0), rect.size.y)), color)
+	draw_circle(rect.position + Vector2(radius, radius), radius, color)
+	draw_circle(rect.position + Vector2(rect.size.x - radius, radius), radius, color)
+
+func _draw_scanlines(size: Vector2) -> void:
+	for y in range(0, int(size.y), 6):
+		draw_line(Vector2(0, y), Vector2(size.x, y), Color(1, 1, 1, 0.018), 1.0)
+
+func _with_alpha(color: Color, alpha: float) -> Color:
+	var next := color
+	next.a = alpha
+	return next
+
 func _layout_buttons() -> void:
 	var size := get_viewport_rect().size
 	action_button.size = Vector2(170, 50)
-	action_button.position = Vector2((size.x - action_button.size.x) / 2.0, size.y * 0.26 + 132)
+	if status == "dead":
+		action_button.position = Vector2((size.x - action_button.size.x) / 2.0, size.y * 0.26 + 180)
+	else:
+		action_button.position = Vector2((size.x - action_button.size.x) / 2.0, size.y * 0.24 + 176)
 	header_restart_button.size = Vector2(82, 36)
 	header_restart_button.position = Vector2(size.x - 100, 18)
 
@@ -397,6 +470,32 @@ func _update_buttons() -> void:
 
 func _on_action_button_pressed() -> void:
 	start_run()
+
+func _style_buttons() -> void:
+	_apply_button_style(action_button, UI_CYAN)
+	_apply_button_style(header_restart_button, UI_MAGENTA)
+
+func _apply_button_style(button: Button, accent: Color) -> void:
+	button.add_theme_stylebox_override("normal", _make_button_style(_with_alpha(UI_PANEL_MID, 0.86), accent, 0.78))
+	button.add_theme_stylebox_override("hover", _make_button_style(_with_alpha(accent, 0.20), accent, 1.0))
+	button.add_theme_stylebox_override("pressed", _make_button_style(_with_alpha(accent, 0.34), accent, 1.0))
+	button.add_theme_color_override("font_color", UI_TEXT)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_pressed_color", Color.WHITE)
+	button.add_theme_font_size_override("font_size", 15)
+
+func _make_button_style(fill: Color, border: Color, border_alpha: float) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = _with_alpha(border, border_alpha)
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 18
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_right = 18
+	style.corner_radius_bottom_left = 8
+	style.shadow_color = _with_alpha(border, 0.20)
+	style.shadow_size = 8
+	return style
 
 func _clamp_player_to_viewport() -> void:
 	if player.is_empty():

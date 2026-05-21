@@ -82,6 +82,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
+- `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
 - `public/godot/void-drifter/*` is the ignored generated Godot web export target
 - `docs/project/*` holds game direction and MVP scope
 - `docs/dev/*` holds workflow and temporary execution context
@@ -95,6 +96,7 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 - Runtime entry: `src/game/runtime/updateWorld.ts`
 - Current gameplay: dark playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, bullet/enemy collisions, player damage, death overlay, restart.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
+- UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 
 ## What this project is not yet
 

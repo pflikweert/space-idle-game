@@ -1,0 +1,226 @@
+# Void Drifter — UI Design Brief
+## LCARS-Inspired Mobile Arcade Interface
+
+---
+
+## Inspiratiebron: LCARS (Star Trek)
+
+LCARS (Library Computer Access/Retrieval System) is het iconische interface-design van Star Trek: The Next Generation en later. Kenmerken:
+- Afgeronde rechthoekige panelen en blokken
+- Horizontale en verticale balken als structuur
+- Kleurgecodeerde secties (geel, oranje, blauw, paars)
+- Sans-serif typografie
+- Donkere achtergrond met lichtgevende elementen
+- Informatie georganiseerd in blokken en kolommen
+- Functioneel maar futuristisch gevoel
+
+---
+
+## Void Drifter Adaptatie — Eigen Look & Feel
+
+We nemen de LCARS-structuur maar passen het aan voor een arcade-game context:
+
+### Wat we overnemen van LCARS:
+- **Afgeronde hoekpanelen** als basis voor UI-blokken (knoppen, meters, info-velden)
+- **Kleurblokken als navigatie** — grote kleurvlakken die secties markeren
+- **Horizontale/verticale balken** als visuele scheiders en structuur
+- **Donkere achtergrond** met lichtgevende UI-elementen
+- **Modulair grid-systeem** — alles past in een logisch raster
+
+### Wat we ANDERS doen (eigen Void Drifter DNA):
+- **Synthwave neon glows** — LCARS-panelen krijgen zachte neon edge-glow (cyan, magenta, purple)
+- **Transparante panelen** — semi-transparant in plaats van solid, zodat je de ruimte erachter ziet
+- **Pixel-art inspired iconen** — upgrade icons en symbolen in de bestaande sprite-stijl
+- **Holografisch effect** — subtiele scanlines, flicker, en chromatic aberration op sommige elementen
+- **Arcade energy** — snellere, agressievere hoeken op actie-elementen (fire buttons, boost indicators)
+- **Void Drifter kleurpalet** in plaats van Star Trek kleuren:
+  - Cyan/blauw = speler-gerelateerde info (health, shield, score)
+  - Magenta/paars = upgrade/progression info
+  - Oranje/warm = waarschuwingen, damage, vijandelijke info
+  - Teal/groen = pickups, healing, positieve status
+  - Wit = primaire tekst
+  - Gedimde grijsblauw = secundaire tekst en inactieve elementen
+
+### Kleurpalet (HEX referenties):
+
+| Rol | Kleur | HEX |
+|-----|-------|-----|
+| Primary Cyan | Helder neon blauw | `#00E5FF` |
+| Player Blue | Diep speler-blauw | `#1565C0` |
+| Magenta Accent | Neon magenta | `#FF00FF` |
+| Purple Panel | Donker paneel paars | `#6A1B9A` |
+| Warning Orange | Arcade oranje | `#FF6D00` |
+| Health Teal | Positief groen-teal | `#00E676` |
+| Background Dark | Bijna-zwart basis | `#0A0A14` |
+| Panel Dark | Paneel achtergrond | `#121228` |
+| Panel Mid | Actief paneel | `#1A1A3E` |
+| Text Primary | Wit tekst | `#E0E0FF` |
+| Text Secondary | Gedimde tekst | `#6070A0` |
+
+---
+
+## UI Schermen & Componenten
+
+### 1. HUD (Gameplay Overlay)
+
+Het minimalistische in-game scherm. Mag gameplay **NIET** blokkeren.
+
+**Boven (top bar):**
+- Linkerbovenhoek: LCARS-stijl afgeronde balk met score/wave counter
+- Rechterbovenhoek: Kleine compacte XP/currency indicator
+
+**Onder (bottom bar):**
+- Health bar: Horizontale LCARS-balk, cyan gevuld, afgeronde linkerhoek
+- Shield bar: Tweede dunne balk eronder, teal kleur
+- Weapon indicator: Klein LCARS-blok rechtsonder met actief wapen-icoon
+- Special ability: Circulaire cooldown indicator met neon glow
+
+**Regels:**
+- Maximaal 15% schermruimte voor UI
+- Altijd semi-transparant zodat gameplay zichtbaar blijft
+- Geen grote solide blokken over het speelveld
+- Tekst klein maar leesbaar (10–12sp equivalent)
+
+---
+
+### 2. Upgrade/Shop Scherm (tussen runs)
+
+Volledig LCARS-geïnspireerd scherm. Hier mag je uitpakken met het design.
+
+**Layout:**
+- Linkerzijde: Verticale LCARS navigatie-balk met afgeronde secties (Weapons, Shields, Engines, Drones, Special)
+- Rechterzijde: Geselecteerde upgrade details in een groot paneel
+- Onderzijde: Currency/resources balk
+- Achtergrond: Subtiel zichtbare ruimte met parallax effect (dim)
+
+**Elementen:**
+- Upgrade cards: LCARS-stijl afgeronde panelen met icoon + stats
+- Progress bars: Afgeronde horizontale balken die level tonen
+- Knoppen: Afgeronde LCARS-blokken met neon glow hover-state
+- Vergrendelde upgrades: Zelfde vorm maar gedimde kleuren + lock icoon
+
+---
+
+### 3. Pause/Menu Scherm
+
+**Layout:**
+- Centraal paneel met LCARS-afgeronde randen
+- Achtergrond: Gameplay geblurred en gedimd
+- Menu-opties als horizontale LCARS-balken gestapeld
+- Resume knop: Groot, cyan glow, prominente positie
+
+---
+
+### 4. Death/Run Summary Scherm
+
+**Layout:**
+- Groot centraal LCARS-frame met run statistieken
+- Stats in LCARS-blokken: Wave bereikt, vijanden vernietigd, XP verdiend, tijd overleefd
+- Afgeronde panelen voor "Try Again" en "Upgrades" knoppen
+- Dramatische achtergrondanimatie (ship debris, fading explosie)
+
+---
+
+### 5. Ship Select Scherm
+
+**Layout:**
+- Centraal: 3D-gerenderde ship preview (groot)
+- Links: LCARS navigatie-balk met schip-klassen
+- Rechts: Stats paneel met LCARS-geformateerde bars (Speed, Armor, Fire Rate, Special)
+- Onder: Selectie-knop met neon glow
+
+---
+
+## Component Library — Design Specificaties
+
+### Knoppen
+
+| Type | Fill | Border | Glow | Tekst |
+|------|------|--------|------|-------|
+| Primair | Cyan (`#00E5FF`) | — | Subtiele cyan glow | Donker, bold |
+| Secundair | Transparant | Cyan border 1–2px | Zwak | Licht |
+| Danger/Confirm | Oranje of Magenta fill | — | Oranje/magenta glow | Donker, bold |
+| Disabled | Grijsblauw (`#6070A0`) | — | Geen | Gedimde tekst |
+| Hover/Press | Brightness +20% | — | Glow intensiteit +50% | — |
+
+**Vorm:** Afgeronde rechthoek. Asymmetrische radius waar van toepassing (LCARS-stijl).
+
+---
+
+### Panelen
+
+- **LCARS-panel:** Afgeronde hoeken met grotere radius linksboven, kleinere elders — asymmetrisch zoals LCARS
+- **Achtergrond:** Semi-transparant donker (`#121228` op 80% opacity)
+- **Border:** 1–2px subtle glow in sectie-kleur
+- **Header:** Solid kleurblok bovenaan het paneel (niet transparant)
+
+---
+
+### Bars (Health, XP, Progress)
+
+- **Vorm:** Afgeronde horizontale balk (LCARS-stijl)
+- **Achtergrond:** Donker transparant
+- **Fill:** Gradient van helder naar iets donkerder, met subtle inner glow
+- **Animatie:** Smooth fill transition; flash-effect bij damage
+
+---
+
+### Typografie
+
+| Gebruik | Stijl | Grootte | Kleur |
+|---------|-------|---------|-------|
+| Heading | Bold, UPPERCASE, +2% letter-spacing | 16–20sp | `#E0E0FF` |
+| Body | Regular, normale spacing | 12–14sp | `#E0E0FF` |
+| Stats/Numbers | Monospace, tabular figures | 12–14sp | Sectie-kleur |
+| Secundair | Regular | 10–12sp | `#6070A0` |
+
+**Font-suggestie:** Orbitron, Exo 2, Rajdhani, of een clean geometric sans-serif.
+
+> Altijd licht op donker. Nooit donkere tekst op donkere achtergrond.
+
+---
+
+### Iconen
+
+- Gebruik de bestaande Void Drifter upgrade-iconen (pixel-art inspired, neon glow)
+- Nieuwe iconen in dezelfde stijl: **32×32** of **64×64** base size
+- Altijd met subtle glow in de dominante kleur van het icoon
+
+---
+
+## Sprite-Integratie Regels
+
+Omdat Void Drifter 2D sprite-based is in Godot:
+
+1. **UI als sprites/textures** — niet als vector, maar als pre-rendered sprite assets
+2. **9-slice panels** — maak LCARS-panelen als 9-slice sprites zodat ze schaalbaar zijn
+3. **Animatie-atlas** — UI hover/press states als aparte frames
+4. **Resolution:** Ontwerp op **1080×1920** (portrait), export @1x en @2x
+5. **Transparantie:** Alle UI-elementen als PNG met alpha channel
+
+---
+
+## Do's en Don'ts
+
+### ✅ DO:
+- LCARS-structuur gebruiken als layout-basis
+- Afgeronde hoeken en kleurblokken
+- Void Drifter neon-kleuren in LCARS-vormen
+- Semi-transparant zodat de game-wereld zichtbaar is
+- Holografisch sci-fi gevoel
+- Consistent met bestaande sprite-assets
+- Leesbaar op kleine mobiele schermen
+- Snelle, responsive animaties
+
+### ❌ DON'T:
+- Exacte Star Trek LCARS kleuren kopiëren (geen Federation-geel/oranje)
+- Star Trek logo's, tekens of Starfleet referenties
+- Te veel tekst op scherm — dit is een arcade game, geen database
+- Solide ondoorzichtige panelen over gameplay
+- Realistische UI (geen iOS/Android native widgets)
+- Te druk of rommelig — readability boven alles
+- Flat design zonder glow of diepte — moet premium voelen
+
+---
+
+*Void Drifter UI Design Brief — v1.0 | LCARS-Inspired Mobile Arcade Interface*

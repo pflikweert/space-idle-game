@@ -31,6 +31,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
 - Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
 - `npm run godot:export:web` exports the Godot build into Expo's public folder
+- LCARS-neon UI style guide under `docs/project/void-drifter-ui-style-guide.md`
+- Luma reference UI assets under `godot/void-drifter/assets/ui/luma_reference/`
+- Godot HUD/start/death UI uses LCARS-neon panels, compact meters, chips, scanlines, and styled neon buttons
 
 ## Not Built Yet
 
@@ -38,20 +41,20 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Final enemy sprites or imported/generated enemy assets
 - Background asteroid collision or hazards; parallax is visual only
 - Player upgrades, XP, pickups, or level-up choices
+- Upgrade/shop UI implementation; the Luma upgrade mockup is reference only
 - Full enemy wave design or complete balance pass
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
 - Committed Godot web export output; the export is local/generated and ignored
 - Native mobile Godot embedding inside Expo
-- Editor import metadata verification in Codex; Godot is not installed in this environment
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
 - Shared gameplay source between Expo TypeScript and Godot GDScript
 
 ## Next Step Options
 
-1. Install Godot 4.x + Web export templates, then run `npm run godot:export:web`.
-2. Test `/void-drifter` through Expo with the embedded Godot web build.
-3. Improve visual readability for enemy silhouettes against the parallax background.
+1. Test `/void-drifter` through Expo with the embedded Godot web build.
+2. Improve visual readability for enemy silhouettes against the parallax background.
+3. Plan the first upgrade/shop screen only after the run reads well.
 
-Default recommendation: verify the embedded Godot route before adding progression.
+Default recommendation: verify the LCARS-neon Godot run before adding progression.

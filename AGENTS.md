@@ -21,12 +21,14 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - MVP scope stays narrow: one playable prototype screen, placeholder progression, no production systems.
 - Do not add backend, Supabase, OpenAI, monetization, account systems, analytics, live ops, or store-release work unless explicitly requested in a later phase.
 - Do not swap to a heavy game engine without an explicit decision.
+- VOID DRIFTER UI must follow `docs/project/void-drifter-ui-style-guide.md`: LCARS-inspired, neon, semi-transparent, arcade-readable, and Godot-first for the primary route.
 
 ## Working style
 
 - Analyze the existing code before changing structure.
 - Reuse existing Expo and React Native patterns before adding new ones.
 - Keep route files thin and let `src/game/*` hold prototype-specific UI, state, and core helpers.
+- For primary VOID DRIFTER UI, update `godot/void-drifter` first; keep `/void-drifter-expo` as fallback/reference unless explicitly asked.
 - For larger changes, start with a short plan or checklist.
 - Prefer small, reviewable edits over broad refactors.
 

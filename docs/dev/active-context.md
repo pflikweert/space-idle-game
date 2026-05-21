@@ -33,6 +33,9 @@
 - Expo route `/void-drifter` is nu de Godot embed shell.
 - Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
 - Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
+- LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
+- Luma UI reference assets staan in `godot/void-drifter/assets/ui/luma_reference/`.
+- Godot HUD/start/death UI gebruikt LCARS-neon panels, meters, chips, scanlines en gestylede buttons.
 
 ## Nog Niet Gedaan
 
@@ -43,10 +46,10 @@
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
+- Geen upgrade/shop UI implementatie; Luma upgrade mockup is alleen referentie.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
 - Geen gecommit Godot web-export output; `public/godot/void-drifter` is lokaal/generated.
 - Geen native mobile Godot-in-Expo integratie; de integratie is web-first via Expo route + Godot HTML export.
-- Geen editor-verified import metadata in deze Codex sessie, omdat Godot hier niet geinstalleerd is.
 - Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
 - Geen externe ECS-framework.
 
@@ -54,6 +57,6 @@
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: installeer Godot 4.x + export templates en draai `npm run godot:export:web`
-- optie B: test `/void-drifter` via Expo met de embedded Godot build
-- optie C: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie A: test `/void-drifter` via Expo met de embedded Godot build
+- optie B: kleine visual clarity pass voor enemy silhouettes tegen de parallax achtergrond
+- optie C: eerste upgrade/shop screen pas plannen nadat de run visueel klopt
