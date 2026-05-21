@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
@@ -24,6 +24,27 @@ const PLAYER_BOUNDS_PADDING = 10;
 const PLAYER_SPRITE_SIZE = 76;
 const PLAYER_DAMAGED_HP_THRESHOLD = 0.3;
 const PLAYER_BANKING_THRESHOLD = 1.2;
+const PARALLAX_LAYER_HEIGHT = 2048;
+const PARALLAX_LAYERS = [
+  {
+    id: 'far-stars',
+    source: require('@/assets/images/void-drifter/backgrounds/bg_far_stars.png'),
+    speed: 12,
+    opacity: 0.72,
+  },
+  {
+    id: 'mid-nebula',
+    source: require('@/assets/images/void-drifter/backgrounds/bg_mid_nebula.png'),
+    speed: 24,
+    opacity: 0.34,
+  },
+  {
+    id: 'near-asteroids',
+    source: require('@/assets/images/void-drifter/backgrounds/bg_near_asteroids.png'),
+    speed: 48,
+    opacity: 0.2,
+  },
+] as const;
 const DAMAGE_VALUES = {
   bullet: 1,
   enemyContact: 12,
@@ -85,6 +106,7 @@ type GameState = {
   particles: Particle[];
   kills: number;
   elapsed: number;
+  backgroundTime: number;
   status: RunStatus;
   spawnTimer: number;
   fireTimer: number;
@@ -102,6 +124,7 @@ type Snapshot = Pick<
   | 'particles'
   | 'kills'
   | 'elapsed'
+  | 'backgroundTime'
   | 'status'
 >;
 
@@ -123,14 +146,6 @@ const PLAYER_SHIP_SPRITES = {
   damaged: require('@/assets/images/void-drifter/player-ship/256/player_ship_damaged.png'),
 } as const;
 
-const STAR_DOTS = Array.from({ length: 86 }, (_, index) => ({
-  id: index,
-  xRatio: ((index * 37 + 11) % 100) / 100,
-  yRatio: ((index * 53 + 17) % 100) / 100,
-  size: 1 + (index % 3),
-  opacity: 0.22 + (index % 5) * 0.09,
-}));
-
 function createInitialGameState(size: PlayfieldSize, status: RunStatus = 'ready'): GameState {
   const playerStart = {
     x: size.width / 2,
@@ -150,6 +165,7 @@ function createInitialGameState(size: PlayfieldSize, status: RunStatus = 'ready'
     particles: [],
     kills: 0,
     elapsed: 0,
+    backgroundTime: 0,
     status,
     spawnTimer: FIRST_ENEMY_SPAWN_DELAY,
     fireTimer: PLAYER_FIRE_INTERVAL * 0.6,
@@ -168,6 +184,7 @@ function cloneSnapshot(state: GameState): Snapshot {
     particles: state.particles.map((particle) => ({ ...particle })),
     kills: state.kills,
     elapsed: state.elapsed,
+    backgroundTime: state.backgroundTime,
     status: state.status,
   };
 }
@@ -238,6 +255,10 @@ function getMaxEnemies(elapsed: number) {
     DIFFICULTY_SCALING.maxEnemiesStart +
       Math.floor(elapsed / DIFFICULTY_SCALING.maxEnemiesRampSeconds)
   );
+}
+
+function advanceBackground(state: GameState, deltaSeconds: number) {
+  state.backgroundTime += deltaSeconds;
 }
 
 function spawnEnemy(state: GameState, size: PlayfieldSize) {
@@ -442,8 +463,6 @@ export function VoidDrifterPrototypeScreen() {
     setSnapshot(cloneSnapshot(freshState));
   }, [playfieldSize]);
 
-  const stars = useMemo(() => STAR_DOTS, []);
-
   useEffect(() => {
     resetToReady();
   }, [resetToReady]);
@@ -460,6 +479,8 @@ export function VoidDrifterPrototypeScreen() {
         (timestamp - state.lastFrameTime) / 1000
       );
       state.lastFrameTime = timestamp;
+
+      advanceBackground(state, deltaSeconds);
 
       if (state.status === 'running') {
         advanceGame(state, deltaSeconds, playfieldSize);
@@ -499,6 +520,7 @@ export function VoidDrifterPrototypeScreen() {
 
   const hpPercent = Math.max(0, Math.min(100, (snapshot.player.hp / PLAYER_HP) * 100));
   const playerShipSprite = getPlayerShipSprite(snapshot);
+  const parallaxTileHeight = Math.max(PARALLAX_LAYER_HEIGHT, playfieldSize.height);
 
   function updatePlayerTarget(event: GestureResponderEvent) {
     if (gameRef.current.status !== 'running') {
@@ -559,21 +581,31 @@ export function VoidDrifterPrototypeScreen() {
           onResponderGrant={updatePlayerTarget}
           onResponderMove={updatePlayerTarget}
           onStartShouldSetResponder={() => snapshot.status === 'running'}>
-          {stars.map((star) => (
-            <View
-              key={star.id}
-              style={[
-                styles.star,
-                {
-                  top: star.yRatio * playfieldSize.height,
-                  left: star.xRatio * playfieldSize.width,
-                  width: star.size,
-                  height: star.size,
-                  opacity: star.opacity,
-                },
-              ]}
-            />
-          ))}
+          {PARALLAX_LAYERS.map((layer) => {
+            const offset = (snapshot.backgroundTime * layer.speed) % parallaxTileHeight;
+
+            return (
+              <View key={layer.id} pointerEvents="none" style={styles.parallaxLayer}>
+                {[-1, 0].map((tileIndex) => (
+                  <Image
+                    contentFit="cover"
+                    key={`${layer.id}-${tileIndex}`}
+                    source={layer.source}
+                    style={[
+                      styles.parallaxTile,
+                      {
+                        height: parallaxTileHeight,
+                        opacity: layer.opacity,
+                        top: offset + tileIndex * parallaxTileHeight,
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            );
+          })}
+
+          <View pointerEvents="none" style={styles.gameplayReadabilityOverlay} />
 
           <View style={styles.scanLine} />
 
@@ -797,10 +829,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(125, 211, 252, 0.28)',
     backgroundColor: '#050816',
   },
-  star: {
+  parallaxLayer: {
     position: 'absolute',
-    borderRadius: 99,
-    backgroundColor: '#e0f2fe',
+    bottom: 0,
+    left: 0,
+    overflow: 'hidden',
+    right: 0,
+    top: 0,
+  },
+  parallaxTile: {
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    width: '100%',
+  },
+  gameplayReadabilityOverlay: {
+    backgroundColor: 'rgba(2, 6, 23, 0.38)',
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   scanLine: {
     position: 'absolute',

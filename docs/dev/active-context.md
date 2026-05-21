@@ -9,7 +9,8 @@
 ## Gebouwd
 
 - Geisoleerde Expo Router route voor VOID DRIFTER.
-- Browser-speelveld met dark space achtergrond en star dots.
+- Browser-speelveld met drie VOID DRIFTER parallax background layers.
+- Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec.
 - Player ship gebruikt echte VOID DRIFTER PNG sprites uit de MVP asset pack.
 - Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
 - Click/touch-drag movement: ship vliegt smooth naar target.
@@ -28,6 +29,7 @@
 
 - Boost sprite is aanwezig als asset, maar nog niet gekoppeld omdat er geen boost-trigger bestaat.
 - Enemies zijn nog placeholder shapes, geen final enemy assets.
+- Background asteroids zijn alleen visueel; geen collision/hazards.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
@@ -39,6 +41,6 @@
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: kleine visual clarity pass voor enemy silhouettes
+- optie A: kleine visual clarity pass voor enemy silhouettes tegen de nieuwe achtergrond
 - optie B: eerste pickup/XP placeholder na kills
 - optie C: 30-seconden tuning review met Pieter's speelervaring

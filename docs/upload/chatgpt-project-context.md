@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T18:02:26.741Z
-Source Commit: 2c66460
+Build Timestamp (UTC): 2026-05-21T18:09:22.708Z
+Source Commit: e91e12d
 
 ## Upload Policy
 
@@ -203,7 +203,8 @@ Path: `docs/dev/active-context.md`
 ## Gebouwd
 
 - Geisoleerde Expo Router route voor VOID DRIFTER.
-- Browser-speelveld met dark space achtergrond en star dots.
+- Browser-speelveld met drie VOID DRIFTER parallax background layers.
+- Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec.
 - Player ship gebruikt echte VOID DRIFTER PNG sprites uit de MVP asset pack.
 - Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
 - Click/touch-drag movement: ship vliegt smooth naar target.
@@ -222,6 +223,7 @@ Path: `docs/dev/active-context.md`
 
 - Boost sprite is aanwezig als asset, maar nog niet gekoppeld omdat er geen boost-trigger bestaat.
 - Enemies zijn nog placeholder shapes, geen final enemy assets.
+- Background asteroids zijn alleen visueel; geen collision/hazards.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
 - Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
@@ -233,7 +235,7 @@ Path: `docs/dev/active-context.md`
 
 Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: kleine visual clarity pass voor enemy silhouettes
+- optie A: kleine visual clarity pass voor enemy silhouettes tegen de nieuwe achtergrond
 - optie B: eerste pickup/XP placeholder na kills
 - optie C: 30-seconden tuning review met Pieter's speelervaring
 
@@ -375,7 +377,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 - Isolated web route: `/void-drifter`
 - Home entry button: `Open VOID DRIFTER`
-- Dark cosmic playfield with star dots
+- Three-layer parallax space background
+- Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec
 - Player ship PNG sprites from the MVP asset pack
 - Ship sprite-state switching for idle, bank-left, bank-right, and low-HP damaged
 - Click/touch-drag ship movement
@@ -395,6 +398,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 - Boost sprite behavior; the boost PNG exists but is not wired because there is no boost trigger yet
 - Final enemy sprites or imported/generated enemy assets
+- Background asteroid collision or hazards; parallax is visual only
 - Player upgrades, XP, pickups, or level-up choices
 - Full enemy wave design or complete balance pass
 - Keyboard controls
@@ -404,7 +408,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Next Step Options
 
-1. Improve visual readability for enemy silhouettes.
+1. Improve visual readability for enemy silhouettes against the parallax background.
 2. Add the first pickup/XP placeholder after enemy kills.
 3. Do a focused 30-second tuning review after hands-on play.
 

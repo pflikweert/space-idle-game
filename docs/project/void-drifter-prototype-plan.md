@@ -8,7 +8,8 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 - Isolated web route: `/void-drifter`
 - Home entry button: `Open VOID DRIFTER`
-- Dark cosmic playfield with star dots
+- Three-layer parallax space background
+- Background scroll speeds: far stars 12 px/sec, mid nebula 24 px/sec, near asteroids 48 px/sec
 - Player ship PNG sprites from the MVP asset pack
 - Ship sprite-state switching for idle, bank-left, bank-right, and low-HP damaged
 - Click/touch-drag ship movement
@@ -28,6 +29,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 - Boost sprite behavior; the boost PNG exists but is not wired because there is no boost trigger yet
 - Final enemy sprites or imported/generated enemy assets
+- Background asteroid collision or hazards; parallax is visual only
 - Player upgrades, XP, pickups, or level-up choices
 - Full enemy wave design or complete balance pass
 - Keyboard controls
@@ -37,7 +39,7 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Next Step Options
 
-1. Improve visual readability for enemy silhouettes.
+1. Improve visual readability for enemy silhouettes against the parallax background.
 2. Add the first pickup/XP placeholder after enemy kills.
 3. Do a focused 30-second tuning review after hands-on play.
 
