@@ -10,22 +10,32 @@ import {
   View,
 } from 'react-native';
 
-const PLAYER_HP = 100;
-const ENEMY_SPAWN_INTERVAL = 850;
-const PLAYER_FIRE_INTERVAL = 320;
-const BULLET_SPEED = 430;
-const ENEMY_SPEED = 58;
+const PLAYER_HP = 140;
+const ENEMY_SPAWN_INTERVAL = 1500;
+const MIN_ENEMY_SPAWN_INTERVAL = 620;
+const FIRST_ENEMY_SPAWN_DELAY = 1350;
+const PLAYER_FIRE_INTERVAL = 260;
+const BULLET_SPEED = 540;
+const ENEMY_SPEED = 42;
 const ENEMY_HP = 2;
-const PLAYER_MOVE_SPEED = 360;
+const PLAYER_MOVE_SPEED = 470;
 const PLAYER_BOUNDS_PADDING = 10;
 const DAMAGE_VALUES = {
   bullet: 1,
-  enemyContact: 18,
+  enemyContact: 12,
 } as const;
 
 const PLAYER_RADIUS = 18;
 const MAX_DELTA_SECONDS = 0.033;
-const PARTICLE_LIFETIME = 0.34;
+const PARTICLE_LIFETIME = 0.42;
+const DIFFICULTY_SCALING = {
+  maxEnemiesStart: 3,
+  maxEnemiesCap: 13,
+  maxEnemiesRampSeconds: 11,
+  spawnRampMsPerSecond: 24,
+  enemySpeedRampPerSecond: 0.012,
+  enemySpeedCapMultiplier: 1.48,
+} as const;
 
 type Vector = {
   x: number;
@@ -57,7 +67,7 @@ type Particle = Vector & {
   color: string;
 };
 
-type RunStatus = 'running' | 'dead';
+type RunStatus = 'ready' | 'running' | 'dead';
 
 type GameState = {
   player: Vector & {
@@ -110,7 +120,7 @@ const STAR_DOTS = Array.from({ length: 86 }, (_, index) => ({
   opacity: 0.22 + (index % 5) * 0.09,
 }));
 
-function createInitialGameState(size: PlayfieldSize): GameState {
+function createInitialGameState(size: PlayfieldSize, status: RunStatus = 'ready'): GameState {
   const playerStart = {
     x: size.width / 2,
     y: size.height * 0.68,
@@ -129,8 +139,8 @@ function createInitialGameState(size: PlayfieldSize): GameState {
     particles: [],
     kills: 0,
     elapsed: 0,
-    status: 'running',
-    spawnTimer: ENEMY_SPAWN_INTERVAL * 0.45,
+    status,
+    spawnTimer: FIRST_ENEMY_SPAWN_DELAY,
     fireTimer: PLAYER_FIRE_INTERVAL * 0.6,
     lastFrameTime: null,
     nextId: 1,
@@ -197,6 +207,28 @@ function movePlayerTowardTarget(state: GameState, deltaSeconds: number, size: Pl
   state.playerVelocityX = (dx / distance) * step;
 }
 
+function getSpawnInterval(elapsed: number) {
+  return Math.max(
+    MIN_ENEMY_SPAWN_INTERVAL,
+    ENEMY_SPAWN_INTERVAL - elapsed * DIFFICULTY_SCALING.spawnRampMsPerSecond
+  );
+}
+
+function getEnemySpeedMultiplier(elapsed: number) {
+  return Math.min(
+    DIFFICULTY_SCALING.enemySpeedCapMultiplier,
+    1 + elapsed * DIFFICULTY_SCALING.enemySpeedRampPerSecond
+  );
+}
+
+function getMaxEnemies(elapsed: number) {
+  return Math.min(
+    DIFFICULTY_SCALING.maxEnemiesCap,
+    DIFFICULTY_SCALING.maxEnemiesStart +
+      Math.floor(elapsed / DIFFICULTY_SCALING.maxEnemiesRampSeconds)
+  );
+}
+
 function spawnEnemy(state: GameState, size: PlayfieldSize) {
   const variant = ENEMY_VARIANTS[state.nextId % ENEMY_VARIANTS.length];
   const edge = state.nextId % 4;
@@ -216,7 +248,7 @@ function spawnEnemy(state: GameState, size: PlayfieldSize) {
     y,
     radius: variant.radius,
     hp: variant.hp,
-    speed: ENEMY_SPEED * variant.speedMultiplier,
+    speed: ENEMY_SPEED * variant.speedMultiplier * getEnemySpeedMultiplier(state.elapsed),
     color: variant.color,
   });
 }
@@ -272,9 +304,9 @@ function advanceGame(state: GameState, deltaSeconds: number, size: PlayfieldSize
   state.spawnTimer -= deltaMs;
   state.fireTimer -= deltaMs;
 
-  if (state.spawnTimer <= 0) {
+  if (state.spawnTimer <= 0 && state.enemies.length < getMaxEnemies(state.elapsed)) {
     spawnEnemy(state, size);
-    state.spawnTimer = ENEMY_SPAWN_INTERVAL;
+    state.spawnTimer = getSpawnInterval(state.elapsed);
   }
 
   if (state.fireTimer <= 0) {
@@ -357,6 +389,10 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+function getScore(kills: number, elapsed: number) {
+  return kills * 100 + Math.floor(elapsed) * 5;
+}
+
 export function VoidDrifterPrototypeScreen() {
   const windowSize = useWindowDimensions();
   const animationFrameRef = useRef<number | null>(null);
@@ -367,8 +403,14 @@ export function VoidDrifterPrototypeScreen() {
   const gameRef = useRef<GameState>(createInitialGameState(playfieldSize));
   const [snapshot, setSnapshot] = useState<Snapshot>(() => cloneSnapshot(gameRef.current));
 
-  const resetRun = useCallback(() => {
-    const freshState = createInitialGameState(playfieldSize);
+  const resetToReady = useCallback(() => {
+    const freshState = createInitialGameState(playfieldSize, 'ready');
+    gameRef.current = freshState;
+    setSnapshot(cloneSnapshot(freshState));
+  }, [playfieldSize]);
+
+  const startRun = useCallback(() => {
+    const freshState = createInitialGameState(playfieldSize, 'running');
     gameRef.current = freshState;
     setSnapshot(cloneSnapshot(freshState));
   }, [playfieldSize]);
@@ -376,8 +418,8 @@ export function VoidDrifterPrototypeScreen() {
   const stars = useMemo(() => STAR_DOTS, []);
 
   useEffect(() => {
-    resetRun();
-  }, [resetRun]);
+    resetToReady();
+  }, [resetToReady]);
 
   useEffect(() => {
     function tick(timestamp: number) {
@@ -453,9 +495,11 @@ export function VoidDrifterPrototypeScreen() {
             <Text style={styles.kicker}>VOID DRIFTER</Text>
             <Text style={styles.title}>Core Fun Prototype</Text>
           </View>
-          <Pressable style={styles.headerButton} onPress={resetRun}>
-            <Text style={styles.headerButtonText}>Restart</Text>
-          </Pressable>
+          {snapshot.status !== 'ready' && (
+            <Pressable style={styles.headerButton} onPress={startRun}>
+              <Text style={styles.headerButtonText}>Restart</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.hud}>
@@ -576,15 +620,46 @@ export function VoidDrifterPrototypeScreen() {
             <View style={styles.playerEngine} />
           </View>
 
+          {snapshot.status === 'ready' && (
+            <View style={styles.startOverlay}>
+              <Text style={styles.startTitle}>VOID DRIFTER</Text>
+              <Text style={styles.startSubtitle}>
+                Survive the sector. Your ship fires automatically.
+              </Text>
+              <Text style={styles.startHint}>
+                Click or drag to steer. Weapons auto-target the nearest enemy.
+              </Text>
+              <Pressable
+                testID="void-drifter-start-run"
+                style={styles.startButton}
+                onPress={startRun}>
+                <Text style={styles.startButtonText}>Start Run</Text>
+              </Pressable>
+            </View>
+          )}
+
           {snapshot.status === 'dead' && (
             <View style={styles.deathOverlay}>
               <Text style={styles.deathKicker}>Run ended</Text>
-              <Text style={styles.deathTitle}>Drifter offline</Text>
-              <Text style={styles.deathStats}>
-                {snapshot.kills} kills / {formatTime(snapshot.elapsed)}
-              </Text>
-              <Pressable style={styles.deathButton} onPress={resetRun}>
-                <Text style={styles.deathButtonText}>Restart run</Text>
+              <Text style={styles.deathTitle}>Signal Lost</Text>
+              <View style={styles.deathStatsRow}>
+                <View style={styles.deathStat}>
+                  <Text style={styles.deathStatLabel}>Kills</Text>
+                  <Text style={styles.deathStatValue}>{snapshot.kills}</Text>
+                </View>
+                <View style={styles.deathStat}>
+                  <Text style={styles.deathStatLabel}>Survived</Text>
+                  <Text style={styles.deathStatValue}>{formatTime(snapshot.elapsed)}</Text>
+                </View>
+                <View style={styles.deathStat}>
+                  <Text style={styles.deathStatLabel}>Score</Text>
+                  <Text style={styles.deathStatValue}>
+                    {getScore(snapshot.kills, snapshot.elapsed)}
+                  </Text>
+                </View>
+              </View>
+              <Pressable style={styles.deathButton} onPress={startRun}>
+                <Text style={styles.deathButtonText}>Restart Run</Text>
               </Pressable>
             </View>
           )}
@@ -774,6 +849,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#38bdf8',
     opacity: 0.86,
   },
+  startOverlay: {
+    position: 'absolute',
+    left: 18,
+    right: 18,
+    top: '24%',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 211, 238, 0.42)',
+    backgroundColor: 'rgba(2, 6, 23, 0.9)',
+    paddingHorizontal: 24,
+    paddingVertical: 30,
+  },
+  startTitle: {
+    color: '#f8fafc',
+    fontSize: 34,
+    fontWeight: '900',
+    letterSpacing: 1.6,
+    textAlign: 'center',
+  },
+  startSubtitle: {
+    color: '#cbd5e1',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+    maxWidth: 420,
+    textAlign: 'center',
+  },
+  startHint: {
+    color: '#67e8f9',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 19,
+    maxWidth: 430,
+    textAlign: 'center',
+  },
+  startButton: {
+    marginTop: 6,
+    borderRadius: 8,
+    backgroundColor: '#22d3ee',
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+  },
+  startButtonText: {
+    color: '#082f49',
+    fontSize: 15,
+    fontWeight: '900',
+  },
   deathOverlay: {
     position: 'absolute',
     left: 18,
@@ -805,6 +929,36 @@ const styles = StyleSheet.create({
     color: '#cbd5e1',
     fontSize: 16,
     fontWeight: '700',
+  },
+  deathStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  deathStat: {
+    minWidth: 96,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.2)',
+    backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    gap: 3,
+  },
+  deathStatLabel: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  deathStatValue: {
+    color: '#f8fafc',
+    fontSize: 17,
+    fontWeight: '900',
   },
   deathButton: {
     marginTop: 4,

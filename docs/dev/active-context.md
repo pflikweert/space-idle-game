@@ -4,7 +4,7 @@
 - huidige focus: VOID DRIFTER Core Fun
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
-- laatste verificatie: `npm run typecheck` en `npm run lint` groen
+- laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 
 ## Gebouwd
 
@@ -17,15 +17,17 @@
 - Bullet/enemy collisions, kills, eenvoudige explosion particles.
 - Enemy/player collisions met HP damage.
 - HUD met HP, kills, elapsed time en enemy count.
-- Death overlay met score, time en restart.
-- Restart reset de run.
+- Start overlay met `Start Run` en korte controls-hint.
+- Run start pas na `Start Run`; ready-state blijft enemy-free.
+- Death overlay met `Signal Lost`, kills, survived time, score en restart.
+- Restart start direct een nieuwe run.
+- Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
 
 ## Nog Niet Gedaan
 
 - Geen final ship asset of uploaded reference-art implementatie.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
-- Geen start-run menu binnen de VOID DRIFTER route.
-- Geen enemy waves/balancing/difficulty curve.
+- Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
@@ -33,8 +35,8 @@
 
 ## Volgende Kleine Stap
 
-Maak de run beter leesbaar en leuker door een kleine start/death flow of tuning-pass te kiezen:
+Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: start overlay met `Start Run` en korte controls-hint
-- optie B: tuning-pass voor movement/enemy speed/fire rate/HP
-- optie C: eerste pickup/XP placeholder na kills
+- optie A: eerste pickup/XP placeholder na kills
+- optie B: kleine visual clarity pass voor ship/enemy silhouettes
+- optie C: 30-seconden tuning review met Pieter's speelervaring

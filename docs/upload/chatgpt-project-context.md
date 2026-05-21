@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T16:55:52.642Z
-Source Commit: e7d7075
+Build Timestamp (UTC): 2026-05-21T17:01:39.114Z
+Source Commit: 80cb026
 
 ## Upload Policy
 
@@ -198,7 +198,7 @@ Path: `docs/dev/active-context.md`
 - huidige focus: VOID DRIFTER Core Fun
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
-- laatste verificatie: `npm run typecheck` en `npm run lint` groen
+- laatste verificatie: `npm run typecheck`, `npm run lint`, browser-smoke en `npm run docs:bundle:verify` groen
 
 ## Gebouwd
 
@@ -211,15 +211,17 @@ Path: `docs/dev/active-context.md`
 - Bullet/enemy collisions, kills, eenvoudige explosion particles.
 - Enemy/player collisions met HP damage.
 - HUD met HP, kills, elapsed time en enemy count.
-- Death overlay met score, time en restart.
-- Restart reset de run.
+- Start overlay met `Start Run` en korte controls-hint.
+- Run start pas na `Start Run`; ready-state blijft enemy-free.
+- Death overlay met `Signal Lost`, kills, survived time, score en restart.
+- Restart start direct een nieuwe run.
+- Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
 
 ## Nog Niet Gedaan
 
 - Geen final ship asset of uploaded reference-art implementatie.
 - Geen player upgrades, XP, pickups, leveling of meta-progressie.
-- Geen start-run menu binnen de VOID DRIFTER route.
-- Geen enemy waves/balancing/difficulty curve.
+- Geen uitgewerkte wave-design/balancing voorbij een lichte scaling-pass.
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen backend, accounts, save system, analytics of store/live-ops werk.
@@ -227,11 +229,11 @@ Path: `docs/dev/active-context.md`
 
 ## Volgende Kleine Stap
 
-Maak de run beter leesbaar en leuker door een kleine start/death flow of tuning-pass te kiezen:
+Maak de volgende Core Fun stap klein en toetsbaar:
 
-- optie A: start overlay met `Start Run` en korte controls-hint
-- optie B: tuning-pass voor movement/enemy speed/fire rate/HP
-- optie C: eerste pickup/XP placeholder na kills
+- optie A: eerste pickup/XP placeholder na kills
+- optie B: kleine visual clarity pass voor ship/enemy silhouettes
+- optie C: 30-seconden tuning review met Pieter's speelervaring
 
 ---
 
@@ -374,21 +376,23 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Dark cosmic playfield with star dots
 - Placeholder player ship with engine glow/trail
 - Click/touch-drag ship movement
+- Start overlay with `Start Run` and controls hint
+- Run stays enemy-free until started
 - Enemies spawn from playfield edges
 - Enemies chase the player position
 - Player auto-shoots at nearest enemy
 - Bullets can kill enemies
 - Enemies can damage the player
 - HUD shows HP, kills, elapsed time, enemy count
-- Death overlay shows kills/time
-- Restart resets the run
+- Death overlay shows kills, survived time, score
+- Restart starts a new run immediately
+- Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
 
 ## Not Built Yet
 
 - Final player ship sprite or imported/generated game assets
-- Start screen inside the VOID DRIFTER route
 - Player upgrades, XP, pickups, or level-up choices
-- Enemy wave design, difficulty curve, or balanced tuning
+- Full enemy wave design or complete balance pass
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
 - Save data, accounts, backend, analytics, monetization, live ops, or store release
@@ -396,11 +400,11 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 ## Next Step Options
 
-1. Add a start overlay with `Start Run` and a tiny controls hint.
-2. Tune the first 30 seconds: movement speed, spawn rate, enemy speed, fire rate, damage.
-3. Add the first pickup/XP placeholder after enemy kills.
+1. Add the first pickup/XP placeholder after enemy kills.
+2. Improve visual readability for ship/enemy silhouettes.
+3. Do a focused 30-second tuning review after hands-on play.
 
-Default recommendation: tune the first 30 seconds before adding progression.
+Default recommendation: improve visual readability before adding progression.
 
 ---
 
