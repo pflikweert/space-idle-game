@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createGeneration,
+  createDreamMachineImageGeneration,
   downloadOutput,
+  waitForDreamMachineGeneration,
   waitForGeneration,
 } from './luma-client.mjs';
 import {
@@ -16,7 +18,8 @@ import {
   renderPromptTemplate,
 } from './prompt-templates.mjs';
 
-const DEFAULT_MODEL = 'uni-1';
+const DEFAULT_AGENTS_MODEL = 'uni-1';
+const DEFAULT_DREAM_MACHINE_MODEL = 'photon-flash-1';
 const DEFAULT_OUTPUT_FORMAT = 'png';
 const DEFAULT_USER_ID = 'void-drifter-local-dev';
 const DEFAULT_POLL_INTERVAL_MS = 3000;
@@ -39,7 +42,8 @@ Required:
 Options:
   --dry-run                    Print sanitized request and do not call Luma
   --ref <path>                 Local PNG/JPEG/WebP reference file; repeat up to ${MAX_IMAGE_REFS} times
-  --model <model>              uni-1 or uni-1-max (default: ${DEFAULT_MODEL})
+  --api <api>                  agents, dream-machine, or auto (default: auto)
+  --model <model>              Agents: uni-1/uni-1-max. Dream Machine: photon-flash-1/photon-1
   --output-format <format>     png or jpeg (default: ${DEFAULT_OUTPUT_FORMAT})
   --aspect-ratio <ratio>       Optional Luma aspect ratio, such as 1:1, 3:2, or 16:9
   --user-id <id>               Opaque Luma user_id (default: ${DEFAULT_USER_ID})
@@ -60,8 +64,9 @@ function parseArgs(argv) {
   const options = {
     refs: [],
     dryRun: false,
-    model: DEFAULT_MODEL,
+    model: null,
     outputFormat: DEFAULT_OUTPUT_FORMAT,
+    api: 'auto',
     userId: DEFAULT_USER_ID,
     webSearch: false,
     pollIntervalMs: DEFAULT_POLL_INTERVAL_MS,
@@ -100,6 +105,10 @@ function parseArgs(argv) {
         break;
       case '--model':
         options.model = requireValue(arg, next);
+        index += 1;
+        break;
+      case '--api':
+        options.api = requireValue(arg, next);
         index += 1;
         break;
       case '--output-format':
@@ -161,8 +170,15 @@ function validateOptions(options) {
     throw new Error('--template is required');
   }
 
-  if (!['uni-1', 'uni-1-max'].includes(options.model)) {
-    throw new Error('--model must be uni-1 or uni-1-max');
+  if (!['auto', 'agents', 'dream-machine'].includes(options.api)) {
+    throw new Error('--api must be auto, agents, or dream-machine');
+  }
+
+  if (
+    options.model &&
+    !['uni-1', 'uni-1-max', 'photon-flash-1', 'photon-1'].includes(options.model)
+  ) {
+    throw new Error('--model must be uni-1, uni-1-max, photon-flash-1, or photon-1');
   }
 
   if (!['png', 'jpeg'].includes(options.outputFormat)) {
@@ -171,11 +187,11 @@ function validateOptions(options) {
 
   if (
     options.aspectRatio &&
-    !['3:1', '2:1', '16:9', '3:2', '1:1', '2:3', '9:16', '1:2', '1:3'].includes(
+    !['3:1', '2:1', '16:9', '3:2', '4:3', '3:4', '1:1', '2:3', '9:16', '1:2', '1:3', '21:9', '9:21'].includes(
       options.aspectRatio
     )
   ) {
-    throw new Error('--aspect-ratio must be one of 3:1, 2:1, 16:9, 3:2, 1:1, 2:3, 9:16, 1:2, or 1:3');
+    throw new Error('--aspect-ratio must be one of 3:1, 2:1, 16:9, 3:2, 4:3, 3:4, 1:1, 2:3, 9:16, 1:2, 1:3, 21:9, or 9:21');
   }
 
   if (options.refs.length > MAX_IMAGE_REFS) {
@@ -323,6 +339,54 @@ function buildRequestBody({ prompt, options, imageRefs }) {
   return body;
 }
 
+function resolveApiMode(options, apiKey) {
+  if (options.api !== 'auto') {
+    return options.api;
+  }
+
+  if (apiKey?.startsWith('luma-api-')) {
+    return 'agents';
+  }
+
+  if (apiKey?.startsWith('luma-')) {
+    return 'dream-machine';
+  }
+
+  return 'agents';
+}
+
+function applyResolvedModel(options, apiMode) {
+  if (options.model) {
+    return options;
+  }
+
+  return {
+    ...options,
+    model: apiMode === 'dream-machine' ? DEFAULT_DREAM_MACHINE_MODEL : DEFAULT_AGENTS_MODEL,
+  };
+}
+
+function buildGenerationRequest({ prompt, options, imageRefs, apiMode }) {
+  if (apiMode === 'dream-machine') {
+    if (imageRefs.length > 0) {
+      throw new Error('Dream Machine image references require public image URLs; local base64 refs are only supported by the Agents API path.');
+    }
+
+    const body = {
+      prompt,
+      model: options.model,
+    };
+
+    if (options.aspectRatio) {
+      body.aspect_ratio = options.aspectRatio;
+    }
+
+    return body;
+  }
+
+  return buildRequestBody({ prompt, options, imageRefs });
+}
+
 function sanitizeRequestBody(body) {
   return {
     ...body,
@@ -335,6 +399,20 @@ function sanitizeRequestBody(body) {
 
 function getTimestamp() {
   return new Date().toISOString().replaceAll(':', '').replaceAll('.', '-');
+}
+
+function getOutputExtension(outputUrl, options) {
+  try {
+    const pathname = new URL(outputUrl).pathname;
+    const extension = path.extname(pathname).toLowerCase();
+    if (['.png', '.jpg', '.jpeg', '.webp'].includes(extension)) {
+      return extension.slice(1) === 'jpeg' ? 'jpg' : extension.slice(1);
+    }
+  } catch {
+    // Fall back to the requested format below.
+  }
+
+  return options.outputFormat === 'jpeg' ? 'jpg' : options.outputFormat;
 }
 
 async function readRunRecords(runRecordsPath) {
@@ -370,7 +448,7 @@ function appendUnique(values, additions) {
   return next;
 }
 
-async function updateManifestAfterSuccess({ manifest, assetKey, options, outputPath, generation, imageRefs }) {
+async function updateManifestAfterSuccess({ manifest, assetKey, options, outputPath, generation, imageRefs, apiMode }) {
   const asset = getAsset(manifest, assetKey);
   const target = asset.kind === 'shared-vfx' ? manifest.sharedVfx : asset.data;
   const generationMetadata = {
@@ -383,6 +461,7 @@ async function updateManifestAfterSuccess({ manifest, assetKey, options, outputP
   };
 
   generationMetadata.model = options.model;
+  generationMetadata.api = apiMode;
   generationMetadata.promptTemplateIds = appendUnique(generationMetadata.promptTemplateIds, [
     options.template,
   ]);
@@ -418,14 +497,26 @@ async function run() {
   const asset = getAsset(manifest, options.enemy);
   const prompt = renderPromptTemplate(options.template, asset.data);
   const imageRefs = await buildImageRefs(options.refs);
-  const requestBody = buildRequestBody({ prompt, options, imageRefs });
+  const initialApiKey = process.env.LUMA_AGENTS_API_KEY;
+  const apiMode = resolveApiMode(options, initialApiKey);
+  const resolvedOptions = applyResolvedModel(options, apiMode);
+  const requestBody = buildGenerationRequest({
+    prompt,
+    options: resolvedOptions,
+    imageRefs,
+    apiMode,
+  });
 
   if (options.dryRun) {
     console.log(
       JSON.stringify(
         {
           dryRun: true,
-          endpoint: 'POST https://agents.lumalabs.ai/v1/generations',
+          api: apiMode,
+          endpoint:
+            apiMode === 'dream-machine'
+              ? 'POST https://api.lumalabs.ai/dream-machine/v1/generations/image'
+              : 'POST https://agents.lumalabs.ai/v1/generations',
           asset: options.enemy,
           assetKind: asset.kind,
           template: options.template,
@@ -453,26 +544,39 @@ async function run() {
     throw new Error('LUMA_AGENTS_API_KEY must be the raw key value without a "Bearer " prefix.');
   }
 
-  if (!apiKey.startsWith('luma-api-')) {
-    throw new Error('LUMA_AGENTS_API_KEY does not look like a Luma Agents key. Current Agents API keys are documented as luma-api-* tokens from platform.lumalabs.ai.');
+  if (apiMode === 'agents' && !apiKey.startsWith('luma-api-')) {
+    throw new Error('Agents API mode requires a luma-api-* key from platform.lumalabs.ai.');
+  }
+
+  if (apiMode === 'dream-machine' && !apiKey.startsWith('luma-')) {
+    throw new Error('Dream Machine API mode requires a luma-* key from lumalabs.ai/dream-machine/api/keys.');
   }
 
   let created;
   try {
-    created = await createGeneration(apiKey, requestBody);
+    created =
+      apiMode === 'dream-machine'
+        ? await createDreamMachineImageGeneration(apiKey, requestBody)
+        : await createGeneration(apiKey, requestBody);
   } catch (error) {
     if (error.status === 401) {
       throw new Error(
-        'Luma rejected LUMA_AGENTS_API_KEY with HTTP 401. Use an Agents API key, omit any "Bearer " prefix, and keep it only in your local shell or .env.local.'
+        `Luma rejected LUMA_AGENTS_API_KEY with HTTP 401 for ${apiMode}. Omit any "Bearer " prefix and confirm the key belongs to that API dashboard.`
       );
     }
 
     throw error;
   }
-  const completed = await waitForGeneration(apiKey, created.id, {
-    pollIntervalMs: options.pollIntervalMs,
-    timeoutMs: options.timeoutMs,
-  });
+  const completed =
+    apiMode === 'dream-machine'
+      ? await waitForDreamMachineGeneration(apiKey, created.id, {
+          pollIntervalMs: resolvedOptions.pollIntervalMs,
+          timeoutMs: resolvedOptions.timeoutMs,
+        })
+      : await waitForGeneration(apiKey, created.id, {
+          pollIntervalMs: resolvedOptions.pollIntervalMs,
+          timeoutMs: resolvedOptions.timeoutMs,
+        });
 
   if (completed.state !== 'completed') {
     throw new Error(
@@ -480,17 +584,22 @@ async function run() {
     );
   }
 
-  const output = completed.output?.find((candidate) => candidate.type === 'image') ?? completed.output?.[0];
-  if (!output?.url) {
+  const outputUrl =
+    apiMode === 'dream-machine'
+      ? completed.assets?.image
+      : completed.output?.find((candidate) => candidate.type === 'image')?.url ?? completed.output?.[0]?.url;
+
+  if (!outputUrl) {
     throw new Error(`Luma generation ${completed.id} completed without an output URL`);
   }
 
   const outputDir = path.join(REPO_ROOT, 'assets/game/enemies', options.enemy, 'references/luma');
   await mkdir(outputDir, { recursive: true });
-  const outputFilename = `${options.template}-${getTimestamp()}.${options.outputFormat}`;
+  const outputExtension = getOutputExtension(outputUrl, resolvedOptions);
+  const outputFilename = `${options.template}-${getTimestamp()}.${outputExtension}`;
   const absoluteOutputPath = path.join(outputDir, outputFilename);
   const relativeOutputPath = path.relative(REPO_ROOT, absoluteOutputPath);
-  const outputBytes = await downloadOutput(output.url);
+  const outputBytes = await downloadOutput(outputUrl);
   await writeFile(absoluteOutputPath, outputBytes);
 
   const record = {
@@ -499,11 +608,12 @@ async function run() {
     completedAt: new Date().toISOString(),
     enemy: options.enemy,
     template: options.template,
-    model: options.model,
-    outputFormat: options.outputFormat,
-    aspectRatio: options.aspectRatio ?? null,
-    webSearch: options.webSearch,
-    userId: options.userId,
+    api: apiMode,
+    model: resolvedOptions.model,
+    outputFormat: resolvedOptions.outputFormat,
+    aspectRatio: resolvedOptions.aspectRatio ?? null,
+    webSearch: resolvedOptions.webSearch,
+    userId: resolvedOptions.userId,
     outputPath: relativeOutputPath,
     prompt,
     inputReferences: imageRefs.map((ref) => ({
@@ -516,10 +626,11 @@ async function run() {
   await updateManifestAfterSuccess({
     manifest,
     assetKey: options.enemy,
-    options,
+    options: resolvedOptions,
     outputPath: relativeOutputPath,
     generation: completed,
     imageRefs,
+    apiMode,
   });
 
   console.log(JSON.stringify({ generationId: completed.id, outputPath: relativeOutputPath }, null, 2));

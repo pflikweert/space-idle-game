@@ -1249,6 +1249,23 @@
           116
         ]
       }
+    },
+    "generation": {
+      "provider": "luma",
+      "model": "photon-flash-1",
+      "promptTemplateIds": [
+        "enemy.vfx.explosion-set"
+      ],
+      "referenceImagePaths": [
+        "assets/game/enemies/shared-vfx/references/luma/enemy.vfx.explosion-set-2026-05-22T070931-699Z.jpg",
+        "assets/game/enemies/shared-vfx/references/luma/enemy.vfx.explosion-set-2026-05-22T071019-322Z.jpg"
+      ],
+      "generationIds": [
+        "56d91942-905c-47fd-bb5f-1741f89da575",
+        "475ccbac-32f7-494c-961e-58cc148c9e3c"
+      ],
+      "api": "dream-machine",
+      "createdAt": "2026-05-22T07:10:12.460000Z"
     }
   }
 }

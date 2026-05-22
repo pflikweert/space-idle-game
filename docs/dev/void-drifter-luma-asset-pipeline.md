@@ -152,7 +152,7 @@ Keep VFX requests pixel-game friendly: moderate detail, transparent background, 
 
 - Keep `LUMA_AGENTS_API_KEY` local-only, for example in an uncommitted `.env.local` or shell environment.
 - Use the raw Agents API key value only; do not include a `Bearer ` prefix in `.env.local`.
-- Use a Luma Agents key from `platform.lumalabs.ai`; current Agents docs describe valid tokens as `luma-api-*`.
+- The local CLI supports both documented key families: `luma-api-*` for Luma Agents/Uni and `luma-*` for Dream Machine image generation. Dream Machine defaults to `photon-flash-1` for lower-cost prototype-quality images.
 - Do not commit API keys, request logs containing secrets, account ids, or local env files.
 - Do not expose Luma calls through Expo, React Native, or client-side Godot web code.
 - Commit selected generated assets and metadata, not secret-bearing integration logic.

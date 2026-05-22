@@ -20,7 +20,10 @@ The CLI also reads `.env.local` directly, so you can use:
 LUMA_AGENTS_API_KEY="luma-api-..."
 ```
 
-The Agents API currently documents valid tokens as `luma-api-*`. Keys for another Luma API surface will be rejected by `agents.lumalabs.ai`.
+The CLI supports both Luma key families:
+
+- `luma-api-*`: Luma Agents API, defaults to `uni-1`.
+- `luma-*`: Dream Machine API, defaults to `photon-flash-1` for lower-cost prototype-quality images.
 
 ## Dry Run
 
