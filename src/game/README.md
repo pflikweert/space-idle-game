@@ -2,16 +2,13 @@
 
 This folder holds the prototype game foundation.
 
-- `core/` for VOID DRIFTER types, tuning constants, math, and collision helpers
-- `runtime/` for world creation and the central simulation update
-- `systems/` for small pure-TypeScript gameplay systems
+- `core/` for shared VOID DRIFTER data used by Expo shell screens such as the Enemy Codex
 - `state/` for lightweight prototype state
 - `ui/` for reusable screen-level game UI
 
 Current VOID DRIFTER playable screen:
 
-- `ui/void-drifter-prototype-screen.tsx`
-- `runtime/createInitialWorld.ts`
-- `runtime/updateWorld.ts`
+- Godot scene under `godot/void-drifter`
+- Expo route shell in `ui/void-drifter-godot-screen.tsx`
 
-Keep route files thin. React Native screens own input and rendering; pure TypeScript runtime files own world state and gameplay simulation.
+Keep route files thin. VOID DRIFTER gameplay belongs in Godot; Expo UI owns route shell and overview screens.

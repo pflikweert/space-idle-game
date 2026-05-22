@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-21T20:57:43.249Z
-Source Commit: c72544e
+Build Timestamp (UTC): 2026-05-22T07:04:07.380Z
+Source Commit: f279778
 
 ## Upload Policy
 
@@ -18,6 +18,7 @@ Source Commit: c72544e
 - `docs/README.md`
 - `docs/dev/active-context.md`
 - `docs/dev/local-browser-testing.md`
+- `docs/dev/void-drifter-luma-asset-pipeline.md`
 - `docs/dev/workflow.md`
 - `docs/project/game-vision.md`
 - `docs/project/mvp-scope.md`
@@ -84,12 +85,6 @@ http://localhost:8081/void-drifter
 
 The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
 
-The old React Native prototype remains available as a fallback/reference:
-
-```text
-http://localhost:8081/void-drifter-expo
-```
-
 If `godot` is not available in PATH, set `GODOT_BIN=/path/to/Godot` before running `npm run godot:export:web`.
 
 ## Verify commands
@@ -113,13 +108,12 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 ## Current structure
 
 - `src/app/*` is the route entry and assembly layer
-- `src/game/core/*` holds VOID DRIFTER types, tuning constants, math, and collision helpers
-- `src/game/runtime/*` holds world creation and the central `updateWorld` simulation step
-- `src/game/systems/*` holds small pure-TypeScript gameplay systems
+- `src/game/core/*` holds shared VOID DRIFTER data for Expo shell screens such as the Enemy Codex
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
 - `godot/void-drifter/assets/player_ship/*` holds the current Luma-derived player ship sprites
+- `assets/game/enemies/*/sheets` is the source for enemy sheets; generated `frames-cell` keep stable gameplay pivots, `preview.png` is used by the Enemy Codex, and `frames-tight` is only for VFX/debug after alpha checks
 - `godot/void-drifter/assets/vfx/*` holds cropped projectile, trail, spark, and explosion sprites
 - `godot/void-drifter/assets/backgrounds/*` holds the current sector, parallax, midfield, and foreground environment layers
 - `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
@@ -133,12 +127,10 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 
 - Home route: `src/app/index.tsx`
 - VOID DRIFTER route: `src/app/void-drifter/index.tsx` embeds the Godot web build when exported
-- Expo fallback route: `src/app/void-drifter-expo/index.tsx`
-- Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
-- Runtime entry: `src/game/runtime/updateWorld.ts`
-- Current gameplay: dark sector-framed playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, simple enemy projectiles, Red Surge bonus waves every 12 Red Scout Drone kills, plasma bolt trails, hit sparks, enemy explosions/debris, player damage feedback, death overlay, restart.
+- Current gameplay: dark sector-framed playfield, controllable player ship, transparent data-driven enemy spawns, enemies chase the player, stable enemy visual states with direction hysteresis, auto-shooting, temporary plasma weapon boosts, simple enemy projectiles, Red Surge bonus waves every 12 Red Scout Drone kills, plasma bolt trails, hit sparks, calmer enemy explosions/debris, player damage feedback, death overlay, restart.
 - Current Godot start flow: `/void-drifter` shows the Godot ready screen, `Start Run` starts the run, `Restart` is hidden until running/death states, and the Enemies entry navigates to `/void-drifter/enemies`.
-- Current Godot HUD direction: sector/wave/time/score top bar plus hull and non-interactive weapon-strip placeholders at the bottom. The wave module shows Red Surge status during surge events; sector/loadout labels stay presentation-only until real progression systems exist.
+- Current Godot HUD direction: sector/wave/time/score top bar plus responsive hull and plasma weapon boost status at the bottom. The wave module shows Red Surge status during surge events; sector/loadout labels stay presentation-only until real progression systems exist.
+- Current local persistence: Godot stores a small VOID DRIFTER profile at `user://void_drifter_profile.json` for lifetime score/kills, total runs, best score/time/wave/surge, highest weapon level, and last-run summary.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
 - UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 
@@ -188,8 +180,11 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - Analyze the existing code before changing structure.
 - Reuse existing Expo and React Native patterns before adding new ones.
 - Keep route files thin and let `src/game/*` hold prototype-specific UI, state, and core helpers.
-- For VOID DRIFTER, `/void-drifter` is Godot-first. Update `godot/void-drifter` gameplay, HUD, menus, start screen, and assets first; keep `/void-drifter-expo` as fallback/reference unless explicitly asked.
-- For VOID DRIFTER enemy work, use `assets/game/enemies/**/frames-tight` as the source of transparent sprites. Mirror Godot enemy folders as snake_case under `godot/void-drifter/assets/enemies/*`. Do not reintroduce old non-transparent sheets or old `move-*` v1 frames.
+- For VOID DRIFTER, `/void-drifter` is Godot-first and there is no React Native gameplay fallback. Update `godot/void-drifter` gameplay, HUD, menus, start screen, and assets first.
+- For Godot animation work, use `.agents/skills/godot-animation-workflow`: choose the simplest suitable node (`AnimationPlayer`, `AnimationTree`, `AnimatedSprite2D`, or `Tween`), keep animation FSM separate from gameplay FSM, and verify Godot changes with `npm run godot:check`.
+- For VOID DRIFTER enemy work, use the enemy sheets under `assets/game/enemies/**/sheets` as the source, generate fixed `frames-cell` canvases for Godot gameplay, generate `preview.png` for Enemy Codex cards, and reserve `frames-tight` for VFX/debug only after alpha/bounds checks. Mirror Godot enemy folders as snake_case under `godot/void-drifter/assets/enemies/*`. Do not reintroduce old non-transparent sheets or old `move-*` v1 frames.
+- Keep enemy/player movement sprites on stable transparent canvases; do not draw gameplay sprites from tightly cropped frames when that would move the pivot or make side/hit frames appear sliced. Enemy visual state should use short timers and direction hysteresis instead of swapping state/direction every frame. When combat frames read like death/explosion art, keep the movement sprite as the primary and show hit/attack as FX overlays.
+- Keep bottom HUD and weapon strips responsive on short/mobile viewports; reserve playfield space so the player is not clamped behind UI.
 - Keep VOID DRIFTER enemy definitions data-driven in `src/game/core/enemies.ts` and mirrored in `godot/void-drifter/scripts/void_drifter_game.gd`. Spawning should use active status, run-level gates, and weights rather than hardcoded one-off enemy ids.
 - Enemy overview/codex navigation for the primary game belongs in the Godot root/start interface first, not only in Expo route wrapper panels.
 - For localhost/browser verification, use `.agents/skills/local-browser-testing` and `docs/dev/local-browser-testing.md`: prefer Browser Use, search for the Node REPL `js` tool if needed, and never claim a visual browser check without a screenshot, DOM snapshot, or console log inspection.
@@ -242,14 +237,14 @@ Path: `docs/dev/active-context.md`
 
 # Active Context
 
-- status: first playable Godot web prototype exists with transparent v2 enemy roster
+- status: first playable Godot web prototype exists with transparent fixed-canvas enemy roster, local profile persistence, and temporary weapon boosts
 - huidige focus: VOID DRIFTER Core Fun
 - route: `/void-drifter`
 - entry vanaf home: `Open VOID DRIFTER`
-- laatste verificatie: Godot headless scene-load via `npm run godot:check`, `npm run godot:export:web`, `npm run typecheck`, `npm run lint`, Expo static export en `npm run docs:bundle:verify` groen; browser-smoke via `curl` kon niet omdat `localhost:8081` niet draaide
-- runtime status: VOID DRIFTER gameplay is split into `src/game/core`, `src/game/runtime`, and `src/game/systems`
+- laatste verificatie: `npm run typecheck`, `npm run lint`, `npm run godot:check`, `npm run godot:export:web` en `npm run docs:upload` groen; `curl -I` smoke checks op `localhost:8082/void-drifter` en `/void-drifter/enemies` geven 200, `/void-drifter-expo` geeft 404
+- runtime status: VOID DRIFTER gameplay runs in Godot; TypeScript is shell/Codex data only
 - Godot status: eerste Godot 4.x MVP-port staat in `godot/void-drifter` en `/void-drifter` embedt de Godot web-export zodra die lokaal is gebouwd
-- enemy status: Enemy Asset Pack v2 is toegevoegd; Red Scout Drone, Red Fighter en Red Cruiser zijn active data-driven enemies met run-level gated weighted spawning
+- enemy status: Enemy Asset Pack v2 is opnieuw uit de aangeleverde 1536x1024 sheets gesneden; Red Scout Drone, Red Fighter en Red Cruiser zijn active data-driven enemies met run-level gated weighted spawning
 - lokale browsercheck: voortaan Browser Use proberen volgens `docs/dev/local-browser-testing.md`; als de runtime niet beschikbaar is, expliciet melden en alleen fallback smoke checks gebruiken
 
 ## Gebouwd
@@ -262,15 +257,17 @@ Path: `docs/dev/active-context.md`
 - Godot player sheet output bevat idle, bank-left, bank-right, boost, damaged, shield en icon sprites.
 - Sprite-state switching: idle, bank-left, bank-right en low-HP damaged.
 - Godot bullets, hit sparks, engine trail en enemy death bursts gebruiken uitgesneden VFX sheet sprites.
-- Red Scout Drone, Red Fighter en Red Cruiser gebruiken Enemy Asset Pack v2 `frames-tight` sprites: idle/thrust/hit per richting, transparante PNGs en shared enemy death VFX.
-- Godot run heeft een visual clarity pass: plasma bolt trails, Red Scout Drone aura/outline, richtingframes, hit flash, HP feedback, grotere death burst + debris en shield-impact feedback bij player contact damage.
+- Red Scout Drone, Red Fighter en Red Cruiser gebruiken Enemy Asset Pack v2 fixed 384x512 `frames-cell` gameplay sprites: idle/thrust/attack/hit per richting, transparante PNGs en shared enemy death VFX.
+- Enemy frames worden met `scripts/godot/extract-void-drifter-enemies.gd` opnieuw uit de source sheets gegenereerd; de extractor centreert alpha-content op vaste canvases en maakt per enemy een aparte `preview.png` voor de Codex.
+- Enemy Codex previews gebruiken `preview.png`; gameplay gebruikt fixed `frames-cell` canvases. Gebruik `frames-tight` niet als gameplay-anchor en alleen nog voor VFX/debug na alpha/bounds-checks.
+- Godot run heeft een visual clarity pass: plasma bolt trails, subtiele enemy aura/outline, velocity-based richtingframes met hysteresis, korte hit-state als flash/spark overlay, event-based attack warmup als telegraph/FX, HP feedback, rustige death burst + debris en shield-impact feedback bij player contact damage.
 - Overige VFX sprites staan alvast import-ready klaar: player laser beam, enemy red bullet, enemy purple shot, shield impact en level-up burst.
 - Script `scripts/godot/extract-void-drifter-sheets.gd` snijdt de player/VFX sheets opnieuw uit.
 - Click/touch-drag movement: ship vliegt smooth naar target.
 - Red enemies spawnen vanaf randen en bewegen naar de actuele player positie.
-- Red enemies gebruiken de bestaande attack telegraph/projectile loop; contact damage blijft daarnaast bestaan.
+- Red enemies gebruiken een rustige event-based attack warmup/projectile loop; hit en attack wisselen niet naar onbetrouwbare combat/death-looking primary sprites. Contact damage blijft daarnaast bestaan.
 - Red Surge Waves zijn Godot-first gebouwd: elke 12 kills start een korte bonus-surge met 5-9 red hostiles, tijdelijke pauze op normale spawning, edge/layer breach VFX, bonus score en `RED SURGE` / `SURGE CLEARED` feedback.
-- Enemy registry toegevoegd in Expo/TypeScript voor data-driven stats, overzicht en fallback/reference gameplay.
+- Enemy registry toegevoegd in Expo/TypeScript voor Enemy Codex data; Godot spiegelt de gameplay-definities.
 - Enemy stats schalen via simpele `runLevel = 1 + floor(elapsed / 30)`.
 - Enemy Codex route `/void-drifter/enemies` toont Red Scout Drone, Red Fighter en Red Cruiser als active met stats, scaling, run-level unlocks, spawn weights, abilities en sprite preview.
 - Auto-shooting met bullets richting dichtstbijzijnde enemy.
@@ -283,18 +280,18 @@ Path: `docs/dev/active-context.md`
 - Death overlay met `Signal Lost`, kills, survived time, score en restart.
 - Restart start direct een nieuwe run.
 - Eerste tuning-pass voor HP, movement, fire rate, spawn pacing, enemy speed en lichte difficulty scaling.
-- Interne pure TypeScript game-runtime met centrale `WorldState`, `createInitialWorld()` en `updateWorld(world, input, deltaMs)`.
-- Gameplay systems zijn opgesplitst voor player movement, enemy spawning/movement, weapons, projectiles, collisions en effects.
 - Godot 4.x project met `project.godot`, `scenes/main.tscn`, GDScript gameplay loop en gekopieerde bestaande player/background assets.
 - Godot-port bevat dezelfde Core Fun: start, movement, enemies, auto-shooting, collisions, HP/kills/time HUD, death en restart.
 - Expo route `/void-drifter` is nu de Godot embed shell.
 - `/void-drifter` startscherm-regressie is gefixt: het Godot script parse't weer, `Start Run` koppelt opnieuw aan de run-state, `Restart` is niet zichtbaar op ready, en de `Enemy Codex` entry zit in de Godot start/death-flow in plaats van als losse Expo iframe-overlay.
-- Expo route `/void-drifter-expo` bewaart de React Native prototypeversie als fallback/reference.
 - Script `npm run godot:export:web` exporteert Godot naar `public/godot/void-drifter`.
 - LCARS-neon UI richting is vastgelegd in `docs/project/void-drifter-ui-style-guide.md`.
 - Luma UI reference assets staan in `godot/void-drifter/assets/ui/luma_reference/`.
 - Godot HUD/start/death UI gebruikt LCARS-neon panels, meters, chips, scanlines en gestylede buttons.
-- Godot HUD toont sector/wave/time/score bovenin en hull + compacte non-interactive weapon strip onderin; de wave-module toont tijdens Red Surge echte surge-status, terwijl sector/loadout nog presentatie-only zijn.
+- Godot HUD toont sector/wave/time/score bovenin en een responsive bottom HUD met hull + plasma weapon boost/charge status; de wave-module toont tijdens Red Surge echte surge-status, terwijl sector/loadout nog presentatie-only zijn.
+- Godot player clamp houdt nu rekening met de gereserveerde bottom HUD-ruimte op korte/mobile viewports.
+- Persistent local profile toegevoegd via `user://void_drifter_profile.json`: lifetime score/kills, total runs, best score/time/wave/surge, highest weapon level en last-run summary.
+- In-run main weapon upgrades toegevoegd als automatische tijdelijke plasma boosts op basis van kill-charge: level 2 sneller/sterker, level 3 twin-shot, level 4 triple/sterker.
 - Script `npm run godot:check` laadt de Godot scene headless en faalt op parse/load errors voordat web export wordt gestart.
 - Lokale browser-verificatieafspraak is vastgelegd in `docs/dev/local-browser-testing.md` en `.agents/skills/local-browser-testing/SKILL.md`.
 
@@ -302,15 +299,15 @@ Path: `docs/dev/active-context.md`
 
 - Boost en shield sprites zijn aanwezig als assets, maar nog niet gekoppeld omdat er geen boost/shield-trigger bestaat.
 - Background asteroids zijn alleen visueel; geen collision/hazards.
-- Geen player upgrades, XP, pickups, leveling of meta-progressie.
-- Sector/loadout HUD is presentatie-only; er is nog geen echte sector progression, inventory, loadout selectie of weapon upgrade systeem.
+- Geen XP, pickups, leveling, shop, inventory of reward-choice systeem.
+- Sector/loadout HUD is presentatie-only; er is nog geen echte sector progression, inventory of loadout selectie.
 - Enemy projectile gameplay is bewust minimaal: bestaande rechte kogelbaan, simpele cooldown, geen patroonvarianten per enemy type.
 - Red Surge Waves zijn korte dopamine-events bovenop endless spawning, geen volledige wave-game met wave completion, boss, rewardskeuzes of run-lock.
-- Expo/React Native fallback `/void-drifter-expo` heeft nog geen Red Surge parity.
+- Geen React Native gameplay fallback meer; VOID DRIFTER gameplay is Godot-only.
 - Geen keyboard controls.
 - Geen audio, screen shake, pause, settings of accessibility pass.
 - Geen upgrade/shop UI implementatie; Luma upgrade mockup is alleen referentie.
-- Geen backend, accounts, save system, analytics of store/live-ops werk.
+- Geen backend, accounts, analytics of store/live-ops werk; persistence is alleen lokale Godot profile JSON.
 - Geen gecommit Godot web-export output; `public/godot/void-drifter` is lokaal/generated.
 - Geen native mobile Godot-in-Expo integratie; de integratie is web-first via Expo route + Godot HTML export.
 - Geen gedeelde runtime tussen Expo TypeScript en Godot GDScript; dit is een eerste port naast de bestaande webversie.
@@ -321,8 +318,8 @@ Path: `docs/dev/active-context.md`
 Maak de volgende Core Fun stap klein en toetsbaar:
 
 - optie A: start `npm run web` en test `/void-drifter` visueel in de browser met de embedded Godot build
-- optie B: visuele browsercheck van Enemy Codex navigatie en Fighter/Cruiser spawning rond runLevel 2/4
-- optie C: eerste upgrade/shop screen pas plannen nadat de run visueel klopt
+- optie B: visuele browsercheck van Enemy Codex previews en Fighter/Cruiser spawning rond runLevel 2/4
+- optie C: tune tijdelijke plasma boost thresholds/durations nadat de run visueel klopt
 
 ---
 
@@ -359,10 +356,11 @@ http://localhost:8081/void-drifter
 Fallback route:
 
 ```text
-http://localhost:8081/void-drifter-expo
+http://localhost:8081/void-drifter/enemies
 ```
 
 For gameplay UI work, verify that the Godot embed loads, the start overlay is visible, HUD text is readable, controls respond, and console logs do not show runtime errors.
+For VOID DRIFTER sprite/HUD work, also check a wide desktop viewport, a mobile-sized viewport, and a short-height viewport. Confirm enemy sprites are not cropped or pivot-shifted, Codex previews are inspectable, and bottom HUD/weapon UI does not overlap the player playfield.
 
 ## Fallback Rule
 
@@ -370,13 +368,183 @@ If the local browser runtime is unavailable, say so plainly. Then use fallback c
 
 ```bash
 curl -I http://localhost:8081/void-drifter
-curl -I http://localhost:8081/void-drifter-expo
+curl -I http://localhost:8081/void-drifter/enemies
 npm run godot:export:web
 npm run typecheck
 npm run lint
 ```
 
 Do not describe fallback checks as a visual browser test.
+
+---
+
+# Source: Docs Dev Void Drifter Luma Asset Pipeline
+
+Path: `docs/dev/void-drifter-luma-asset-pipeline.md`
+
+# VOID DRIFTER Luma Asset Pipeline
+
+This document prepares a safe Luma Uni-1.1-ready enemy asset workflow. It does not add API calls, dependencies, backend code, or runtime Luma access.
+
+## Runtime Boundary
+
+VOID DRIFTER runtime uses committed local assets only.
+
+- Godot gameplay loads mirrored PNGs from `godot/void-drifter/assets/enemies/*`.
+- Expo shell and Codex screens use shared metadata from `src/game/core/*` and preview PNGs from `assets/game/enemies/*/preview.png`.
+- Luma prompts, reference images, generation notes, and future scripts are dev/build tooling only.
+- Never call Luma from Expo, React Native, or bundled Godot web runtime.
+
+Recommended structure:
+
+```text
+assets/game/enemies/
+  enemy-assets-manifest.json
+  <enemy-asset-folder>/
+    sheets/
+    frames-cell/
+    frames-tight/
+    preview.png
+    references/
+      luma/
+        front.png
+        top.png
+        side.png
+        turnaround-demo.png
+    generation/
+      luma-runs.json
+
+docs/dev/
+  void-drifter-luma-asset-pipeline.md
+
+scripts/assets/
+  validate-enemy-assets.mjs
+
+tools/luma/
+  README.md
+  prompt-templates.ts
+```
+
+`scripts/assets/*` is a future optional tooling location. `tools/luma/*` contains the local-only API tooling for dry runs and approved reference generation.
+
+## Enemy Manifest
+
+`assets/game/enemies/enemy-assets-manifest.json` is the canonical asset pipeline manifest. It records source sheets, generated gameplay frame paths, source metadata, and empty Luma generation metadata for the current enemies.
+
+`src/game/core/enemies.ts` remains the runtime gameplay registry for Expo UI. `godot/void-drifter/scripts/void_drifter_game.gd` remains the mirrored Godot gameplay registry. Only update those runtime registries when an enemy should actually appear in the game.
+
+Manifest entries should include:
+
+- `enemyId`: runtime gameplay id, such as `void_drone`.
+- `assetKey`: runtime asset key, such as `red_scout_drone`.
+- `assetFolder`: folder under `assets/game/enemies/`.
+- `displayName`, `archetype`, `role`, `description`, `status`, and `rarityTier`.
+- `stats`, `scaling`, `spawn`, and `abilities` copied from the approved runtime definition when the enemy is active.
+- `sprites.preview`, `sprites.sheets`, `sprites.framesCell`, and optional `sprites.framesTight`.
+- `source.provider`, `source.sourceFiles`, and `source.notes`.
+- `generation.provider`, `generation.model`, `generation.promptTemplateIds`, `generation.referenceImagePaths`, and optional Luma generation ids after future API/tooling work.
+
+## Animation And Enemy Guardrails
+
+New enemy animation work must preserve gameplay readability before adding visual variety.
+
+- Gameplay sprites must come from fixed `frames-cell` canvases with stable pivots. Do not use `frames-tight` as a gameplay source.
+- Direction labels are semantic: `*-right` means the ship nose points right and thrusters sit on the left; `*-left` means the ship nose points left and thrusters sit on the right. Verify this for every enemy before export.
+- Movement silhouettes should remain primary in gameplay. If attack, hit, damaged, or combat frames read like death/explosion art, keep the movement frame visible and render the combat moment as a flash, spark, telegraph, projectile, or death VFX overlay.
+- Hit feedback should be short and non-destructive: flash/spark/scorch overlay for roughly 100-150ms, not a death or explosion sprite.
+- Death sprites and shared explosion VFX only appear when the enemy is removed/killed.
+- Attack feedback should be event-based and timer-driven. Avoid continuous charge flicker or per-frame state flipping.
+- Direction changes should use velocity dominance plus hysteresis/lock timing so diagonal chase movement does not swap frames every frame.
+- Each generated enemy side frame must be visually checked for cut-off hulls, neighbor sprites, wrong thruster orientation, and baked dark/red background slabs before it enters Godot.
+- Codex previews use `preview.png`, not gameplay-tight frames, so dark ships remain readable on dark UI.
+
+## Prompt Templates
+
+Use English prompts for the most consistent output. Keep the ship identity stable across templates and change one major variable per generation pass.
+
+```text
+enemy.reference.front
+Create a clean front-view reference of a VOID DRIFTER enemy ship named {displayName}. Arcade-readable sci-fi silhouette, dark hull with neon red/cyan accents, transparent or flat neutral background, centered full object, no text, no UI, no pilot, no environment, consistent hard-surface details.
+
+enemy.reference.turnaround
+Create a 4-view turnaround reference sheet for {displayName}: front, rear/top, left side, right side. Same ship identity in every view, centered, consistent proportions, arcade-readable silhouette, neutral background, no labels, no text.
+
+enemy.sprite.transparent
+Create a transparent-background game sprite of {displayName}, 384x512 canvas, centered stable pivot, readable at {recommendedDisplaySize}px, neon arcade sci-fi material, no shadow baked into background, no cropping, no text.
+
+enemy.animation.attack
+Create attack-state sprite references for {displayName}: idle silhouette preserved, weapon glow active, muzzle/charge accents visible, same 384x512 centered canvas, transparent background, no explosion or death damage.
+
+enemy.animation.damaged
+Create damaged-state sprite references for {displayName}: same silhouette and pose as the movement sprite, small hull cracks, sparks, scorch marks, readable but not destroyed, transparent background.
+
+enemy.animation.death
+Create a death/explosion variant for {displayName}: debris and energy burst matching the ship palette, transparent background, suitable as short overlay VFX, do not replace movement sprite silhouette.
+
+enemy.demo.turnaround
+Create a polished 3D/turnaround demo reference for {displayName}, same design language, three-quarter view, cinematic but asset-reference focused, neutral background, no gameplay UI.
+```
+
+## Manual Workflow
+
+1. Add or update an enemy entry in `enemy-assets-manifest.json` with `status: "concept"` or `status: "locked"` until it is approved for runtime.
+2. Generate prompts from the documented templates manually or inspect them with `npm run luma:enemy:dry-run -- --enemy <enemy-asset-folder> --template <template-id>`.
+3. Run Luma outside the app runtime with `npm run luma:enemy:generate -- --enemy <enemy-asset-folder> --template <template-id>` only after explicitly choosing to spend an API call.
+4. Save selected references under `assets/game/enemies/<enemy-asset-folder>/references/luma/`.
+5. Create or replace movement and combat sheets under `assets/game/enemies/<enemy-asset-folder>/sheets/`.
+6. Run the existing enemy extraction flow to regenerate `frames-cell`, `frames-tight`, Godot mirrored PNGs, and `preview.png`.
+7. Update manifest `source` and `generation` metadata.
+8. Update `src/game/core/enemies.ts`, `src/game/core/enemyAssets.ts`, and the Godot mirrored definitions only when the enemy should become runtime-visible.
+
+## Local API Tooling
+
+Dry runs do not require a key and do not call Luma:
+
+```bash
+npm run luma:enemy:dry-run -- --enemy red-scout-drone --template enemy.reference.front
+```
+
+Real generation requires `LUMA_AGENTS_API_KEY` in the shell environment:
+
+```bash
+npm run luma:enemy:generate -- --enemy red-fighter --template enemy.sprite.transparent
+```
+
+Local reference images can be passed without public hosting:
+
+```bash
+npm run luma:enemy:generate -- \
+  --enemy red-cruiser \
+  --template enemy.reference.turnaround \
+  --ref assets/game/enemies/red-cruiser/references/luma/front.png
+```
+
+The CLI sends local references as base64 `image_ref` data, keeps `web_search` disabled by default, downloads completed output URLs immediately, writes run records to `generation/luma-runs.json`, and updates manifest generation metadata only after successful generation.
+
+Shared enemy death VFX can use the `shared-vfx` asset target:
+
+```bash
+npm run luma:enemy:generate -- \
+  --enemy shared-vfx \
+  --template enemy.vfx.explosion-set \
+  --aspect-ratio 16:9
+```
+
+Keep VFX requests pixel-game friendly: moderate detail, transparent background, reusable small frames, restrained glow, and subtle debris variants rather than max-fidelity cinematic explosions.
+
+## Security
+
+- Keep `LUMA_AGENTS_API_KEY` local-only, for example in an uncommitted `.env.local` or shell environment.
+- Use the raw Agents API key value only; do not include a `Bearer ` prefix in `.env.local`.
+- Do not commit API keys, request logs containing secrets, account ids, or local env files.
+- Do not expose Luma calls through Expo, React Native, or client-side Godot web code.
+- Commit selected generated assets and metadata, not secret-bearing integration logic.
+- Keep Luma `web_search` disabled by default for this asset workflow unless a future task explicitly needs it.
+- Do not add a Luma SDK dependency until an approved API-client task requires it; the current local tool uses Node built-ins only.
+
+## Future API Hook
+
+The current API hook is a local dev script under `tools/luma/` using local environment variables. `image_edit`, server-side generation, or a Supabase Edge Function should only be considered after an explicit backend decision, because the current prototype is frontend-only.
 
 ---
 
@@ -485,6 +653,8 @@ Build one playable VOID DRIFTER web prototype screen that proves whether one sim
 - player damage
 - HUD for HP, kills, elapsed time, and enemy count
 - death and restart
+- tiny local run profile for best/lifetime stats
+- temporary automatic main-weapon boosts during a run
 
 ## Explicitly not in MVP
 
@@ -496,7 +666,7 @@ Build one playable VOID DRIFTER web prototype screen that proves whether one sim
 - heavy 3D or dedicated game-engine integration
 - final art pipeline
 - final ship/enemy assets
-- upgrades, XP, pickups, or meta-progression
+- shops, XP trees, pickups, loadout inventory, or complex meta-progression
 - audio
 - multiplayer
 
@@ -524,57 +694,57 @@ Prove that one short browser-playable run feels readable and fun before adding s
 - Ship sprite-state switching for idle, bank-left, bank-right, and low-HP damaged
 - Godot bullets, hit sparks, engine trail, and enemy death bursts use cropped VFX sheet sprites from `godot/void-drifter/assets/vfx/`
 - Enemy Asset Pack v2 is installed under `assets/game/enemies/` with transparent Red Scout Drone, Red Fighter, Red Cruiser, and shared enemy VFX frames
-- Red Scout Drone, Red Fighter, and Red Cruiser use transparent `frames-tight` idle/thrust/hit direction sprites plus shared enemy death VFX
-- Godot combat feedback pass: plasma bolt trails/glow, Red Scout Drone aura/outline, velocity-based direction frames, hit flash, enemy HP feedback, larger death burst/debris, and shield-impact contact feedback for player damage
+- Red Scout Drone, Red Fighter, and Red Cruiser use transparent fixed 384x512 `frames-cell` idle/thrust/attack/hit direction sprites plus shared enemy death VFX
+- Enemy sheet extraction recenters alpha content on fixed gameplay canvases so direction and hit frames keep a stable pivot; it also generates per-enemy `preview.png` assets for the Codex. `frames-tight` is reserved for VFX/debug use after alpha/bounds checks.
+- Godot combat feedback pass: plasma bolt trails/glow, subtle enemy aura/outline, velocity-based direction frames with hysteresis, hit as flash/spark overlay instead of death-looking primary sprites, event-based attack warmup as telegraph/FX, enemy HP feedback, calmer death burst/debris, and shield-impact contact feedback for player damage
 - Future VFX assets are also cropped and import-ready: player laser beam, enemy red bullet, enemy purple shot, shield impact, and level-up burst
-- Sheet extraction helper exists at `scripts/godot/extract-void-drifter-sheets.gd`
+- Sheet extraction helpers exist at `scripts/godot/extract-void-drifter-sheets.gd` and `scripts/godot/extract-void-drifter-enemies.gd`
 - Click/touch-drag ship movement
 - Start overlay with `Start Run` and controls hint
 - Run stays enemy-free until started
 - Red Scout Drone, Red Fighter, and Red Cruiser are active enemy types
-- Enemy registry added for data-driven stats, overview data, weighted run-level spawning, and React Native fallback/reference gameplay
+- Enemy registry added for data-driven overview data; Godot mirrors the gameplay definitions for weighted run-level spawning
 - Red enemies spawn from playfield edges
 - Enemies chase the player position
-- Existing enemy attack telegraph fires a simple red enemy projectile at high charge
+- Enemy attack warmup shows a short red telegraph, then fires a simple red enemy projectile
 - Red Surge Waves in Godot: every 12 kills starts a short bonus surge with 5-9 red hostiles, paused normal spawning, edge/layer breach VFX, bonus score, and `RED SURGE` / `SURGE CLEARED` feedback
 - Enemy stats now scale through simple run-level progression: `1 + floor(elapsed / 30)`
+- In-run plasma weapon boosts are automatic and temporary: kills fill charge, then level 2/3/4 briefly improve fire rate, damage, and shot count before returning to level 1
 - Player auto-shoots at nearest enemy
 - Bullets can kill enemies
 - Enemies can damage the player
 - Enemy projectiles can damage the player and trigger shield-impact feedback
-- HUD shows HP, kills, elapsed time, enemy count
-- Death overlay shows kills, survived time, score
+- HUD shows HP, kills, elapsed time, enemy count, score, plasma boost level, charge, and timer
+- Death overlay shows kills, survived time, score, earned score, best score, and lifetime score
+- Local Godot profile persistence stores lifetime score/kills, total runs, best score/time/wave/surge, highest weapon level, and last-run summary in `user://void_drifter_profile.json`
 - Restart starts a new run immediately
 - Light tuning pass: calmer first seconds, responsive movement, faster bullets, slower early enemies, spawn/max-enemy scaling
-- Internal pure TypeScript game runtime under `src/game/core`, `src/game/runtime`, and `src/game/systems`
-- Central `WorldState`, `createInitialWorld()`, and `updateWorld(world, input, deltaMs)` preserve gameplay outside the React render layer
 - First Godot 4.x MVP port under `godot/void-drifter`
 - Godot scene includes start flow, ship movement, parallax, enemy spawning/chase, auto-shooting, collisions, HUD, death, and restart
 - Godot start screen regression is fixed: script parse/load is clean, `Start Run` starts the run, `Restart` is hidden in ready state, and the `Enemy Codex` entry belongs to the Godot start/death UI instead of the Expo iframe shell
 - Expo route `/void-drifter` embeds the Godot web export when `public/godot/void-drifter/build-info.json` exists
 - Expo route `/void-drifter/enemies` shows Red Scout Drone, Red Fighter, and Red Cruiser as active with stats, scaling, run-level unlocks, spawn weights, abilities, and sprite previews
-- Expo route `/void-drifter-expo` keeps the React Native prototype available as fallback/reference
 - `npm run godot:export:web` exports the Godot build into Expo's public folder
 - LCARS-neon UI style guide under `docs/project/void-drifter-ui-style-guide.md`
 - Luma reference UI assets under `godot/void-drifter/assets/ui/luma_reference/`
 - Godot HUD/start/death UI uses LCARS-neon panels, compact meters, chips, scanlines, and styled neon buttons
-- Godot HUD now leans toward the MVP reference: top sector/wave/time/score/kills, Red Surge status in the wave module during surge events, and bottom hull plus non-interactive plasma/locked weapon strip
+- Godot HUD now leans toward the MVP reference: top sector/wave/time/score/kills, Red Surge status in the wave module during surge events, and responsive bottom hull plus plasma weapon boost strip
 - `npm run godot:check` performs a headless Godot scene-load check and fails on script parse/load errors before web export
 
 ## Not Built Yet
 
 - Boost and shield ship sprites exist as assets, but boost/shield gameplay behavior is not wired because there is no trigger/system yet
-- Sector, score framing, and weapon strip UI are presentation-only; no real sector progression, loadout selection, or weapon inventory exists yet
+- Sector and loadout UI are presentation-only; no real sector progression, loadout selection, weapon inventory, shop, or reward-choice system exists yet
 - Enemy projectile gameplay is intentionally minimal: straight shots, simple cooldown, no enemy-specific pattern variants yet
 - Red Surge Waves are short bonus events on top of endless spawning, not a full wave-completion game, boss system, or reward-choice loop
-- Expo fallback `/void-drifter-expo` does not have Red Surge parity yet
+- React Native gameplay fallback has been removed; VOID DRIFTER gameplay is Godot-only
 - Background asteroid collision or hazards; parallax is visual only
-- Player upgrades, XP, pickups, or level-up choices
+- XP, pickups, level-up choices, shop, or persistent upgrade purchases
 - Upgrade/shop UI implementation; the Luma upgrade mockup is reference only
 - Full enemy wave design or complete balance pass beyond the first Red Surge MVP
 - Keyboard controls
 - Audio, pause, settings, screen shake, or polish pass
-- Save data, accounts, backend, analytics, monetization, live ops, or store release
+- Accounts, backend, analytics, monetization, live ops, or store release; persistence is local Godot JSON only
 - Committed Godot web export output; the export is local/generated and ignored
 - Native mobile Godot embedding inside Expo
 - External ECS/runtime framework; current runtime is intentionally small and local to the Expo codebase
@@ -584,9 +754,9 @@ Prove that one short browser-playable run feels readable and fun before adding s
 
 1. Start `npm run web` and visually test `/void-drifter` through Expo with the embedded Godot web build.
 2. Visually verify Enemy Codex navigation and Fighter/Cruiser spawning around runLevel 2/4.
-3. Plan the first upgrade/shop screen only after the run reads well.
+3. Tune temporary plasma boost thresholds/durations after visual browser verification.
 
-Default recommendation: verify the LCARS-neon Godot run before adding progression.
+Default recommendation: visually verify the LCARS-neon Godot run on desktop, mobile, and short-height viewports before adding any shop or reward-choice systems.
 
 ---
 
@@ -622,7 +792,7 @@ This is inspiration, not a direct Star Trek copy. Do not use Star Trek marks, ic
 - Use semi-transparent panels; never cover the playfield with large opaque blocks.
 - HUD should stay compact, roughly 15% of the screen where possible.
 - Top HUD: sector, wave, time, score, kills, and enemy count presentation.
-- Bottom HUD: hull/health and compact status/weapon information.
+- Bottom HUD: hull/health and compact weapon charge/boost information; reserve playfield space on short/mobile viewports so gameplay never sits underneath it.
 - Weapon strips may show locked/loadout placeholders, but they must be clearly non-interactive until upgrades and inventory are actually implemented.
 - Text is small, uppercase, and high contrast.
 - Use cyan for player/system info, magenta for special/progression, orange for danger, teal for positive status.
@@ -664,16 +834,13 @@ Path: `src/game/README.md`
 
 This folder holds the prototype game foundation.
 
-- `core/` for VOID DRIFTER types, tuning constants, math, and collision helpers
-- `runtime/` for world creation and the central simulation update
-- `systems/` for small pure-TypeScript gameplay systems
+- `core/` for shared VOID DRIFTER data used by Expo shell screens such as the Enemy Codex
 - `state/` for lightweight prototype state
 - `ui/` for reusable screen-level game UI
 
 Current VOID DRIFTER playable screen:
 
-- `ui/void-drifter-prototype-screen.tsx`
-- `runtime/createInitialWorld.ts`
-- `runtime/updateWorld.ts`
+- Godot scene under `godot/void-drifter`
+- Expo route shell in `ui/void-drifter-godot-screen.tsx`
 
-Keep route files thin. React Native screens own input and rendering; pure TypeScript runtime files own world state and gameplay simulation.
+Keep route files thin. VOID DRIFTER gameplay belongs in Godot; Expo UI owns route shell and overview screens.

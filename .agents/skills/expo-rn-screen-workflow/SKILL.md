@@ -12,9 +12,9 @@ Use for screen work, route work, or lightweight UI implementation.
 3. Reuse existing theme and layout patterns before adding new ones.
 4. Keep the primary action obvious and the copy compact.
 5. Avoid extra dependencies for simple screens.
-6. For VOID DRIFTER, treat Expo screens as fallback/reference unless the user explicitly asks for Expo-first UI.
+6. For VOID DRIFTER, Expo screens are shell/codex UI only; gameplay belongs in Godot.
 
 # Do not
 - Do not add unrelated state, data, or infra work during a screen task.
 - Do not introduce multiple new visual patterns in one pass.
-- Do not put primary VOID DRIFTER gameplay navigation only in the Expo route wrapper.
+- Do not rebuild a React Native gameplay fallback for VOID DRIFTER.

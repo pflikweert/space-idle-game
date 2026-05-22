@@ -26,7 +26,7 @@ This is inspiration, not a direct Star Trek copy. Do not use Star Trek marks, ic
 - Use semi-transparent panels; never cover the playfield with large opaque blocks.
 - HUD should stay compact, roughly 15% of the screen where possible.
 - Top HUD: sector, wave, time, score, kills, and enemy count presentation.
-- Bottom HUD: hull/health and compact status/weapon information.
+- Bottom HUD: hull/health and compact weapon charge/boost information; reserve playfield space on short/mobile viewports so gameplay never sits underneath it.
 - Weapon strips may show locked/loadout placeholders, but they must be clearly non-interactive until upgrades and inventory are actually implemented.
 - Text is small, uppercase, and high contrast.
 - Use cyan for player/system info, magenta for special/progression, orange for danger, teal for positive status.

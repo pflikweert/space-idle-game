@@ -14,6 +14,7 @@ Use for any task that risks growing beyond the current prototype slice.
 5. Do not introduce a new engine or major framework shift without an explicit decision.
 6. For VOID DRIFTER, keep `/void-drifter` Godot-first and avoid moving primary game UI back into Expo wrappers.
 7. Stop scope creep early and call out assumptions clearly.
+8. Keep generated VOID DRIFTER art prototype-readable and pixel-game friendly; do not chase max-fidelity, photoreal, or production-polish renders unless explicitly requested.
 
 # Do not
 - Do not turn a small prototype task into an architecture project.

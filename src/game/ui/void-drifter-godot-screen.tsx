@@ -70,14 +70,9 @@ export function VoidDrifterGodotScreen() {
           </View>
           <Text style={styles.note}>
             Godot is not installed in this Codex environment, so the export could not be generated
-            here. The React Native prototype remains available as a fallback.
+            here. VOID DRIFTER now runs Godot-first, so export the web build to play.
           </Text>
 
-          <Link href="/void-drifter-expo" asChild>
-            <Pressable style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Open Expo fallback</Text>
-            </Pressable>
-          </Link>
           <Link href="/void-drifter/enemies" asChild>
             <Pressable style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>Enemy Codex</Text>

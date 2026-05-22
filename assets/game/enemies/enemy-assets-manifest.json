@@ -1,30 +1,54 @@
 {
+  "version": 1,
   "pack": "void-drifter-enemy-pack-v2-red",
-  "recommendedUse": "Use frames-tight for gameplay sprites; sheets are kept for atlas/preview/debug.",
-  "grid": {
-    "columns": 4,
-    "rows": 2,
-    "sheetSize": [
-      1536,
-      1024
-    ],
-    "cellSize": [
-      384,
-      512
-    ]
+  "recommendedUse": "Use frames-cell for gameplay sprites so direction, thrust, attack, and hit states keep a stable pivot. Use preview.png for Codex cards. Use frames-tight only for VFX or debug views after alpha/bounds checks.",
+  "pipeline": {
+    "sourceProvider": "manual",
+    "gameplayCanvas": {
+      "width": 384,
+      "height": 512
+    },
+    "sheetGrid": {
+      "columns": 4,
+      "rows": 2,
+      "sheetSize": [
+        1536,
+        1024
+      ]
+    },
+    "runtimeRule": "game uses committed local assets only",
+    "toolingRule": "Luma prompts, references, generation records, and future API scripts are dev/build tooling only."
   },
   "enemies": {
     "red-scout-drone": {
-      "name": "Red Scout Drone",
-      "role": "Fast fodder / swarm scout",
+      "enemyId": "void_drone",
+      "assetKey": "red_scout_drone",
+      "assetFolder": "red-scout-drone",
+      "displayName": "Void Drone",
+      "archetype": "fast fodder / swarm scout",
+      "role": "Basic chase enemy",
+      "description": "Standard void-skimmer that enters from screen edges and pushes the player out of position.",
       "status": "active",
-      "activeInMvpNow": true,
+      "rarityTier": "common",
       "recommendedDisplaySize": 48,
-      "baseStats": {
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
         "hp": 16,
         "speed": 52,
         "contactDamage": 10,
         "xpReward": 4,
+        "coinReward": 2,
         "scoreReward": 10,
         "radius": 18
       },
@@ -37,630 +61,768 @@
         "weight": 100,
         "minRunLevel": 1
       },
-      "sheets": {
-        "movement": "assets/game/enemies/red-scout-drone/sheets/sheet-a-movement.png",
-        "combat": "assets/game/enemies/red-scout-drone/sheets/sheet-b-combat.png"
-      },
-      "frames": {
-        "idle-down": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/idle-down.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/idle-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            145,
-            300
-          ]
+      "abilities": [
+        "chase_player",
+        "contact_damage",
+        "red_projectile_later"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/red-scout-drone/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/red-scout-drone/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/red-scout-drone/sheets/sheet-b-combat.png"
         },
-        "idle-up": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/idle-up.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/idle-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            301
-          ]
+        "framesCell": {
+          "idle": {
+            "up": "assets/game/enemies/red-scout-drone/frames-cell/idle-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-cell/idle-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-cell/idle-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-cell/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-scout-drone/frames-cell/thrust-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-cell/thrust-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-cell/thrust-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-cell/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-scout-drone/frames-cell/attack-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-cell/attack-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-cell/attack-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-cell/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-scout-drone/frames-cell/hit-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-cell/hit-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-cell/hit-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-cell/hit-right.png"
+          }
         },
-        "idle-left": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/idle-left.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/idle-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            224
-          ]
+        "framesTight": {
+          "idle": {
+            "up": "assets/game/enemies/red-scout-drone/frames-tight/idle-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-tight/idle-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-tight/idle-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-tight/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-scout-drone/frames-tight/thrust-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-tight/thrust-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-tight/thrust-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-tight/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-scout-drone/frames-tight/attack-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-tight/attack-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-tight/attack-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-tight/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-scout-drone/frames-tight/hit-up.png",
+            "down": "assets/game/enemies/red-scout-drone/frames-tight/hit-down.png",
+            "left": "assets/game/enemies/red-scout-drone/frames-tight/hit-left.png",
+            "right": "assets/game/enemies/red-scout-drone/frames-tight/hit-right.png"
+          }
         },
-        "idle-right": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/idle-right.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/idle-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            123,
-            182
-          ]
-        },
-        "thrust-down": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/thrust-down.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/thrust-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            139,
-            284
-          ]
-        },
-        "thrust-up": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/thrust-up.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/thrust-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            289
-          ]
-        },
-        "thrust-left": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/thrust-left.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/thrust-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            271
-          ]
-        },
-        "thrust-right": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/thrust-right.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/thrust-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            160,
-            183
-          ]
-        },
-        "attack-down": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/attack-down.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/attack-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            324,
-            269
-          ]
-        },
-        "attack-up": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/attack-up.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/attack-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            240,
-            354
-          ]
-        },
-        "attack-left": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/attack-left.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/attack-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            270,
-            429
-          ]
-        },
-        "attack-right": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/attack-right.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/attack-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            276,
-            351
-          ]
-        },
-        "hit-down": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/hit-down.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/hit-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            258,
-            220
-          ]
-        },
-        "hit-up": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/hit-up.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/hit-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            233,
-            324
-          ]
-        },
-        "hit-left": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/hit-left.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/hit-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            272,
-            239
-          ]
-        },
-        "hit-right": {
-          "cell": "assets/game/enemies/red-scout-drone/frames-cell/hit-right.png",
-          "tight": "assets/game/enemies/red-scout-drone/frames-tight/hit-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            257,
-            301
-          ]
+        "frameMetadata": {
+          "idle": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                301
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                145,
+                300
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                224
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                123,
+                182
+              ]
+            }
+          },
+          "thrust": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                289
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                139,
+                284
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                271
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                160,
+                183
+              ]
+            }
+          },
+          "attack": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                240,
+                354
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                324,
+                269
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                270,
+                429
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                276,
+                351
+              ]
+            }
+          },
+          "hit": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                233,
+                324
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                258,
+                220
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                272,
+                239
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                257,
+                301
+              ]
+            }
+          }
         }
+      },
+      "source": {
+        "provider": "manual",
+        "sourceFiles": [
+          "assets/game/enemies/red-scout-drone/sheets/sheet-a-movement.png",
+          "assets/game/enemies/red-scout-drone/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Existing manually imported Luma-derived enemy pack source. Keep as local committed assets until an API workflow is explicitly added."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "uni-1",
+        "promptTemplateIds": [],
+        "referenceImagePaths": [],
+        "generationIds": []
       }
     },
     "red-fighter": {
-      "name": "Red Fighter",
-      "role": "Medium aggressive flanker",
-      "status": "locked",
-      "activeInMvpNow": false,
+      "enemyId": "red_scout",
+      "assetKey": "red_fighter",
+      "assetFolder": "red-fighter",
+      "displayName": "Red Scout",
+      "archetype": "fast low-HP enemy",
+      "role": "Fast low-HP enemy",
+      "description": "Fast red scout craft that arrives early and punishes slow movement.",
+      "status": "active",
+      "rarityTier": "uncommon",
       "recommendedDisplaySize": 68,
-      "baseStats": {
-        "hp": 34,
-        "speed": 42,
-        "contactDamage": 14,
-        "xpReward": 8,
-        "scoreReward": 22,
-        "radius": 25
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 22,
+        "speed": 72,
+        "contactDamage": 12,
+        "xpReward": 7,
+        "coinReward": 3,
+        "scoreReward": 24,
+        "radius": 22
       },
       "scaling": {
-        "hpPerLevel": 5,
-        "speedPerLevel": 1,
+        "hpPerLevel": 4,
+        "speedPerLevel": 1.2,
         "damagePerLevel": 1.4
       },
       "spawn": {
-        "weight": 0,
-        "minRunLevel": 99
+        "weight": 35,
+        "minRunLevel": 2
       },
-      "sheets": {
-        "movement": "assets/game/enemies/red-fighter/sheets/sheet-a-movement.png",
-        "combat": "assets/game/enemies/red-fighter/sheets/sheet-b-combat.png"
-      },
-      "frames": {
-        "idle-down": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/idle-down.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/idle-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            329,
-            295
-          ]
+      "abilities": [
+        "chase_player",
+        "contact_damage",
+        "flank_player_later"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/red-fighter/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/red-fighter/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/red-fighter/sheets/sheet-b-combat.png"
         },
-        "idle-up": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/idle-up.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/idle-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            235
-          ]
+        "framesCell": {
+          "idle": {
+            "up": "assets/game/enemies/red-fighter/frames-cell/idle-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-cell/idle-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-cell/idle-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-cell/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-fighter/frames-cell/thrust-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-cell/thrust-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-cell/thrust-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-cell/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-fighter/frames-cell/attack-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-cell/attack-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-cell/attack-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-cell/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-fighter/frames-cell/hit-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-cell/hit-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-cell/hit-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-cell/hit-right.png"
+          }
         },
-        "idle-left": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/idle-left.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/idle-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            204
-          ]
+        "framesTight": {
+          "idle": {
+            "up": "assets/game/enemies/red-fighter/frames-tight/idle-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-tight/idle-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-tight/idle-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-tight/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-fighter/frames-tight/thrust-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-tight/thrust-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-tight/thrust-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-tight/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-fighter/frames-tight/attack-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-tight/attack-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-tight/attack-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-tight/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-fighter/frames-tight/hit-up.png",
+            "down": "assets/game/enemies/red-fighter/frames-tight/hit-down.png",
+            "left": "assets/game/enemies/red-fighter/frames-tight/hit-left.png",
+            "right": "assets/game/enemies/red-fighter/frames-tight/hit-right.png"
+          }
         },
-        "idle-right": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/idle-right.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/idle-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            258,
-            195
-          ]
-        },
-        "thrust-down": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/thrust-down.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/thrust-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            322,
-            369
-          ]
-        },
-        "thrust-up": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/thrust-up.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/thrust-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            358
-          ]
-        },
-        "thrust-left": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/thrust-left.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/thrust-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            382,
-            204
-          ]
-        },
-        "thrust-right": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/thrust-right.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/thrust-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            293,
-            191
-          ]
-        },
-        "attack-down": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/attack-down.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/attack-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            336,
-            294
-          ]
-        },
-        "attack-up": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/attack-up.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/attack-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            383,
-            286
-          ]
-        },
-        "attack-left": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/attack-left.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/attack-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            322,
-            203
-          ]
-        },
-        "attack-right": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/attack-right.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/attack-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            337,
-            189
-          ]
-        },
-        "hit-down": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/hit-down.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/hit-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            325,
-            263
-          ]
-        },
-        "hit-up": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/hit-up.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/hit-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            313
-          ]
-        },
-        "hit-left": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/hit-left.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/hit-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            324,
-            183
-          ]
-        },
-        "hit-right": {
-          "cell": "assets/game/enemies/red-fighter/frames-cell/hit-right.png",
-          "tight": "assets/game/enemies/red-fighter/frames-tight/hit-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            341,
-            182
-          ]
+        "frameMetadata": {
+          "idle": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                235
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                329,
+                295
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                204
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                258,
+                195
+              ]
+            }
+          },
+          "thrust": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                358
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                322,
+                369
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                382,
+                204
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                293,
+                191
+              ]
+            }
+          },
+          "attack": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                383,
+                286
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                336,
+                294
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                322,
+                203
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                337,
+                189
+              ]
+            }
+          },
+          "hit": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                313
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                325,
+                263
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                324,
+                183
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                341,
+                182
+              ]
+            }
+          }
         }
+      },
+      "source": {
+        "provider": "manual",
+        "sourceFiles": [
+          "assets/game/enemies/red-fighter/sheets/sheet-a-movement.png",
+          "assets/game/enemies/red-fighter/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Existing manually imported Luma-derived enemy pack source. Keep as local committed assets until an API workflow is explicitly added."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "uni-1",
+        "promptTemplateIds": [],
+        "referenceImagePaths": [],
+        "generationIds": []
       }
     },
     "red-cruiser": {
-      "name": "Red Cruiser",
-      "role": "Heavy tank / slow pressure ship",
-      "status": "locked",
-      "activeInMvpNow": false,
+      "enemyId": "void_tank",
+      "assetKey": "red_cruiser",
+      "assetFolder": "red-cruiser",
+      "displayName": "Void Tank",
+      "archetype": "slow high-HP pressure ship",
+      "role": "Slow high-HP enemy",
+      "description": "Armored void hull that soaks fire and compresses safe space later in a run.",
+      "status": "active",
+      "rarityTier": "elite",
       "recommendedDisplaySize": 96,
-      "baseStats": {
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
         "hp": 90,
         "speed": 25,
         "contactDamage": 24,
         "xpReward": 18,
+        "coinReward": 8,
         "scoreReward": 60,
         "radius": 38
       },
@@ -670,302 +832,353 @@
         "damagePerLevel": 2.2
       },
       "spawn": {
-        "weight": 0,
-        "minRunLevel": 99
+        "weight": 12,
+        "minRunLevel": 4
       },
-      "sheets": {
-        "movement": "assets/game/enemies/red-cruiser/sheets/sheet-a-movement.png",
-        "combat": "assets/game/enemies/red-cruiser/sheets/sheet-b-combat.png"
-      },
-      "frames": {
-        "idle-down": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/idle-down.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/idle-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            272,
-            383
-          ]
+      "abilities": [
+        "chase_player",
+        "contact_damage",
+        "spread_fire_later"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/red-cruiser/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/red-cruiser/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/red-cruiser/sheets/sheet-b-combat.png"
         },
-        "idle-up": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/idle-up.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/idle-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            369
-          ]
+        "framesCell": {
+          "idle": {
+            "up": "assets/game/enemies/red-cruiser/frames-cell/idle-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-cell/idle-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-cell/idle-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-cell/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-cruiser/frames-cell/thrust-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-cell/thrust-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-cell/thrust-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-cell/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-cruiser/frames-cell/attack-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-cell/attack-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-cell/attack-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-cell/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-cruiser/frames-cell/hit-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-cell/hit-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-cell/hit-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-cell/hit-right.png"
+          }
         },
-        "idle-left": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/idle-left.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/idle-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            371
-          ]
+        "framesTight": {
+          "idle": {
+            "up": "assets/game/enemies/red-cruiser/frames-tight/idle-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-tight/idle-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-tight/idle-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-tight/idle-right.png"
+          },
+          "thrust": {
+            "up": "assets/game/enemies/red-cruiser/frames-tight/thrust-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-tight/thrust-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-tight/thrust-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-tight/thrust-right.png"
+          },
+          "attack": {
+            "up": "assets/game/enemies/red-cruiser/frames-tight/attack-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-tight/attack-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-tight/attack-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-tight/attack-right.png"
+          },
+          "hit": {
+            "up": "assets/game/enemies/red-cruiser/frames-tight/hit-up.png",
+            "down": "assets/game/enemies/red-cruiser/frames-tight/hit-down.png",
+            "left": "assets/game/enemies/red-cruiser/frames-tight/hit-left.png",
+            "right": "assets/game/enemies/red-cruiser/frames-tight/hit-right.png"
+          }
         },
-        "idle-right": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/idle-right.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/idle-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            344,
-            212
-          ]
-        },
-        "thrust-down": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/thrust-down.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/thrust-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            263,
-            325
-          ]
-        },
-        "thrust-up": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/thrust-up.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/thrust-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            314
-          ]
-        },
-        "thrust-left": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/thrust-left.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/thrust-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            316
-          ]
-        },
-        "thrust-right": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/thrust-right.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/thrust-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            330,
-            212
-          ]
-        },
-        "attack-down": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/attack-down.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/attack-down.png",
-          "cellRegion": [
-            0,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            355,
-            411
-          ]
-        },
-        "attack-up": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/attack-up.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/attack-up.png",
-          "cellRegion": [
-            384,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            415
-          ]
-        },
-        "attack-left": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/attack-left.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/attack-left.png",
-          "cellRegion": [
-            768,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            220
-          ]
-        },
-        "attack-right": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/attack-right.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/attack-right.png",
-          "cellRegion": [
-            1152,
-            0,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            318,
-            263
-          ]
-        },
-        "hit-down": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/hit-down.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/hit-down.png",
-          "cellRegion": [
-            0,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            330,
-            381
-          ]
-        },
-        "hit-up": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/hit-up.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/hit-up.png",
-          "cellRegion": [
-            384,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            383
-          ]
-        },
-        "hit-left": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/hit-left.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/hit-left.png",
-          "cellRegion": [
-            768,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            384,
-            270
-          ]
-        },
-        "hit-right": {
-          "cell": "assets/game/enemies/red-cruiser/frames-cell/hit-right.png",
-          "tight": "assets/game/enemies/red-cruiser/frames-tight/hit-right.png",
-          "cellRegion": [
-            1152,
-            512,
-            384,
-            512
-          ],
-          "cellSize": [
-            384,
-            512
-          ],
-          "tightSize": [
-            318,
-            246
-          ]
+        "frameMetadata": {
+          "idle": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                369
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                272,
+                383
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                371
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                344,
+                212
+              ]
+            }
+          },
+          "thrust": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                314
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                263,
+                325
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                316
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                330,
+                212
+              ]
+            }
+          },
+          "attack": {
+            "up": {
+              "cellRegion": [
+                384,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                415
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                355,
+                411
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                220
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                0,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                318,
+                263
+              ]
+            }
+          },
+          "hit": {
+            "up": {
+              "cellRegion": [
+                384,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                383
+              ]
+            },
+            "down": {
+              "cellRegion": [
+                0,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                330,
+                381
+              ]
+            },
+            "left": {
+              "cellRegion": [
+                768,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                384,
+                270
+              ]
+            },
+            "right": {
+              "cellRegion": [
+                1152,
+                512,
+                384,
+                512
+              ],
+              "cellSize": [
+                384,
+                512
+              ],
+              "tightSize": [
+                318,
+                246
+              ]
+            }
+          }
         }
+      },
+      "source": {
+        "provider": "manual",
+        "sourceFiles": [
+          "assets/game/enemies/red-cruiser/sheets/sheet-a-movement.png",
+          "assets/game/enemies/red-cruiser/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Existing manually imported Luma-derived enemy pack source. Keep as local committed assets until an API workflow is explicitly added."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "uni-1",
+        "promptTemplateIds": [],
+        "referenceImagePaths": [],
+        "generationIds": []
       }
     }
   },

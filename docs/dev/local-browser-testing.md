@@ -27,10 +27,11 @@ http://localhost:8081/void-drifter
 Fallback route:
 
 ```text
-http://localhost:8081/void-drifter-expo
+http://localhost:8081/void-drifter/enemies
 ```
 
 For gameplay UI work, verify that the Godot embed loads, the start overlay is visible, HUD text is readable, controls respond, and console logs do not show runtime errors.
+For VOID DRIFTER sprite/HUD work, also check a wide desktop viewport, a mobile-sized viewport, and a short-height viewport. Confirm enemy sprites are not cropped or pivot-shifted, Codex previews are inspectable, and bottom HUD/weapon UI does not overlap the player playfield.
 
 ## Fallback Rule
 
@@ -38,7 +39,7 @@ If the local browser runtime is unavailable, say so plainly. Then use fallback c
 
 ```bash
 curl -I http://localhost:8081/void-drifter
-curl -I http://localhost:8081/void-drifter-expo
+curl -I http://localhost:8081/void-drifter/enemies
 npm run godot:export:web
 npm run typecheck
 npm run lint

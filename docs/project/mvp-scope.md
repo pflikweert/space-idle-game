@@ -16,6 +16,8 @@ Build one playable VOID DRIFTER web prototype screen that proves whether one sim
 - player damage
 - HUD for HP, kills, elapsed time, and enemy count
 - death and restart
+- tiny local run profile for best/lifetime stats
+- temporary automatic main-weapon boosts during a run
 
 ## Explicitly not in MVP
 
@@ -27,6 +29,6 @@ Build one playable VOID DRIFTER web prototype screen that proves whether one sim
 - heavy 3D or dedicated game-engine integration
 - final art pipeline
 - final ship/enemy assets
-- upgrades, XP, pickups, or meta-progression
+- shops, XP trees, pickups, loadout inventory, or complex meta-progression
 - audio
 - multiplayer

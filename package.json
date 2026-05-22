@@ -14,6 +14,8 @@
     "docs:bundle": "node ./scripts/docs/build-docs-upload.mjs",
     "docs:bundle:verify": "node ./scripts/docs/build-docs-upload.mjs --check",
     "docs:upload": "node ./scripts/docs/build-docs-upload.mjs",
+    "luma:enemy:dry-run": "node ./tools/luma/generate-enemy-reference.mjs --dry-run",
+    "luma:enemy:generate": "node ./tools/luma/generate-enemy-reference.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

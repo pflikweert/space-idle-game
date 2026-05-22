@@ -51,12 +51,6 @@ http://localhost:8081/void-drifter
 
 The home screen at `http://localhost:8081/` includes an `Open VOID DRIFTER` entry button.
 
-The old React Native prototype remains available as a fallback/reference:
-
-```text
-http://localhost:8081/void-drifter-expo
-```
-
 If `godot` is not available in PATH, set `GODOT_BIN=/path/to/Godot` before running `npm run godot:export:web`.
 
 ## Verify commands
@@ -80,13 +74,12 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 ## Current structure
 
 - `src/app/*` is the route entry and assembly layer
-- `src/game/core/*` holds VOID DRIFTER types, tuning constants, math, and collision helpers
-- `src/game/runtime/*` holds world creation and the central `updateWorld` simulation step
-- `src/game/systems/*` holds small pure-TypeScript gameplay systems
+- `src/game/core/*` holds shared VOID DRIFTER data for Expo shell screens such as the Enemy Codex
 - `src/game/state/*` holds lightweight prototype state
 - `src/game/ui/*` holds screen-level game UI
 - `godot/void-drifter/*` holds the first Godot 4.x VOID DRIFTER MVP port
 - `godot/void-drifter/assets/player_ship/*` holds the current Luma-derived player ship sprites
+- `assets/game/enemies/*/sheets` is the source for enemy sheets; generated `frames-cell` keep stable gameplay pivots, `preview.png` is used by the Enemy Codex, and `frames-tight` is only for VFX/debug after alpha checks
 - `godot/void-drifter/assets/vfx/*` holds cropped projectile, trail, spark, and explosion sprites
 - `godot/void-drifter/assets/backgrounds/*` holds the current sector, parallax, midfield, and foreground environment layers
 - `godot/void-drifter/assets/ui/luma_reference/*` holds LCARS-neon Luma reference assets
@@ -100,12 +93,10 @@ This writes one generated upload bundle at `docs/upload/chatgpt-project-context.
 
 - Home route: `src/app/index.tsx`
 - VOID DRIFTER route: `src/app/void-drifter/index.tsx` embeds the Godot web build when exported
-- Expo fallback route: `src/app/void-drifter-expo/index.tsx`
-- Expo fallback screen: `src/game/ui/void-drifter-prototype-screen.tsx`
-- Runtime entry: `src/game/runtime/updateWorld.ts`
-- Current gameplay: dark sector-framed playfield, controllable player ship, enemy spawns, enemies chase the player, auto-shooting, simple enemy projectiles, Red Surge bonus waves every 12 Red Scout Drone kills, plasma bolt trails, hit sparks, enemy explosions/debris, player damage feedback, death overlay, restart.
+- Current gameplay: dark sector-framed playfield, controllable player ship, transparent data-driven enemy spawns, enemies chase the player, stable enemy visual states with direction hysteresis, auto-shooting, temporary plasma weapon boosts, simple enemy projectiles, Red Surge bonus waves every 12 Red Scout Drone kills, plasma bolt trails, hit sparks, calmer enemy explosions/debris, player damage feedback, death overlay, restart.
 - Current Godot start flow: `/void-drifter` shows the Godot ready screen, `Start Run` starts the run, `Restart` is hidden until running/death states, and the Enemies entry navigates to `/void-drifter/enemies`.
-- Current Godot HUD direction: sector/wave/time/score top bar plus hull and non-interactive weapon-strip placeholders at the bottom. The wave module shows Red Surge status during surge events; sector/loadout labels stay presentation-only until real progression systems exist.
+- Current Godot HUD direction: sector/wave/time/score top bar plus responsive hull and plasma weapon boost status at the bottom. The wave module shows Red Surge status during surge events; sector/loadout labels stay presentation-only until real progression systems exist.
+- Current local persistence: Godot stores a small VOID DRIFTER profile at `user://void_drifter_profile.json` for lifetime score/kills, total runs, best score/time/wave/surge, highest weapon level, and last-run summary.
 - Godot port: `godot/void-drifter/scenes/main.tscn`
 - UI style guide: `docs/project/void-drifter-ui-style-guide.md`
 

@@ -33,7 +33,8 @@ func _init() -> void:
 		quit(1)
 		return
 
-	_extract_sheet(ship_sheet, "res://assets/player_ship", SHIP_FRAMES, true, 0.018, 0.055, 18)
+	# Gameplay ship states must keep a fixed canvas so banking/damage frames do not jitter around the player pivot.
+	_extract_sheet(ship_sheet, "res://assets/player_ship", SHIP_FRAMES, true, 0.018, 0.055, -1)
 	_extract_sheet(vfx_sheet, "res://assets/vfx", VFX_FRAMES, true, 0.070, 0.180, 10)
 	print("Extracted VOID DRIFTER ship and VFX sheet assets.")
 	quit(0)
@@ -62,7 +63,7 @@ func _extract_sheet(source_path: String, output_dir: String, frames: Dictionary,
 		var cell := _crop_image(image, frames[frame_name])
 		if remove_black:
 			_remove_dark_background(cell, alpha_threshold, alpha_fade)
-		var trimmed := _trim_image(cell, trim_padding)
+		var trimmed := cell if trim_padding < 0 else _trim_image(cell, trim_padding)
 		var output_path := _global_path("%s/%s.png" % [output_dir, frame_name])
 		var save_error := trimmed.save_png(output_path)
 		if save_error != OK:
