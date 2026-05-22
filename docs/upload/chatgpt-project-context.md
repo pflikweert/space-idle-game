@@ -2,8 +2,8 @@
 
 Generated upload bundle. Canonical source remains the original repo docs.
 
-Build Timestamp (UTC): 2026-05-22T07:04:07.380Z
-Source Commit: f279778
+Build Timestamp (UTC): 2026-05-22T07:05:40.392Z
+Source Commit: 8c449f3
 
 ## Upload Policy
 
@@ -536,6 +536,7 @@ Keep VFX requests pixel-game friendly: moderate detail, transparent background, 
 
 - Keep `LUMA_AGENTS_API_KEY` local-only, for example in an uncommitted `.env.local` or shell environment.
 - Use the raw Agents API key value only; do not include a `Bearer ` prefix in `.env.local`.
+- Use a Luma Agents key from `platform.lumalabs.ai`; current Agents docs describe valid tokens as `luma-api-*`.
 - Do not commit API keys, request logs containing secrets, account ids, or local env files.
 - Do not expose Luma calls through Expo, React Native, or client-side Godot web code.
 - Commit selected generated assets and metadata, not secret-bearing integration logic.
