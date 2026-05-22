@@ -1,4 +1,6 @@
-export type EnemyTypeId = 'red_scout_drone' | 'red_fighter' | 'red_cruiser';
+export type EnemyTypeId = 'void_drone' | 'red_scout' | 'void_tank';
+
+export type EnemyAssetKey = 'red_scout_drone' | 'red_fighter' | 'red_cruiser';
 
 export type EnemyAbility =
   | 'chase_player'
@@ -11,16 +13,19 @@ export type EnemyStatus = 'active' | 'locked';
 
 export type EnemyDefinition = {
   id: EnemyTypeId;
+  assetKey: EnemyAssetKey;
   name: string;
   role: string;
   description: string;
   status: EnemyStatus;
+  unlockWave: number;
   recommendedDisplaySize: number;
   baseStats: {
     hp: number;
     speed: number;
     contactDamage: number;
     xpReward: number;
+    coinReward: number;
     scoreReward: number;
     radius: number;
   };
@@ -40,21 +45,23 @@ export type EnemyRuntimeStats = EnemyDefinition['baseStats'] & {
   level: number;
 };
 
-// TODO: Later: enemy balancing/admin editor can read/write this definition shape.
 export const ENEMY_DEFINITIONS = [
   {
-    id: 'red_scout_drone',
-    name: 'Red Scout Drone',
-    role: 'Fast fodder / swarm scout',
+    id: 'void_drone',
+    assetKey: 'red_scout_drone',
+    name: 'Void Drone',
+    role: 'Basic chase enemy',
     description:
-      'Fast red hostile scout drone that enters from screen edges and chases the player.',
+      'Standard void-skimmer that enters from screen edges and pushes the player out of position.',
     status: 'active',
+    unlockWave: 1,
     recommendedDisplaySize: 48,
     baseStats: {
       hp: 16,
       speed: 52,
       contactDamage: 10,
       xpReward: 4,
+      coinReward: 2,
       scoreReward: 10,
       radius: 18,
     },
@@ -70,23 +77,26 @@ export const ENEMY_DEFINITIONS = [
     abilities: ['chase_player', 'contact_damage', 'red_projectile_later'],
   },
   {
-    id: 'red_fighter',
-    name: 'Red Fighter',
-    role: 'Medium aggressive flanker',
-    description: 'Sharper red attack craft that joins after the first scout pressure spike.',
+    id: 'red_scout',
+    assetKey: 'red_fighter',
+    name: 'Red Scout',
+    role: 'Fast low-HP enemy',
+    description: 'Fast red scout craft that arrives early and punishes slow movement.',
     status: 'active',
+    unlockWave: 2,
     recommendedDisplaySize: 68,
     baseStats: {
-      hp: 34,
-      speed: 42,
-      contactDamage: 14,
-      xpReward: 8,
-      scoreReward: 22,
-      radius: 25,
+      hp: 22,
+      speed: 72,
+      contactDamage: 12,
+      xpReward: 7,
+      coinReward: 3,
+      scoreReward: 24,
+      radius: 22,
     },
     scaling: {
-      hpPerLevel: 5,
-      speedPerLevel: 1,
+      hpPerLevel: 4,
+      speedPerLevel: 1.2,
       damagePerLevel: 1.4,
     },
     spawn: {
@@ -96,17 +106,20 @@ export const ENEMY_DEFINITIONS = [
     abilities: ['chase_player', 'contact_damage', 'flank_player_later'],
   },
   {
-    id: 'red_cruiser',
-    name: 'Red Cruiser',
-    role: 'Heavy tank / slow pressure ship',
-    description: 'Broad armored pressure ship that adds slower, heavier pressure later in a run.',
+    id: 'void_tank',
+    assetKey: 'red_cruiser',
+    name: 'Void Tank',
+    role: 'Slow high-HP enemy',
+    description: 'Armored void hull that soaks fire and compresses safe space later in a run.',
     status: 'active',
+    unlockWave: 4,
     recommendedDisplaySize: 96,
     baseStats: {
       hp: 90,
       speed: 25,
       contactDamage: 24,
       xpReward: 18,
+      coinReward: 8,
       scoreReward: 60,
       radius: 38,
     },
@@ -123,7 +136,7 @@ export const ENEMY_DEFINITIONS = [
   },
 ] as const satisfies EnemyDefinition[];
 
-export const ACTIVE_ENEMY_TYPE_ID: EnemyTypeId = 'red_scout_drone';
+export const ACTIVE_ENEMY_TYPE_ID: EnemyTypeId = 'void_drone';
 
 export function getRunLevel(elapsedSeconds: number) {
   return 1 + Math.floor(elapsedSeconds / 30);
@@ -150,12 +163,14 @@ export function getEnemyStats(enemyTypeId: EnemyTypeId, level: number): EnemyRun
     speed: definition.baseStats.speed + definition.scaling.speedPerLevel * levelOffset,
     contactDamage:
       definition.baseStats.contactDamage + definition.scaling.damagePerLevel * levelOffset,
+    coinReward: definition.baseStats.coinReward + Math.floor(levelOffset * 0.5),
   };
 }
 
 export function getSpawnableEnemyDefinitions(runLevel: number) {
   return ENEMY_DEFINITIONS.filter(
-    (enemy) => enemy.status === 'active' && enemy.spawn.minRunLevel <= runLevel && enemy.spawn.weight > 0
+    (enemy) =>
+      enemy.status === 'active' && enemy.spawn.minRunLevel <= runLevel && enemy.spawn.weight > 0
   );
 }
 

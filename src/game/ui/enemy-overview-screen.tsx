@@ -35,6 +35,7 @@ export function EnemyOverviewScreen() {
             <View key={enemy.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.previewFrame}>
+                  <View style={styles.previewGlow} />
                   <Image
                     contentFit="contain"
                     source={getEnemyPreviewSource(enemy.id)}
@@ -83,14 +84,15 @@ export function EnemyOverviewScreen() {
                 <View style={styles.panel}>
                   <Text style={styles.sectionTitle}>Spawn</Text>
                   <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>XP / Score</Text>
+                    <Text style={styles.statLabel}>XP / Coins / Score</Text>
                     <Text style={styles.statValue}>
-                      {enemy.baseStats.xpReward} / {enemy.baseStats.scoreReward}
+                      {enemy.baseStats.xpReward} / {enemy.baseStats.coinReward} /{' '}
+                      {enemy.baseStats.scoreReward}
                     </Text>
                   </View>
                   <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Run Level</Text>
-                    <Text style={styles.statValue}>{enemy.spawn.minRunLevel}+</Text>
+                    <Text style={styles.statLabel}>Unlock Wave</Text>
+                    <Text style={styles.statValue}>{enemy.unlockWave}</Text>
                   </View>
                   <View style={styles.statRow}>
                     <Text style={styles.statLabel}>Weight</Text>
@@ -178,17 +180,24 @@ const styles = StyleSheet.create({
   previewFrame: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 112,
-    height: 112,
+    width: 172,
+    height: 172,
     overflow: 'hidden',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.34)',
-    backgroundColor: '#020617',
+    borderColor: 'rgba(251, 146, 60, 0.42)',
+    backgroundColor: '#111827',
+  },
+  previewGlow: {
+    position: 'absolute',
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    backgroundColor: 'rgba(248, 113, 113, 0.18)',
   },
   preview: {
-    width: 96,
-    height: 96,
+    width: 164,
+    height: 164,
   },
   enemyIntro: {
     flex: 1,
