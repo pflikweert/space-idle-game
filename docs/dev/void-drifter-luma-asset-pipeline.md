@@ -146,7 +146,7 @@ npm run luma:enemy:generate -- \
   --aspect-ratio 16:9
 ```
 
-Keep VFX requests pixel-game friendly: moderate detail, transparent background, reusable small frames, restrained glow, and subtle debris variants rather than max-fidelity cinematic explosions.
+Keep VFX requests pixel-game friendly: moderate detail, transparent alpha background, reusable small frames, restrained glow, and subtle debris variants rather than max-fidelity cinematic explosions. If a Dream Machine `luma-*` key returns JPEG without alpha, treat it as a reference sheet and extract/review local PNG candidates before using anything in runtime. Prefer an Agents `luma-api-*` key when true PNG/alpha output is required.
 
 ## Security
 

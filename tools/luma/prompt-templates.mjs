@@ -37,7 +37,7 @@ export const PROMPT_TEMPLATES = {
   'enemy.vfx.explosion-set': {
     description: 'Shared enemy death explosion sprite-set reference.',
     build: () =>
-      'Create a clean sprite sheet for VOID DRIFTER enemy death explosions: sprites only, no labels, no captions, no numbers, no letters, no logos, no UI, no decorative text. Pixel-game friendly arcade sci-fi style, moderate detail, not photorealistic, not max fidelity. Use a simple 2 row grid with 6 to 8 isolated explosion sprites. Show one subtle red/cyan plasma pop evolving from small ignition to dissipating glow, plus a few alternate end states. Only one or two end states should have tiny hull fragments drifting away; keep debris sparse and subtle. Each sprite must be centered in its own cell, stable scale, clean separation, dark or transparent-looking empty background, no smoky realism, no large screen-filling blasts.',
+      'Create a clean sprite sheet for VOID DRIFTER enemy death explosions on a transparent alpha background. The output should be isolated sprites only: no labels, no captions, no numbers, no letters, no logos, no UI, no decorative text, no scene background. Pixel-game friendly arcade sci-fi style, moderate detail, not photorealistic, not max fidelity. Use a simple 2 row grid with 6 to 8 isolated explosion sprites. Show one subtle red/cyan plasma pop evolving from small ignition to dissipating glow, plus a few alternate end states. Only one or two end states should have tiny hull fragments drifting away; keep debris sparse and subtle. Each sprite must be centered in its own cell, stable scale, clean separation, transparent empty background, no smoky realism, no large screen-filling blasts.',
   },
 };
 

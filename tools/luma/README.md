@@ -65,6 +65,8 @@ npm run luma:enemy:generate -- \
   --aspect-ratio 16:9
 ```
 
+The VFX prompt asks for a transparent alpha background. Dream Machine keys may still return JPEG outputs without alpha; when that happens, use the extracted PNG candidate frames only after local background keying and visual review. Agents `luma-api-*` keys are preferred when true PNG/alpha output is required.
+
 Add local references without public hosting:
 
 ```bash
@@ -83,6 +85,19 @@ Reference files are sent as base64 `image_ref` data. For image generation, use a
 - Manifest updates: `assets/game/enemies/enemy-assets-manifest.json`
 
 Generated reference images still need human review before creating sheets or changing runtime enemy data.
+
+Extract the newest shared explosion sheet into PNG candidate frames:
+
+```bash
+npm run luma:vfx:extract
+```
+
+Or pass an explicit generated sheet:
+
+```bash
+npm run luma:vfx:extract -- \
+  --source assets/game/enemies/shared-vfx/references/luma/enemy.vfx.explosion-set-2026-05-22T071019-322Z.jpg
+```
 
 ## Safety
 
