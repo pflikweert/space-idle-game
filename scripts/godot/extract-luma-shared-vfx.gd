@@ -85,10 +85,10 @@ func _remove_dark_background(image: Image) -> void:
 		for x in range(image.get_width()):
 			var color := image.get_pixel(x, y)
 			var brightness := maxf(color.r, maxf(color.g, color.b))
-			if brightness < 0.25:
+			if brightness < 0.50:
 				color.a = 0.0
-			elif brightness < 0.42:
-				color.a = color.a * ((brightness - 0.25) / 0.17)
+			elif brightness < 0.72:
+				color.a = color.a * ((brightness - 0.50) / 0.22)
 			else:
 				color.a = minf(1.0, color.a * 1.08)
 			image.set_pixel(x, y, color)
