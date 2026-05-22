@@ -1,4 +1,5 @@
-const LUMA_API_BASE_URL = 'https://agents.lumalabs.ai/v1';
+const LUMA_AGENTS_API_BASE_URL = 'https://agents.lumalabs.ai/v1';
+const LUMA_DREAM_MACHINE_API_BASE_URL = 'https://api.lumalabs.ai/dream-machine/v1';
 
 export class LumaApiError extends Error {
   constructor(message, { status, detail, responseBody } = {}) {
@@ -32,8 +33,8 @@ function getErrorDetail(body) {
   return body.detail ?? body.error ?? body.message ?? body;
 }
 
-async function requestJson(apiKey, path, options = {}) {
-  const response = await fetch(`${LUMA_API_BASE_URL}${path}`, {
+async function requestJson(apiKey, url, options = {}) {
+  const response = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -56,14 +57,14 @@ async function requestJson(apiKey, path, options = {}) {
 }
 
 export function createGeneration(apiKey, requestBody) {
-  return requestJson(apiKey, '/generations', {
+  return requestJson(apiKey, `${LUMA_AGENTS_API_BASE_URL}/generations`, {
     method: 'POST',
     body: JSON.stringify(requestBody),
   });
 }
 
 export function getGeneration(apiKey, generationId) {
-  return requestJson(apiKey, `/generations/${generationId}`);
+  return requestJson(apiKey, `${LUMA_AGENTS_API_BASE_URL}/generations/${generationId}`);
 }
 
 export async function waitForGeneration(apiKey, generationId, options = {}) {
@@ -99,4 +100,37 @@ export async function downloadOutput(url) {
   }
 
   return Buffer.from(await response.arrayBuffer());
+}
+
+export function createDreamMachineImageGeneration(apiKey, requestBody) {
+  return requestJson(apiKey, `${LUMA_DREAM_MACHINE_API_BASE_URL}/generations/image`, {
+    method: 'POST',
+    body: JSON.stringify(requestBody),
+  });
+}
+
+export function getDreamMachineGeneration(apiKey, generationId) {
+  return requestJson(apiKey, `${LUMA_DREAM_MACHINE_API_BASE_URL}/generations/${generationId}`);
+}
+
+export async function waitForDreamMachineGeneration(apiKey, generationId, options = {}) {
+  const pollIntervalMs = options.pollIntervalMs ?? 3000;
+  const timeoutMs = options.timeoutMs ?? 180000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const generation = await getDreamMachineGeneration(apiKey, generationId);
+
+    if (generation.state === 'completed' || generation.state === 'failed') {
+      return generation;
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, pollIntervalMs);
+    });
+  }
+
+  throw new LumaApiError(`Timed out waiting for Dream Machine generation ${generationId}`, {
+    detail: { generationId, timeoutMs },
+  });
 }
