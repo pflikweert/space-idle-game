@@ -1,0 +1,26 @@
+{
+  "provider": "OpenAI built-in ImageGen",
+  "date": "2026-09-09",
+  "sources": {
+    "intact": "sources/intact.png",
+    "damaged": "sources/damaged.png",
+    "critical": "sources/critical.png",
+    "railgun": "sources/railgun.png"
+  },
+  "frames": {
+    "intact": "frames-cell/intact.png",
+    "damaged": "frames-cell/damaged.png",
+    "critical": "frames-cell/critical.png",
+    "railgun": "frames-cell/railgun.png"
+  },
+  "canvas": [
+    384,
+    512
+  ],
+  "runtime": "godot/void-drifter/assets/player_ship/gunship",
+  "importer": "scripts/godot/import-gunship-art.gd",
+  "mask": "Intact alpha master shared across aligned damage interiors; preserves identical edges and removes generated checkerboard backdrop. No per-state alpha fitting.",
+  "anchors": "godot/void-drifter/scripts/systems/gunship_anchors.gd",
+  "weapon": "railgun; pivot at 192,256, muzzle at 192,94; visual muzzle maps to existing player radius",
+  "qa": "docs/dev/void-drifter-gunship-qa.md"
+}

@@ -1,19 +1,17 @@
-# Docs
+# Documentation
 
-This folder holds the lightweight source of truth for the prototype.
-
-- `docs/project/*` explains the game direction and MVP scope.
-- `docs/dev/*` explains workflow, execution discipline, and temporary session context.
-- `docs/project/void-drifter-prototype-plan.md` tracks what the current playable prototype already includes and what remains deliberately out of scope.
-
-Keep docs short, practical, and aligned with the current prototype phase.
-
-To prepare docs for upload to ChatGPT:
+`project/void-drifter-game-reference.md` is the canonical product and handoff
+reference for the current game. It is the only product document bundled for
+ChatGPT Project upload.
 
 ```bash
 npm run docs:upload
+npm run docs:bundle:verify
 ```
 
-The generated upload file is `docs/upload/chatgpt-project-context.md`.
+Upload only `docs/upload/chatgpt-project-context.md`. It is generated; never edit
+it by hand.
 
-`docs/upload/**` is generated output for ChatGPT upload, not canonical source.
+`docs/dev/` contains short contributor workflow notes only. QA reports, temporary
+session notes, asset-prompt history and superseded product plans do not belong in
+this documentation set.

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "476e21bf-0c42-4f89-b937-2f98ec8524fe",
+    "createdAt": "2026-05-22T08:24:24.708000Z",
+    "completedAt": "2026-05-22T08:24:31.953Z",
+    "enemy": "splitter",
+    "template": "enemy.sprite.transparent",
+    "api": "dream-machine",
+    "model": "photon-flash-1",
+    "outputFormat": "png",
+    "aspectRatio": null,
+    "webSearch": false,
+    "userId": "void-drifter-local-dev",
+    "outputPath": "assets/game/enemies/splitter/references/luma/enemy.sprite.transparent-2026-05-22T082431-596Z.jpg",
+    "prompt": "Create a transparent-background game sprite of Split Core, 384x512 canvas, centered stable pivot, readable at 62px, neon arcade sci-fi material, no shadow baked into background, no cropping, no text. Archetype: splitter.",
+    "inputReferences": []
+  }
+]

@@ -42,6 +42,16 @@ export function VoidDrifterGodotScreen() {
     };
   }, []);
 
+  if (buildStatus === 'checking') {
+    return (
+      <View style={styles.screen}>
+        <SafeAreaView style={styles.safeArea}>
+          <Text style={styles.kicker}>Loading VOID DRIFTER…</Text>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   if (Platform.OS === 'web' && buildStatus === 'ready') {
     return (
       <View style={styles.godotShell}>
@@ -69,8 +79,7 @@ export function VoidDrifterGodotScreen() {
             <Text style={styles.command}>npm run web</Text>
           </View>
           <Text style={styles.note}>
-            Godot is not installed in this Codex environment, so the export could not be generated
-            here. VOID DRIFTER now runs Godot-first, so export the web build to play.
+            The Godot web build is unavailable. Export it locally, then reload this page.
           </Text>
 
           <Link href="/void-drifter/enemies" asChild>

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "b8cbe30c-3ad1-4af0-bf1b-6659d678b651",
+    "createdAt": "2026-05-22T08:24:13.537000Z",
+    "completedAt": "2026-05-22T08:24:20.823Z",
+    "enemy": "kamikaze",
+    "template": "enemy.sprite.transparent",
+    "api": "dream-machine",
+    "model": "photon-flash-1",
+    "outputFormat": "png",
+    "aspectRatio": null,
+    "webSearch": false,
+    "userId": "void-drifter-local-dev",
+    "outputPath": "assets/game/enemies/kamikaze/references/luma/enemy.sprite.transparent-2026-05-22T082420-466Z.jpg",
+    "prompt": "Create a transparent-background game sprite of Nova Dart, 384x512 canvas, centered stable pivot, readable at 52px, neon arcade sci-fi material, no shadow baked into background, no cropping, no text. Archetype: kamikaze.",
+    "inputReferences": []
+  }
+]

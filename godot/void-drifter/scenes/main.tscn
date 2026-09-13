@@ -9,29 +9,5 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 1
+mouse_filter = 2
 script = ExtResource("1_game")
-
-[node name="ActionButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 130.0
-offset_top = 460.0
-offset_right = 300.0
-offset_bottom = 510.0
-text = "Start Run"
-
-[node name="EnemiesButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 146.0
-offset_top = 518.0
-offset_right = 284.0
-offset_bottom = 556.0
-text = "Enemy Codex"
-
-[node name="HeaderRestartButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 330.0
-offset_top = 18.0
-offset_right = 410.0
-offset_bottom = 54.0
-text = "Restart"

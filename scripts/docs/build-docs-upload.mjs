@@ -1,196 +1,54 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '../..');
+const repoRoot = path.resolve(path.dirname(__filename), '../..');
+const sourcePath = 'docs/project/void-drifter-game-reference.md';
 const outputPath = 'docs/upload/chatgpt-project-context.md';
 const isCheckMode = process.argv.includes('--check');
-
-const sourceRoots = [
-  'README.md',
-  'AGENTS.md',
-  'docs',
-  'src/game/README.md',
-];
-
-const excludedPathParts = new Set(['node_modules', '.git', '.expo', '.upload', 'docs/upload']);
-
-function normalizeLf(input) {
-  return String(input ?? '').replace(/\r\n?/g, '\n');
-}
 
 function absolute(relativePath) {
   return path.join(repoRoot, relativePath);
 }
 
-async function pathExists(relativePath) {
-  try {
-    await fs.access(absolute(relativePath));
-    return true;
-  } catch {
-    return false;
-  }
+function normalizeLf(value) {
+  return String(value ?? '').replace(/\r\n?/g, '\n');
 }
 
-async function readText(relativePath) {
-  return normalizeLf(await fs.readFile(absolute(relativePath), 'utf8')).trim();
-}
-
-function shouldSkip(relativePath) {
-  const normalized = relativePath.split(path.sep).join('/');
-  return [...excludedPathParts].some((part) => normalized === part || normalized.startsWith(`${part}/`));
-}
-
-async function listMarkdownSources(target) {
-  if (!(await pathExists(target)) || shouldSkip(target)) {
-    return [];
-  }
-
-  const stat = await fs.stat(absolute(target));
-  if (stat.isFile()) {
-    return target.toLowerCase().endsWith('.md') ? [target] : [];
-  }
-
-  const discovered = [];
-
-  async function walk(relativeDir) {
-    const entries = await fs.readdir(absolute(relativeDir), { withFileTypes: true });
-    entries.sort((a, b) => a.name.localeCompare(b.name));
-
-    for (const entry of entries) {
-      const child = path.join(relativeDir, entry.name);
-      if (shouldSkip(child) || entry.name.startsWith('.')) {
-        continue;
-      }
-
-      if (entry.isDirectory()) {
-        await walk(child);
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
-        discovered.push(child);
-      }
-    }
-  }
-
-  await walk(target);
-  return discovered;
-}
-
-function titleForSource(relativePath) {
-  if (relativePath === 'README.md') return 'Root README';
-  if (relativePath === 'AGENTS.md') return 'Agent Instructions';
-  if (relativePath === 'src/game/README.md') return 'Game Module README';
-
-  return relativePath
-    .replace(/\.md$/i, '')
-    .split(/[/-]/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function getHeadCommitHash() {
-  try {
-    return execSync('git rev-parse --short HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
-  } catch {
-    return 'unknown';
-  }
-}
-
-function extractBuildTimestamp(content) {
-  return content.match(/^Build Timestamp \(UTC\):\s*(.+)$/m)?.[1]?.trim() ?? null;
-}
-
-function extractSourceCommit(content) {
-  return content.match(/^Source Commit:\s*(.+)$/m)?.[1]?.trim() ?? null;
-}
-
-async function resolveBuildMetadata() {
-  if (!isCheckMode) {
-    return {
-      timestamp: new Date().toISOString(),
-      commit: getHeadCommitHash(),
-    };
-  }
-
-  const existing = await readText(outputPath).catch(() => '');
-  return {
-    timestamp: extractBuildTimestamp(existing) ?? new Date().toISOString(),
-    commit: extractSourceCommit(existing) ?? getHeadCommitHash(),
-  };
-}
-
-async function buildBundle(metadata) {
-  const sourceSet = new Set();
-
-  for (const sourceRoot of sourceRoots) {
-    const sources = await listMarkdownSources(sourceRoot);
-    for (const source of sources) {
-      sourceSet.add(source.split(path.sep).join('/'));
-    }
-  }
-
-  const sources = [...sourceSet].sort((a, b) => {
-    const priority = ['README.md', 'AGENTS.md', 'docs/README.md', 'docs/dev/active-context.md'];
-    const aPriority = priority.indexOf(a);
-    const bPriority = priority.indexOf(b);
-    if (aPriority !== -1 || bPriority !== -1) {
-      return (aPriority === -1 ? 999 : aPriority) - (bPriority === -1 ? 999 : bPriority);
-    }
-    return a.localeCompare(b);
-  });
-
-  const lines = [
+async function buildBundle() {
+  const source = normalizeLf(await fs.readFile(absolute(sourcePath), 'utf8')).trim();
+  return [
     '# VOID DRIFTER ChatGPT Project Context',
     '',
-    'Generated upload bundle. Canonical source remains the original repo docs.',
+    'This is the single generated file intended for manual upload to a ChatGPT Project.',
+    `Canonical source: \`${sourcePath}\`.`,
+    'Do not edit this artifact directly; update the canonical dossier and run `npm run docs:upload`.',
     '',
-    `Build Timestamp (UTC): ${metadata.timestamp}`,
-    `Source Commit: ${metadata.commit}`,
+    '---',
     '',
-    '## Upload Policy',
+    source,
     '',
-    '- This file is generated for manual upload to ChatGPT Projects.',
-    '- Do not edit this file by hand; edit the source docs and run `npm run docs:upload`.',
-    '- If this file conflicts with source docs, source docs win.',
-    '',
-    '## Included Sources',
-    '',
-    ...sources.map((source) => `- \`${source}\``),
-    '',
-  ];
-
-  for (const source of sources) {
-    lines.push('---', '', `# Source: ${titleForSource(source)}`, '', `Path: \`${source}\``, '');
-    lines.push(await readText(source), '');
-  }
-
-  return `${lines.join('\n').trim()}\n`;
+  ].join('\n');
 }
 
 async function main() {
-  const metadata = await resolveBuildMetadata();
-  const nextContent = await buildBundle(metadata);
-
+  const nextContent = await buildBundle();
   if (isCheckMode) {
-    const existing = await readText(outputPath).catch(() => null);
-    if (existing !== nextContent.trim()) {
+    const existing = await fs.readFile(absolute(outputPath), 'utf8').catch(() => null);
+    if (existing === null || normalizeLf(existing) !== nextContent) {
       console.error(`${outputPath} is out of date. Run \`npm run docs:upload\`.`);
       process.exitCode = 1;
       return;
     }
-
     console.log(`${outputPath} is up to date.`);
     return;
   }
 
-  await fs.rm(absolute('docs/upload'), { recursive: true, force: true });
-  await fs.mkdir(absolute('docs/upload'), { recursive: true });
+  await fs.mkdir(path.dirname(absolute(outputPath)), { recursive: true });
   await fs.writeFile(absolute(outputPath), nextContent);
-  console.log(`Prepared ChatGPT upload bundle at ${outputPath}`);
+  console.log(`Prepared the single ChatGPT upload file at ${outputPath}`);
 }
 
 main().catch((error) => {

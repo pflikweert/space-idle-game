@@ -1,0 +1,18 @@
+[
+  {
+    "id": "4e4d1d0e-22f5-47f5-985c-835534773fbb",
+    "createdAt": "2026-05-22T08:23:46.752000Z",
+    "completedAt": "2026-05-22T08:23:54.224Z",
+    "enemy": "ranged-shooter",
+    "template": "enemy.sprite.transparent",
+    "api": "dream-machine",
+    "model": "photon-flash-1",
+    "outputFormat": "png",
+    "aspectRatio": null,
+    "webSearch": false,
+    "userId": "void-drifter-local-dev",
+    "outputPath": "assets/game/enemies/ranged-shooter/references/luma/enemy.sprite.transparent-2026-05-22T082353-787Z.jpg",
+    "prompt": "Create a transparent-background game sprite of Rift Shooter, 384x512 canvas, centered stable pivot, readable at 66px, neon arcade sci-fi material, no shadow baked into background, no cropping, no text. Archetype: ranged shooter.",
+    "inputReferences": []
+  }
+]

@@ -1,33 +1,35 @@
-# Workflow
+# Contributor Workflow
 
-## Role split
+Keep changes small and verify the affected layer. Gameplay lives in Godot; Expo
+owns routing, the web embed shell and the secondary Codex. Do not add backend,
+accounts, monetization or live services without an explicit scope decision.
 
-- ChatGPT: strategy, prompt design, design review, and planning support
-- Cline or Codex: repo analysis, implementation, verification, and git work
+## Baseline checks
 
-## Execution rules
+```bash
+npm run lint
+npm run typecheck
+```
 
-- prefer the smallest working step
-- avoid feature creep
-- keep routes thin and put prototype logic in `src/game/*`
-- verify before commit
-- do not start a long-lived dev server unless explicitly asked
+For Godot gameplay/UI/assets, also run:
 
-## Baseline verification
+```bash
+npm run godot:check
+npm run godot:export:web
+```
 
-- `npm run lint`
-- `npm run typecheck`
+Use `local-browser-testing.md` for web-facing changes. Do not start a long-lived
+server unless requested.
 
-If a command does not exist, note that clearly and keep the next change cheap.
+## Documentation
 
-## Docs handoff
-
-Use this when preparing project context for ChatGPT upload:
+`../project/void-drifter-game-reference.md` is the only canonical product
+document. Update it with every player-visible change, then run:
 
 ```bash
 npm run docs:upload
+npm run docs:bundle:verify
 ```
 
-The script creates one generated upload bundle at `docs/upload/chatgpt-project-context.md`.
-
-`docs/upload/**` is not canonical source. Edit source docs and regenerate the bundle.
+The generated `docs/upload/chatgpt-project-context.md` is the sole file intended
+for manual ChatGPT Project upload.

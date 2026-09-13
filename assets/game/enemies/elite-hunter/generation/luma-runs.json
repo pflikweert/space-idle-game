@@ -1,0 +1,18 @@
+[
+  {
+    "id": "8159f1a7-3014-403c-a6e1-9b365aad26af",
+    "createdAt": "2026-05-22T08:24:35.548000Z",
+    "completedAt": "2026-05-22T08:24:42.705Z",
+    "enemy": "elite-hunter",
+    "template": "enemy.sprite.transparent",
+    "api": "dream-machine",
+    "model": "photon-flash-1",
+    "outputFormat": "png",
+    "aspectRatio": null,
+    "webSearch": false,
+    "userId": "void-drifter-local-dev",
+    "outputPath": "assets/game/enemies/elite-hunter/references/luma/enemy.sprite.transparent-2026-05-22T082442-363Z.jpg",
+    "prompt": "Create a transparent-background game sprite of Elite Hunter, 384x512 canvas, centered stable pivot, readable at 78px, neon arcade sci-fi material, no shadow baked into background, no cropping, no text. Archetype: elite hunter.",
+    "inputReferences": []
+  }
+]

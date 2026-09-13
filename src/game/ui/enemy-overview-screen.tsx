@@ -1,20 +1,17 @@
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getEnemyPreviewSource } from '../core/enemyAssets';
-import { ENEMY_DEFINITIONS } from '../core/enemies';
-
-function formatStatLabel(label: string) {
-  return label.replace(/([A-Z])/g, ' $1').trim();
-}
-
-function formatAbility(ability: string) {
-  return ability.replaceAll('_', ' ');
-}
+import { ENEMY_DEFINITIONS, GROWTH_START_WAVE } from '../core/enemies';
 
 export function EnemyOverviewScreen() {
+  const [tab, setTab] = useState<'active' | 'archive'>('active');
+  const list = useRef<ScrollView>(null);
+  const enemies = ENEMY_DEFINITIONS.filter((enemy) => (enemy.status === 'active') === (tab === 'active'))
+    .sort((a, b) => a.unlockWave - b.unlockWave);
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
@@ -30,13 +27,23 @@ export function EnemyOverviewScreen() {
           </Link>
         </View>
 
-        <ScrollView contentContainerStyle={styles.list}>
-          {ENEMY_DEFINITIONS.map((enemy) => (
-            <View key={enemy.id} style={styles.card}>
+        <View style={styles.tabs}>
+          {(['active', 'archive'] as const).map((group) => (
+            <Pressable key={group} accessibilityRole="tab" accessibilityState={{ selected: tab === group }}
+              style={[styles.tab, tab === group && styles.tabSelected]}
+              onPress={() => { setTab(group); list.current?.scrollTo({ y: 0, animated: false }); }}>
+              <Text style={styles.headerButtonText}>{group === 'active' ? 'Active' : 'Archive'} / {ENEMY_DEFINITIONS.filter((enemy) => (enemy.status === 'active') === (group === 'active')).length}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.enemyDescription}>{tab === 'active' ? 'Four combat roles. A Dreadnought every ten waves.' : 'Archived designs. These enemies do not spawn in this mode.'}</Text>
+        <ScrollView ref={list} contentContainerStyle={styles.list}>
+          {enemies.map((enemy) => (
+            <View key={enemy.id} style={[styles.card, enemy.id === 'void_boss' && styles.bossCard]}>
               <View style={styles.cardHeader}>
                 <View style={styles.previewFrame}>
-                  <View style={styles.previewGlow} />
                   <Image
+                    accessibilityLabel={enemy.name}
                     contentFit="contain"
                     source={getEnemyPreviewSource(enemy.id)}
                     style={styles.preview}
@@ -50,66 +57,40 @@ export function EnemyOverviewScreen() {
                         styles.statusPill,
                         enemy.status === 'active' ? styles.statusActive : styles.statusLocked,
                       ]}>
-                      <Text style={styles.statusText}>{enemy.status}</Text>
+                      <Text style={styles.statusText}>{enemy.status !== 'active' ? 'Archive' : enemy.id === 'void_boss' ? 'Every 10 waves' : `Wave ${enemy.unlockWave}+`}</Text>
                     </View>
                   </View>
                   <Text style={styles.enemyRole}>{enemy.role}</Text>
-                  <Text style={styles.enemyDescription}>{enemy.description}</Text>
                 </View>
               </View>
 
-              <View style={styles.sectionGrid}>
-                <View style={styles.panel}>
-                  <Text style={styles.sectionTitle}>Base Stats</Text>
-                  {Object.entries(enemy.baseStats).map(([label, value]) => (
-                    <View key={label} style={styles.statRow}>
-                      <Text style={styles.statLabel}>{formatStatLabel(label)}</Text>
-                      <Text style={styles.statValue}>{value}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={styles.panel}>
-                  <Text style={styles.sectionTitle}>Scaling</Text>
-                  {Object.entries(enemy.scaling).map(([label, value]) => (
-                    <View key={label} style={styles.statRow}>
-                      <Text style={styles.statLabel}>{formatStatLabel(label)}</Text>
-                      <Text style={styles.statValue}>+{value}/level</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.sectionGrid}>
-                <View style={styles.panel}>
-                  <Text style={styles.sectionTitle}>Spawn</Text>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>XP / Coins / Score</Text>
-                    <Text style={styles.statValue}>
-                      {enemy.baseStats.xpReward} / {enemy.baseStats.coinReward} /{' '}
-                      {enemy.baseStats.scoreReward}
-                    </Text>
+              <Text style={styles.enemyDescription}>{enemy.description}</Text>
+              <View style={styles.panel}>
+                <Text style={styles.sectionTitle}>Base combat stats</Text>
+                {[
+                  ['Hull', enemy.baseStats.hp],
+                  ['First impact', enemy.baseStats.contactDamage * 2],
+                  ['Contact hit', enemy.baseStats.contactDamage],
+                  ...('contactInterval' in enemy.baseStats ? [
+                    ['Contact cadence', `${enemy.baseStats.contactInterval}s`],
+                  ] : []),
+                  ...('flight' in enemy ? [
+                    ['Spiral to impact', `${enemy.flight.approachDelaySeconds + enemy.flight.approachSeconds}s`],
+                  ] : []),
+                  ...("weapon" in enemy ? [
+                    [enemy.id === 'void_boss' ? 'Rocket' : 'Railgun', enemy.weapon.projectileDamage],
+                    ['Magazine', enemy.weapon.magazine],
+                    ['Reload', `${enemy.weapon.reloadSeconds}s`],
+                  ] : []),
+                  ['Cash / kill', `+${enemy.baseStats.cashReward}`],
+                  ['Coins / kill', `+${enemy.baseStats.coinReward}`],
+                ].map(([label, value]) => (
+                  <View key={label} style={styles.statRow}>
+                    <Text style={styles.statLabel}>{label}</Text>
+                    <Text style={styles.statValue}>{value}</Text>
                   </View>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Unlock Wave</Text>
-                    <Text style={styles.statValue}>{enemy.unlockWave}</Text>
-                  </View>
-                  <View style={styles.statRow}>
-                    <Text style={styles.statLabel}>Weight</Text>
-                    <Text style={styles.statValue}>{enemy.spawn.weight}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.panel}>
-                  <Text style={styles.sectionTitle}>Abilities</Text>
-                  <View style={styles.abilityList}>
-                    {enemy.abilities.map((ability) => (
-                      <View key={ability} style={styles.abilityPill}>
-                        <Text style={styles.abilityText}>{formatAbility(ability)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+                ))}
+                <Text style={styles.statLabel}>Before armor and income bonuses. Hull and damage grow after wave {GROWTH_START_WAVE}.</Text>
               </View>
             </View>
           ))}
@@ -148,6 +129,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   headerButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(103, 232, 249, 0.46)',
@@ -167,7 +150,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.34)',
+    borderColor: '#264451',
     backgroundColor: 'rgba(15, 23, 42, 0.9)',
     gap: 14,
     padding: 16,
@@ -180,28 +163,21 @@ const styles = StyleSheet.create({
   previewFrame: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 172,
-    height: 172,
+    width: 100,
+    height: 100,
     overflow: 'hidden',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(251, 146, 60, 0.42)',
     backgroundColor: '#111827',
   },
-  previewGlow: {
-    position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    backgroundColor: 'rgba(248, 113, 113, 0.18)',
-  },
   preview: {
-    width: 164,
-    height: 164,
+    width: 96,
+    height: 96,
   },
   enemyIntro: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 130,
     gap: 6,
   },
   titleRow: {
@@ -212,7 +188,7 @@ const styles = StyleSheet.create({
   },
   enemyName: {
     color: '#f8fafc',
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
   },
   statusPill: {
@@ -247,14 +223,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  sectionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
   panel: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 130,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.2)',
@@ -286,23 +257,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  abilityList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  abilityPill: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.36)',
-    backgroundColor: 'rgba(127, 29, 29, 0.26)',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  abilityText: {
-    color: '#fecaca',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
+  tabs: { flexDirection: 'row', gap: 8 },
+  tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#264451', borderRadius: 8 },
+  tabSelected: { backgroundColor: '#18394b', borderColor: '#67e8f9' },
+  bossCard: { borderColor: '#9b653a' },
 });

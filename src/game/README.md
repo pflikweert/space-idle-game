@@ -12,3 +12,6 @@ Current VOID DRIFTER playable screen:
 - Expo route shell in `ui/void-drifter-godot-screen.tsx`
 
 Keep route files thin. VOID DRIFTER gameplay belongs in Godot; Expo UI owns route shell and overview screens.
+
+For current player-facing behavior and balance, use
+[`../../docs/project/void-drifter-game-reference.md`](../../docs/project/void-drifter-game-reference.md).

@@ -1180,6 +1180,396 @@
         "referenceImagePaths": [],
         "generationIds": []
       }
+    },
+    "ranged-shooter": {
+      "enemyId": "ranged_shooter",
+      "assetKey": "ranged_shooter",
+      "assetFolder": "ranged-shooter",
+      "displayName": "Rift Shooter",
+      "archetype": "ranged shooter",
+      "role": "Distance pressure enemy",
+      "description": "Keeps a little distance and pressures the ship with charged red shots.",
+      "status": "active",
+      "rarityTier": "uncommon",
+      "recommendedDisplaySize": 66,
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 30,
+        "speed": 42,
+        "contactDamage": 8,
+        "xpReward": 9,
+        "coinReward": 4,
+        "scoreReward": 32,
+        "radius": 24
+      },
+      "scaling": {
+        "hpPerLevel": 5,
+        "speedPerLevel": 0.8,
+        "damagePerLevel": 1.1
+      },
+      "spawn": {
+        "weight": 24,
+        "minRunLevel": 3
+      },
+      "abilities": [
+        "range_control",
+        "charged_projectile"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/ranged-shooter/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/ranged-shooter/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/ranged-shooter/sheets/sheet-b-combat.png"
+        },
+        "framesCell": "assets/game/enemies/ranged-shooter/frames-cell",
+        "framesTight": "assets/game/enemies/ranged-shooter/frames-tight"
+      },
+      "source": {
+        "provider": "procedural-placeholder",
+        "sourceFiles": [
+          "assets/game/enemies/ranged-shooter/sheets/sheet-a-movement.png",
+          "assets/game/enemies/ranged-shooter/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Temporary generated placeholder generated locally from the VOID DRIFTER enemy placeholder script. Luma references are dev/build-time only."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "photon-flash-1",
+        "promptTemplateIds": [
+          "enemy.sprite.transparent"
+        ],
+        "referenceImagePaths": [
+          "assets/game/enemies/ranged-shooter/references/luma/enemy.sprite.transparent-2026-05-22T082353-787Z.jpg"
+        ],
+        "generationIds": [
+          "4e4d1d0e-22f5-47f5-985c-835534773fbb"
+        ],
+        "api": "dream-machine",
+        "createdAt": "2026-05-22T08:23:46.752000Z"
+      }
+    },
+    "void-swarm": {
+      "enemyId": "void_swarm",
+      "assetKey": "void_swarm",
+      "assetFolder": "void-swarm",
+      "displayName": "Void Swarm",
+      "archetype": "swarm",
+      "role": "Cluster contact enemy",
+      "description": "Small low-health contacts that arrive in clusters.",
+      "status": "active",
+      "rarityTier": "common",
+      "recommendedDisplaySize": 42,
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 8,
+        "speed": 82,
+        "contactDamage": 6,
+        "xpReward": 3,
+        "coinReward": 1,
+        "scoreReward": 8,
+        "radius": 13
+      },
+      "scaling": {
+        "hpPerLevel": 2,
+        "speedPerLevel": 1.4,
+        "damagePerLevel": 0.8
+      },
+      "spawn": {
+        "weight": 38,
+        "minRunLevel": 3
+      },
+      "abilities": [
+        "cluster_spawn",
+        "contact_damage"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/void-swarm/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/void-swarm/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/void-swarm/sheets/sheet-b-combat.png"
+        },
+        "framesCell": "assets/game/enemies/void-swarm/frames-cell",
+        "framesTight": "assets/game/enemies/void-swarm/frames-tight"
+      },
+      "source": {
+        "provider": "procedural-placeholder",
+        "sourceFiles": [
+          "assets/game/enemies/void-swarm/sheets/sheet-a-movement.png",
+          "assets/game/enemies/void-swarm/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Temporary generated placeholder generated locally from the VOID DRIFTER enemy placeholder script. Luma references are dev/build-time only."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "photon-flash-1",
+        "promptTemplateIds": [
+          "enemy.sprite.transparent"
+        ],
+        "referenceImagePaths": [
+          "assets/game/enemies/void-swarm/references/luma/enemy.sprite.transparent-2026-05-22T082406-544Z.jpg"
+        ],
+        "generationIds": [
+          "91e0769d-4124-4143-8a24-a5f26f9aacbc"
+        ],
+        "api": "dream-machine",
+        "createdAt": "2026-05-22T08:23:58.335000Z"
+      }
+    },
+    "kamikaze": {
+      "enemyId": "kamikaze",
+      "assetKey": "kamikaze",
+      "assetFolder": "kamikaze",
+      "displayName": "Nova Dart",
+      "archetype": "kamikaze",
+      "role": "Explosive contact enemy",
+      "description": "A bright unstable hull that accelerates into the player and bursts on contact.",
+      "status": "active",
+      "rarityTier": "uncommon",
+      "recommendedDisplaySize": 52,
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 20,
+        "speed": 92,
+        "contactDamage": 20,
+        "xpReward": 8,
+        "coinReward": 4,
+        "scoreReward": 36,
+        "radius": 18
+      },
+      "scaling": {
+        "hpPerLevel": 4,
+        "speedPerLevel": 1.8,
+        "damagePerLevel": 1.8
+      },
+      "spawn": {
+        "weight": 16,
+        "minRunLevel": 5
+      },
+      "abilities": [
+        "charge_player",
+        "explosive_contact"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/kamikaze/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/kamikaze/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/kamikaze/sheets/sheet-b-combat.png"
+        },
+        "framesCell": "assets/game/enemies/kamikaze/frames-cell",
+        "framesTight": "assets/game/enemies/kamikaze/frames-tight"
+      },
+      "source": {
+        "provider": "procedural-placeholder",
+        "sourceFiles": [
+          "assets/game/enemies/kamikaze/sheets/sheet-a-movement.png",
+          "assets/game/enemies/kamikaze/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Temporary generated placeholder generated locally from the VOID DRIFTER enemy placeholder script. Luma references are dev/build-time only."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "photon-flash-1",
+        "promptTemplateIds": [
+          "enemy.sprite.transparent"
+        ],
+        "referenceImagePaths": [
+          "assets/game/enemies/kamikaze/references/luma/enemy.sprite.transparent-2026-05-22T082420-466Z.jpg"
+        ],
+        "generationIds": [
+          "b8cbe30c-3ad1-4af0-bf1b-6659d678b651"
+        ],
+        "api": "dream-machine",
+        "createdAt": "2026-05-22T08:24:13.537000Z"
+      }
+    },
+    "splitter": {
+      "enemyId": "splitter",
+      "assetKey": "splitter",
+      "assetFolder": "splitter",
+      "displayName": "Split Core",
+      "archetype": "splitter",
+      "role": "Split-on-death enemy",
+      "description": "A brittle core that divides into smaller swarm fragments when destroyed.",
+      "status": "active",
+      "rarityTier": "rare",
+      "recommendedDisplaySize": 62,
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 44,
+        "speed": 36,
+        "contactDamage": 14,
+        "xpReward": 14,
+        "coinReward": 6,
+        "scoreReward": 48,
+        "radius": 27
+      },
+      "scaling": {
+        "hpPerLevel": 7,
+        "speedPerLevel": 0.7,
+        "damagePerLevel": 1.3
+      },
+      "spawn": {
+        "weight": 12,
+        "minRunLevel": 6
+      },
+      "abilities": [
+        "split_on_death",
+        "contact_damage"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/splitter/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/splitter/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/splitter/sheets/sheet-b-combat.png"
+        },
+        "framesCell": "assets/game/enemies/splitter/frames-cell",
+        "framesTight": "assets/game/enemies/splitter/frames-tight"
+      },
+      "source": {
+        "provider": "procedural-placeholder",
+        "sourceFiles": [
+          "assets/game/enemies/splitter/sheets/sheet-a-movement.png",
+          "assets/game/enemies/splitter/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Temporary generated placeholder generated locally from the VOID DRIFTER enemy placeholder script. Luma references are dev/build-time only."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "photon-flash-1",
+        "promptTemplateIds": [
+          "enemy.sprite.transparent"
+        ],
+        "referenceImagePaths": [
+          "assets/game/enemies/splitter/references/luma/enemy.sprite.transparent-2026-05-22T082431-596Z.jpg"
+        ],
+        "generationIds": [
+          "476e21bf-0c42-4f89-b937-2f98ec8524fe"
+        ],
+        "api": "dream-machine",
+        "createdAt": "2026-05-22T08:24:24.708000Z"
+      }
+    },
+    "elite-hunter": {
+      "enemyId": "elite_hunter",
+      "assetKey": "elite_hunter",
+      "assetFolder": "elite-hunter",
+      "displayName": "Elite Hunter",
+      "archetype": "elite hunter",
+      "role": "Late-wave elite pressure enemy",
+      "description": "A dangerous hunter tuned for elite encounters and late-wave pressure.",
+      "status": "active",
+      "rarityTier": "elite",
+      "recommendedDisplaySize": 78,
+      "animationStates": [
+        "idle",
+        "thrust",
+        "attack",
+        "hit"
+      ],
+      "directions": [
+        "up",
+        "down",
+        "left",
+        "right"
+      ],
+      "stats": {
+        "hp": 130,
+        "speed": 54,
+        "contactDamage": 28,
+        "xpReward": 34,
+        "coinReward": 16,
+        "scoreReward": 140,
+        "radius": 34
+      },
+      "scaling": {
+        "hpPerLevel": 14,
+        "speedPerLevel": 0.9,
+        "damagePerLevel": 2.4
+      },
+      "spawn": {
+        "weight": 4,
+        "minRunLevel": 8
+      },
+      "abilities": [
+        "elite_pressure",
+        "charged_projectile"
+      ],
+      "sprites": {
+        "preview": "assets/game/enemies/elite-hunter/preview.png",
+        "sheets": {
+          "movement": "assets/game/enemies/elite-hunter/sheets/sheet-a-movement.png",
+          "combat": "assets/game/enemies/elite-hunter/sheets/sheet-b-combat.png"
+        },
+        "framesCell": "assets/game/enemies/elite-hunter/frames-cell",
+        "framesTight": "assets/game/enemies/elite-hunter/frames-tight"
+      },
+      "source": {
+        "provider": "procedural-placeholder",
+        "sourceFiles": [
+          "assets/game/enemies/elite-hunter/sheets/sheet-a-movement.png",
+          "assets/game/enemies/elite-hunter/sheets/sheet-b-combat.png"
+        ],
+        "notes": "Temporary generated placeholder generated locally from the VOID DRIFTER enemy placeholder script. Luma references are dev/build-time only."
+      },
+      "generation": {
+        "provider": "luma",
+        "model": "photon-flash-1",
+        "promptTemplateIds": [
+          "enemy.sprite.transparent"
+        ],
+        "referenceImagePaths": [
+          "assets/game/enemies/elite-hunter/references/luma/enemy.sprite.transparent-2026-05-22T082442-363Z.jpg"
+        ],
+        "generationIds": [
+          "8159f1a7-3014-403c-a6e1-9b365aad26af"
+        ],
+        "api": "dream-machine",
+        "createdAt": "2026-05-22T08:24:35.548000Z"
+      }
     }
   },
   "sharedVfx": {
@@ -1267,5 +1657,96 @@
       "api": "dream-machine",
       "createdAt": "2026-05-22T07:10:12.460000Z"
     }
+  },
+  "railgunRevision": {
+    "date": "2026-09-09",
+    "sourceProvider": "OpenAI built-in ImageGen",
+    "importCommand": "godot --headless --path godot/void-drifter --script ../../scripts/godot/import-railgun-art.gd",
+    "activeReplacements": [
+      {
+        "enemyId": "void_boss",
+        "assetKey": "void_dreadnought",
+        "sourceFolder": "assets/game/enemies/void-dreadnought/sheets",
+        "gameplayFrames": "assets/game/enemies/void-dreadnought/frames-cell",
+        "preview": "assets/game/enemies/void-dreadnought/preview.png",
+        "runtimeFolder": "godot/void-drifter/assets/enemies/void_dreadnought",
+        "canvas": [
+          384,
+          512
+        ],
+        "animation": "Opaque shared hull, four stable directions; procedural engines and hit feedback",
+        "previousArt": "Retained as historical source; runtime registry selects this replacement"
+      },
+      {
+        "enemyId": "void_tank",
+        "assetKey": "void_tank_v3",
+        "sourceFolder": "assets/game/enemies/void-tank-v3/sheets",
+        "gameplayFrames": "assets/game/enemies/void-tank-v3/frames-cell",
+        "preview": "assets/game/enemies/void-tank-v3/preview.png",
+        "runtimeFolder": "godot/void-drifter/assets/enemies/void_tank_v3",
+        "canvas": [
+          384,
+          512
+        ],
+        "animation": "Opaque shared hull, four stable directions; procedural engines and hit feedback",
+        "previousArt": "Retained as historical source; runtime registry selects this replacement"
+      },
+      {
+        "enemyId": "ranged_shooter",
+        "assetKey": "rift_shooter_v3",
+        "sourceFolder": "assets/game/enemies/rift-shooter-v3/sheets",
+        "gameplayFrames": "assets/game/enemies/rift-shooter-v3/frames-cell",
+        "preview": "assets/game/enemies/rift-shooter-v3/preview.png",
+        "runtimeFolder": "godot/void-drifter/assets/enemies/rift_shooter_v3",
+        "canvas": [
+          384,
+          512
+        ],
+        "animation": "Opaque shared hull, four stable directions; procedural engines and hit feedback",
+        "previousArt": "Retained as historical source; runtime registry selects this replacement"
+      }
+    ],
+    "explosion": {
+      "source": "assets/game/enemies/shared-vfx/railgun-revision/sheets/explosion-source.png",
+      "frames": "assets/game/enemies/shared-vfx/railgun-revision/frames-cell/explosion-00.png through explosion-07.png",
+      "canvas": [
+        384,
+        512
+      ],
+      "durationSeconds": 0.35,
+      "alpha": "preserved, no threshold removal",
+      "scaleRule": "Full cells share identical resize and placement; never alpha-fit individual animation frames"
+    }
+  },
+  "scoutOrbitRevision": {
+    "date": "2026-09-09",
+    "sourceProvider": "OpenAI built-in ImageGen",
+    "importCommand": "godot --headless --path godot/void-drifter --script ../../scripts/godot/import-railgun-art.gd -- --scouts",
+    "activeReplacements": [
+      {
+        "enemyId": "void_drone",
+        "assetKey": "void_drone_v3",
+        "source": "assets/game/enemies/void-drone-v3/sheets/ship-source.png",
+        "frames": "assets/game/enemies/void-drone-v3/frames-cell",
+        "preview": "assets/game/enemies/void-drone-v3/preview.png",
+        "runtimeFolder": "godot/void-drifter/assets/enemies/void_drone_v3"
+      },
+      {
+        "enemyId": "red_scout",
+        "assetKey": "red_scout_v3",
+        "source": "assets/game/enemies/red-scout-v3/sheets/ship-source.png",
+        "frames": "assets/game/enemies/red-scout-v3/frames-cell",
+        "preview": "assets/game/enemies/red-scout-v3/preview.png",
+        "runtimeFolder": "godot/void-drifter/assets/enemies/red_scout_v3"
+      }
+    ],
+    "canvas": [
+      384,
+      512
+    ],
+    "runtimeAnimation": "Canonical up-facing hull rotated continuously toward actual velocity, procedural engine flames; source directions retained.",
+    "normalSizeMultiplier": 0.6,
+    "bossSizeChanged": false,
+    "prompts": "docs/dev/void-drifter-orbit-qa.md"
   }
 }

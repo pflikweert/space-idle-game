@@ -5,13 +5,15 @@
 Use this order:
 
 1. `README.md`
-2. relevant docs in `docs/project/*`
+2. `docs/project/void-drifter-game-reference.md` for game/product context
 3. relevant workflow notes in `docs/dev/*`
 4. a matching skill in `.agents/skills/*`
 
 Read only task-relevant files. Do not adopt a "read everything" workflow.
 
 `docs/upload/**` is generated upload output for ChatGPT handoff, not canonical source.
+Update the canonical game reference with player-visible behavior changes, then run
+`npm run docs:upload` and `npm run docs:bundle:verify`.
 
 ## Scope guardrails
 
@@ -21,7 +23,7 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - MVP scope stays narrow: one playable prototype screen, placeholder progression, no production systems.
 - Do not add backend, Supabase, OpenAI, monetization, account systems, analytics, live ops, or store-release work unless explicitly requested in a later phase.
 - Do not swap to a heavy game engine without an explicit decision.
-- VOID DRIFTER UI must follow `docs/project/void-drifter-ui-style-guide.md`: LCARS-inspired, neon, semi-transparent, arcade-readable, and Godot-first for the primary route.
+- VOID DRIFTER UI must follow the visual direction in `docs/project/void-drifter-game-reference.md`: LCARS-inspired, neon, semi-transparent, arcade-readable, and Godot-first for the primary route.
 
 ## Working style
 
@@ -33,16 +35,20 @@ Read only task-relevant files. Do not adopt a "read everything" workflow.
 - For VOID DRIFTER enemy work, use the enemy sheets under `assets/game/enemies/**/sheets` as the source, generate fixed `frames-cell` canvases for Godot gameplay, generate `preview.png` for Enemy Codex cards, and reserve `frames-tight` for VFX/debug only after alpha/bounds checks. Mirror Godot enemy folders as snake_case under `godot/void-drifter/assets/enemies/*`. Do not reintroduce old non-transparent sheets or old `move-*` v1 frames.
 - Keep enemy/player movement sprites on stable transparent canvases; do not draw gameplay sprites from tightly cropped frames when that would move the pivot or make side/hit frames appear sliced. Enemy visual state should use short timers and direction hysteresis instead of swapping state/direction every frame. When combat frames read like death/explosion art, keep the movement sprite as the primary and show hit/attack as FX overlays.
 - Keep bottom HUD and weapon strips responsive on short/mobile viewports; reserve playfield space so the player is not clamped behind UI.
-- Keep VOID DRIFTER enemy definitions data-driven in `src/game/core/enemies.ts` and mirrored in `godot/void-drifter/scripts/void_drifter_game.gd`. Spawning should use active status, run-level gates, and weights rather than hardcoded one-off enemy ids.
+- Keep VOID DRIFTER enemy definitions data-driven in `src/game/core/enemies.ts` and `godot/void-drifter/scripts/systems/enemy_registry.gd`. Spawning should use active status, run-level gates, and weights rather than hardcoded one-off enemy ids.
 - Enemy overview/codex navigation for the primary game belongs in the Godot root/start interface first, not only in Expo route wrapper panels.
 - For localhost/browser verification, use `.agents/skills/local-browser-testing` and `docs/dev/local-browser-testing.md`: prefer Browser Use, search for the Node REPL `js` tool if needed, and never claim a visual browser check without a screenshot, DOM snapshot, or console log inspection.
 - For larger changes, start with a short plan or checklist.
 - Prefer small, reviewable edits over broad refactors.
+- After every change to Godot gameplay, UI, scenes, scripts, or assets, regenerate the local web build with `npm run godot:export:web` before handing off. This is required even when only a Godot-side change was made.
+- The web interface is the standard test surface: after every UI or gameplay change, verify the relevant Expo/Godot route in the local web interface using Browser Use when available, including a screenshot, DOM snapshot, or console inspection. If no local server or browser runtime is available, report that explicitly and use only the documented fallback checks; do not claim visual web verification.
 
 ## Verification
 
 - Do not start a long-lived dev server unless explicitly asked.
 - After relevant code changes, run `npm run lint` and `npm run typecheck` when available.
+- After every Godot change, run `npm run godot:export:web` and report whether the generated web export completed successfully.
+- After relevant web-facing changes, perform the local web-interface verification described above and report the evidence or the exact limitation.
 - If a verification command does not exist, say so clearly instead of pretending it ran.
 - After docs changes that affect ChatGPT handoff context, run `npm run docs:upload` and optionally `npm run docs:bundle:verify`.
 
