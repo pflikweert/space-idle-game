@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 function commandExists(command) {
@@ -25,4 +27,21 @@ export function findGodotBinary() {
   ].filter(Boolean);
 
   return candidates.find((candidate) => existsSync(candidate));
+}
+
+// Godot's macOS RotatedFileLogger can crash while rotating user://logs when
+// repeated headless checks start in the same profile. Keep check output in a
+// unique temporary file so verification never depends on the user's profile
+// directory or its log rotation state.
+export function godotLogArgs(label = 'run') {
+  const safeLabel = String(label).replace(/[^a-z0-9-]/gi, '-');
+  const logPath = join(tmpdir(), `void-drifter-godot-${safeLabel}-${process.pid}-${Date.now()}.log`);
+  return ['--log-file', logPath];
+}
+
+export function godotOutputForAssertions(output) {
+  return String(output).replace(
+    /ERROR: Condition "ret != noErr" is true\. Returning: ""\n\s+at: get_system_ca_certificates \(platform\/macos\/os_macos\.mm:1028\)\n?/g,
+    ''
+  );
 }

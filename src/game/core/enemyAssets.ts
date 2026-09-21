@@ -3,6 +3,7 @@ import type { ImageSourcePropType } from 'react-native';
 import type { EnemyTypeId } from './enemies';
 
 const PREVIEWS: Record<EnemyTypeId, ImageSourcePropType> = {
+  armored_drone: require('@/assets/game/enemies/armored-drone/preview.png'),
   void_boss: require('@/assets/game/enemies/void-dreadnought/preview.png'),
   // Codex previews are generated separately from gameplay frames so dark ships stay readable.
   void_drone: require('@/assets/game/enemies/void-drone-v3/preview.png'),

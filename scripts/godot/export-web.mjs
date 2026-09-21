@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findGodotBinary } from './find-godot.mjs';
+import { findGodotBinary, godotLogArgs } from './find-godot.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../..');
@@ -22,7 +22,7 @@ mkdirSync(dirname(exportPath), { recursive: true });
 
 const result = spawnSync(
   godotBinary,
-  ['--headless', '--path', projectDir, '--export-release', 'Web', exportPath],
+  ['--headless', ...godotLogArgs('export-web'), '--path', projectDir, '--export-release', 'Web', exportPath],
   {
     cwd: repoRoot,
     encoding: 'utf8',

@@ -1,7 +1,6 @@
 extends RefCounted
-const Anchors = preload("res://scripts/systems/gunship_anchors.gd")
-const Weapons = preload("res://scripts/systems/weapon_registry.gd")
 var textures := {}
+var presentation: Dictionary = {}
 var bank := 0.0
 var damage_state := 0
 var pulse_cooldown := 0.0
@@ -16,12 +15,33 @@ var pending_shield := false
 var pending_break := false
 var time := 0.0
 var shield_visibility := 0.0
+var throttle := 0.0
 
-func load_art(game) -> void:
-	for state in ["intact", "damaged", "critical", "railgun"]:
-		textures[state] = game._load_png_texture("res://assets/player_ship/gunship/%s.png" % state)
-	for state in ["shield_idle", "shield_break"]:
-		textures[state] = game._load_png_texture("res://assets/vfx/shield/%s.png" % state.replace("shield_", "shield-"))
+func load_art(game, ship: Dictionary) -> void:
+	presentation = ship.get("presentation",{}).duplicate(true)
+	var art: Dictionary = ship.get("art",{})
+	var combat_states: Dictionary = art.get("combat_states",{})
+	for state in ["intact", "damaged", "critical"]:
+		textures[state] = game._load_png_texture(str(combat_states.get(state,"")))
+	textures.shield_idle = game._load_png_texture(str(art.get("shield_idle","")))
+	textures.shield_break = game._load_png_texture(str(art.get("shield_break","")))
+
+func combat_height() -> float:
+	return float(presentation.get("combat_height",120.0))
+
+func mount_height(kind: String) -> float:
+	return float(presentation.get("weapon_mount_height",34.0)) if kind == "weapon" else float(presentation.get("system_mount_height",30.0))
+
+func mount_height_for(hardpoint: Dictionary, scale := 1.0) -> float:
+	var mount_size: Vector2 = hardpoint.get("mount_size",Vector2(0.18,0.18))
+	return combat_height() * mount_size.y * scale
+
+func local_anchor_offset(anchor: Vector2) -> Vector2:
+	var canvas: Vector2 = presentation.get("source_canvas",Vector2(384,512))
+	return (anchor - Vector2(0.5,0.5)) * canvas * (combat_height() / maxf(1.0,canvas.y))
+
+func weapon_muzzle_offset() -> float:
+	return float(presentation.get("weapon_muzzle_offset",12.0))
 
 func reset(hp_fraction := 1.0) -> void:
 	bank = 0.0
@@ -35,6 +55,7 @@ func reset(hp_fraction := 1.0) -> void:
 	shield_flash = 0.0
 	hull_flash = 0.0
 	break_flash = 0.0
+	throttle = 0.0
 
 func allow_weapon_pulse() -> bool:
 	if pulse_cooldown > 0.0 or hit_pending: return false
@@ -64,7 +85,8 @@ func update(game, delta: float) -> void:
 	shield_flash = maxf(0.0, shield_flash - delta)
 	hull_flash = maxf(0.0, hull_flash - delta)
 	break_flash = maxf(0.0, break_flash - delta)
-	var desired := clampf(game.player_velocity_x / game.PLAYER_MOVE_SPEED, -1.0, 1.0) * deg_to_rad(6.0) if game.pointer_down else 0.0
+	throttle = move_toward(throttle,clampf(float(game.player_motion_speed) / maxf(1.0,game._player_move_speed()),0.0,1.0),delta * 7.0)
+	var desired := clampf(game.player_velocity_x / game._player_move_speed(),-1.0,1.0) * deg_to_rad(6.0) if game.pointer_down else 0.0
 	bank = lerpf(bank, desired, 1.0 - exp(-delta * 12.0))
 	var hp := float(game.player.hp) / maxf(1.0, float(game.player.max_hp))
 	if hp < 0.3: damage_state = 2
@@ -85,36 +107,35 @@ func draw(game) -> void:
 	if textures.is_empty() or game.player.is_empty(): return
 	if game.status == "dead" and float(game.player.hp) <= 0.0: return
 	var center: Vector2 = game.player.position
-	var scale := Anchors.HEIGHT / 512.0
 	var forward := Vector2.UP.rotated(bank)
-	var moving: bool = game.pointer_down and (absf(game.player_velocity_x) > 1.0 or game.player_target.distance_to(center) > 1.0)
-	for index in range(2):
-		var nozzle: Vector2 = center + ((Anchors.ENGINES[index] - Vector2(192,256)) * scale).rotated(bank)
+	var moving: bool = throttle > 0.05
+	var state: String = ["intact", "damaged", "critical"][damage_state]
+	game._draw_centered_texture(textures[state], center, combat_height(), bank, Color.WHITE)
+	var engines: Array = presentation.get("engine_anchors",[])
+	for index in range(engines.size()):
+		var nozzle: Vector2 = center + local_anchor_offset(Vector2(engines[index])).rotated(bank)
 		var flutter := 0.8 + 0.2 * sin(time * 23.0 + index * 1.7)
 		if damage_state == 2: flutter *= 0.45 + 0.55 * absf(sin(time * 17.0 + index))
-		var length := (9.0 if moving else 5.0) * flutter
-		game.draw_line(nozzle, nozzle - forward * length, Color(0.1,0.7,1,0.65), 1.8, true)
-		game.draw_line(nozzle, nozzle - forward * length * 0.65, Color(0.65,1,1,0.95), 0.7, true)
-	var state: String = ["intact", "damaged", "critical"][damage_state]
-	game._draw_centered_texture(textures[state], center, Anchors.HEIGHT, bank, Color.WHITE)
+		var length := lerpf(7.0,22.0,throttle) * flutter
+		var flame_end := nozzle - forward * length
+		var side := forward.orthogonal() * (1.8 + throttle * 2.2)
+		game.draw_colored_polygon(PackedVector2Array([nozzle + side,nozzle - side,flame_end]),Color(0.05,0.55,1.0,0.18 + throttle * 0.20))
+		game.draw_line(nozzle, flame_end, Color(0.08,0.66,1.0,0.64 + throttle * 0.24), 2.5 + throttle * 1.4, true)
+		game.draw_line(nozzle, nozzle - forward * length * 0.72, Color(0.72,1.0,1.0,0.92), 0.9 + throttle * 0.4, true)
+		game.draw_circle(nozzle,1.5 + throttle * 1.0,Color(0.36,0.92,1.0,0.55 + throttle * 0.25))
 	if moving:
 		var side := -signf(game.player_velocity_x)
 		var point := center + Vector2(side * 24.0, 7.0).rotated(bank)
 		game.draw_line(point, point + Vector2(side * (2.0 + 3.0 * absf(sin(time * 22))), 0).rotated(bank), Color(0.35,0.9,1,0.7), 1.1, true)
-	var spec: Dictionary = Weapons.visual("railgun")
-	var turret_scale := float(game.player.radius) / (Vector2(spec.pivot) - Vector2(spec.muzzle)).length()
-	var aim: Vector2 = game.rail_direction
-	game._draw_centered_texture(textures.railgun, center - aim * game.rail_recoil * float(spec.recoil), 512.0 * turret_scale, aim.angle() + PI / 2.0, Color.WHITE)
-	if game.rail_recoil > 0.0:
-		game.draw_line(center, center + aim * game.player.radius, Color(0.5,0.95,1,game.rail_recoil * 0.65), 0.8, true)
 	var charged := float(game.player.shield) / maxf(1.0, float(game.player.max_shield))
+	var shield_height := combat_height() * float(presentation.get("shield_height_multiplier",1.4))
 	if charged > 0.0 and shield_visibility > 0.0:
 		var idle_alpha := (0.025 + charged * 0.085) * shield_visibility
-		game._draw_centered_texture(textures.shield_idle, center, 118.0, 0.0, Color(0.72,0.96,1.0,idle_alpha))
+		game._draw_centered_texture(textures.shield_idle, center, shield_height, 0.0, Color(0.72,0.96,1.0,idle_alpha))
 	if shield_flash > 0.0:
 		var impact_progress := 1.0 - shield_flash / 0.24
 		var impact_alpha := sin(impact_progress * PI)
-		var impact_center := center + Vector2.from_angle(hit_angle) * 45.0
+		var impact_center := center + Vector2.from_angle(hit_angle) * shield_height * 0.32
 		var blast_radius := lerpf(2.0, 8.0, impact_progress)
 		# Keep shield contact feedback distinct from the continuous shield contour: this is
 		# a compact, blue energy burst rather than the old half-shield wave asset.
@@ -129,7 +150,7 @@ func draw(game) -> void:
 	if break_flash > 0.0:
 		var break_progress := 1.0 - break_flash / 0.4
 		var break_alpha := (1.0 - break_progress) * 0.86
-		game._draw_centered_texture(textures.shield_break, center, lerpf(126.0, 178.0, break_progress), 0.0, Color(0.72,0.96,1.0,break_alpha))
+		game._draw_centered_texture(textures.shield_break, center, lerpf(shield_height * 1.05,shield_height * 1.45,break_progress), 0.0, Color(0.72,0.96,1.0,break_alpha))
 	if hull_flash > 0.0:
 		var point := center + Vector2.from_angle(hit_angle) * 19.0
 		var alpha := hull_flash / 0.24

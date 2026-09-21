@@ -2,15 +2,15 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findGodotBinary } from './find-godot.mjs';
+import { findGodotBinary, godotLogArgs, godotOutputForAssertions } from './find-godot.mjs';
 
 const binary = findGodotBinary();
 if (!binary) throw new Error('Godot binary not found');
 const result = spawnSync(binary, [
-  '--headless', '--path', fileURLToPath(new URL('../../godot/void-drifter', import.meta.url)),
+  '--headless', ...godotLogArgs('test-progression'), '--path', fileURLToPath(new URL('../../godot/void-drifter', import.meta.url)),
   '--script', fileURLToPath(new URL('./test-progression.gd', import.meta.url)),
 ], { encoding: 'utf8', timeout: 120_000 });
-const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+const output = godotOutputForAssertions(`${result.stdout ?? ''}${result.stderr ?? ''}`);
 const parityLine = output.split('\n').find((line) => line.startsWith('ENEMY_PARITY:'));
 const statsLine = output.split('\n').find((line) => line.startsWith('ENEMY_STATS:'));
 const rostersLine = output.split('\n').find((line) => line.startsWith('ENEMY_WAVE_ROSTERS:'));

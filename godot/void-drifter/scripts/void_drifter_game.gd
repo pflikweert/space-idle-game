@@ -9,24 +9,32 @@ const EnemyRegistry := preload("res://scripts/systems/enemy_registry.gd")
 const UpgradeRegistry := preload("res://scripts/systems/upgrade_registry.gd")
 const EffectRegistry := preload("res://scripts/systems/effect_registry.gd")
 const WeaponRegistry := preload("res://scripts/systems/weapon_registry.gd")
+const ShipRegistry := preload("res://scripts/systems/ship_registry.gd")
+const EquipmentRegistry := preload("res://scripts/systems/equipment_registry.gd")
+const LoadoutSystem := preload("res://scripts/systems/loadout_system.gd")
 const Autopilot := preload("res://scripts/systems/autopilot.gd")
 const ProgressionPanel := preload("res://scripts/systems/railgun_panel.gd")
-const Cards := preload("res://scripts/systems/railgun_cards.gd")
+const ModuleProgression := preload("res://scripts/systems/module_progression.gd")
+const WeaponStatResolver := preload("res://scripts/systems/weapon_stat_resolver.gd")
+const DamageInteractionResolver := preload("res://scripts/systems/damage_interaction_resolver.gd")
+const UI := preload("res://scripts/systems/ui_design_system.gd")
 const DirectorSystem := preload("res://scripts/systems/director_system.gd")
 const AudioEvents := preload("res://scripts/systems/audio_events.gd")
+const COMMAND_DECK_BACKDROP := preload("res://assets/ui/theme/command_deck_backdrop_v1.png")
+const REFERENCE_VIEWPORT_WIDTH := 430.0
+const REFERENCE_VIEWPORT_HEIGHT := 760.0
+const MAX_NATIVE_UI_FACTOR := 2.4
+const MAX_GAMEPLAY_VISUAL_FACTOR := 1.55
 
 # Gameplay tuning
-const PLAYER_HP := 140
 const FIRST_ENEMY_SPAWN_DELAY := 1350.0
 const PLAYER_FIRE_INTERVAL := 500.0
-const PLAYER_MOVE_SPEED := 470.0
 const PLAYER_BOUNDS_PADDING := 10.0
 # Sized for the 430px mobile reference viewport; canvas stretch handles smaller screens.
 const COMBAT_SPRITE_SCALE := 0.48
 # Nozzle centers measured on the dreadnought's fixed 384x512 idle-up canvas.
 const BOSS_ENGINE_NOZZLES := [Vector2(142, 376), Vector2(173, 377), Vector2(215, 377), Vector2(246, 376)]
 const EFFECT_SCALE := 0.8
-const PLAYER_RADIUS := 18.0 * COMBAT_SPRITE_SCALE
 # Movement sprites use fixed transparent canvases; keep draw height separate from collision radius to avoid pivot jitter.
 const PLAYER_SHIP_VISUAL_HEIGHT := 88.0 * COMBAT_SPRITE_SCALE
 const PLAYER_SPRITE_CANVAS_HEIGHT := 204.0 * COMBAT_SPRITE_SCALE
@@ -46,6 +54,26 @@ const ENEMY_DAMAGE_FLASH_SECONDS := 0.16
 const PLAYER_DAMAGE_FLASH_SECONDS := 0.38
 const FIRST_IMPACT_MULTIPLIER := 2.0
 const PROJECTILE_DAMAGE_MULTIPLIER := 2.0
+const MICRO_MISSILE_HOMING_TURN_RATE := 8.0
+const MICRO_MISSILE_RETARGET_CORRECTION_DISTANCE := 42.0
+const MICRO_MISSILE_RETARGET_TURN_RATE := 15.0
+const MICRO_MISSILE_FLIGHT_BUFFER := 400.0
+const MICRO_MISSILE_VOLLEY_COUNT := 3
+const MICRO_MISSILE_VOLLEY_SPREAD := 0.16
+const MICRO_MISSILE_LANE_SPACING := 10.0
+const MICRO_MISSILE_SALVO_STAGGER_SECONDS := 0.075
+const MICRO_MISSILE_BOOST_SECONDS := 0.18
+const MICRO_MISSILE_TRAIL_SAMPLE_DISTANCE := 5.0
+const MICRO_MISSILE_MAX_TRAIL_POINTS := 36
+const MICRO_MISSILE_TRAIL_LENGTH := 175.0
+const MICRO_MISSILE_SMALL_TRAIL_SAMPLE_DISTANCE := 3.0
+const MICRO_MISSILE_SMALL_MAX_TRAIL_POINTS := 10
+const MICRO_MISSILE_SMALL_TRAIL_LENGTH := 38.0
+const MICRO_MISSILE_SMALL_SCALE := 0.52
+const RAILGUN_TRAIL_SAMPLE_DISTANCE := 5.0
+const RAILGUN_MAX_TRAIL_POINTS := 24
+const RAILGUN_VISUAL_TRAIL_LENGTH := 105.0
+const RAILGUN_FRAGMENT_VISUAL_TRAIL_LENGTH := 42.0
 const ENEMY_ATTACK_WARMUP_SECONDS := 0.42
 const ENEMY_ATTACK_VISUAL_SECONDS := 0.20
 const ENEMY_DEATH_SPRITE_HEIGHT := 102.0
@@ -54,11 +82,11 @@ const ENEMY_DIRECTION_LOCK_SECONDS := 0.16
 const ENEMY_DIRECTION_DOMINANCE := 1.18
 
 # HUD presentation
-const UI_CYAN := Color("#00E5FF")
-const UI_MAGENTA := Color("#FF00FF")
-const UI_ORANGE := Color("#FF6D00")
-const UI_TEAL := Color("#00E676")
-const UI_TEXT := Color("#E0E0FF")
+const UI_CYAN := UI.CYAN
+const UI_MAGENTA := UI.VIOLET
+const UI_ORANGE := UI.GOLD
+const UI_TEAL := UI.MINT
+const UI_TEXT := UI.TEXT
 
 
 const VOID_DRONE_ID := "void_drone"
@@ -100,27 +128,22 @@ var upgrades_control: Button
 var pause_control: Button
 var auto_control: Button
 var speed_control: Button
-var auto_cards_control: Button
 var build_control: Button
 var wave_control: Button
-var cards := Cards.fresh()
 const RailVisuals := preload("res://scripts/systems/railgun_visuals.gd")
 var rail_visuals := RailVisuals.new()
 const WeaponHUDCard := preload("res://scripts/systems/weapon_hud_card.gd")
 var weapon_hud: Control
+var weapon_huds: Array[Control] = []
+var weapon_runtime_by_item_id: Dictionary = {}
 var hud_safe := Vector4.ZERO
 const CompactUI := preload("res://scripts/systems/compact_ui.gd")
 var overview_control: Button
-var selected_card := ""
 var hud_icon_textures: Dictionary = {}
-var card_detail_origin := "railgun_catalog"
-var card_detail := "power"
 var empty_weapon_slots: Array[Control] = []
 var enemy_damage_numbers: Array[Dictionary] = []
-var card_notices: Array[String] = []
-var card_notice := ""
-var card_notice_timer := 0.0
-var card_notice_label: Label
+var blueprint_notice := ""
+var blueprint_notice_timer := 0.0
 var reward_dirty := false
 var buy_quantity := 1
 var damage_numbers: Array[Dictionary] = []
@@ -148,6 +171,8 @@ var foreground_callback: JavaScriptObject
 var save_error := false
 
 var ship_textures := {}
+var equipment_mount_textures: Dictionary = {}
+var equipment_overlay_textures: Dictionary = {}
 var enemy_textures := {}
 var vfx_textures := {}
 var sector_textures: Array[Texture2D] = []
@@ -164,13 +189,19 @@ var runState := {
 	"cash": 30.0,
 	"phase": "spawning",
 	"coinsEarned": 0.0,
+	"modules": 0,
 	"elapsedSeconds": 0.0,
 }
 var run_upgrades := UpgradeRegistry.defaults()
 var menu_view := "main"
+var hangar_selected_slot := ""
+var hangar_selected_equipment := ""
+var hangar_blueprint_filter := "weapons"
+var hangar_pending_unequip := ""
 var player := {}
 var player_target := Vector2.ZERO
 var player_velocity_x := 0.0
+var player_motion_speed := 0.0
 var enemies: Array[Dictionary] = []
 var bullets: Array[Dictionary] = []
 var enemy_projectiles: Array[Dictionary] = []
@@ -184,7 +215,15 @@ var app_backgrounded := false
 var rail_recoil := 0.0
 var rail_direction := Vector2.UP
 var explosion_frames: Array[Texture2D] = []
+var missile_impact_frames: Array[Texture2D] = []
+var shatter_burst_frames: Array[Texture2D] = []
+var subtle_shatter_burst_frames: Array[Texture2D] = []
+var echo_detonation_frames: Array[Texture2D] = []
+var railgun_void_burst_frames: Array[Texture2D] = []
+var railgun_shatter_split_frames: Array[Texture2D] = []
 var muzzle_flashes: Array[Dictionary] = []
+var mount_visuals: Dictionary = {}
+var mount_aim_angles: Dictionary = {}
 var kills := 0
 var score := 0
 var elapsed := 0.0
@@ -201,6 +240,7 @@ var profile := {}
 var metaProgress := {}
 var run_enemy_kills := {}
 var run_discovered_enemies := []
+var run_new_blueprints: Array = []
 var last_run_records := {}
 var run_recorded := false
 var weapon_level := 1
@@ -212,17 +252,27 @@ var audio_events := AudioEvents.new()
 
 func _ready() -> void:
 	set_process(true)
+	# Canvas-drawn HUD text and dynamically-created controls now share the same
+	# Oxanium family as the command-deck panels.
+	add_theme_font_override("font", UI.font(false))
 	profile = profile_store.load_profile()
 	metaProgress = profile
 	_create_runtime_buttons()
 	rng.randomize()
-	gunship.load_art(self)
+	gunship.load_art(self,_active_ship())
+	_load_equipment_mount_textures()
 	ship_textures = {"idle": gunship.textures.intact, "damaged": gunship.textures.damaged, "icon": gunship.textures.intact}
 	build_control.icon = gunship.textures.intact
 	vfx_textures = {"engine_trail": load("res://assets/vfx/engine_trail.png")}
 	run_complete_background = load("res://assets/backgrounds/run_complete_victory_generated.png")
 	for index in range(8):
 		explosion_frames.append(_load_png_texture("res://assets/vfx/railgun/explosion-%02d.png" % index))
+	missile_impact_frames = _load_vfx_atlas("res://assets/vfx/missile_generated/small_impact_atlas.png")
+	shatter_burst_frames = _load_vfx_atlas("res://assets/vfx/missile_generated/shatter_burst_atlas.png")
+	subtle_shatter_burst_frames = _load_vfx_atlas("res://assets/vfx/missile_generated/shatter_burst_subtle_atlas.png")
+	echo_detonation_frames = _load_vfx_atlas("res://assets/vfx/missile_generated/echo_detonation_atlas.png")
+	railgun_void_burst_frames = _load_vfx_atlas("res://assets/vfx/railgun_void_burst_atlas.png")
+	railgun_shatter_split_frames = _load_vfx_atlas("res://assets/vfx/railgun_shatter_split_atlas.png")
 	_load_enemy_textures_from_registry()
 	for index in [0, 2]:
 		background_textures.append(load(PARALLAX_LAYERS[index].path))
@@ -236,11 +286,11 @@ func _create_runtime_buttons() -> void:
 	overlay = ProgressionPanel.new()
 	add_child(overlay)
 	overlay.selected.connect(_on_panel_action)
+
 	upgrades_control = overlay.button("Upgrades", "shop")
 	pause_control = overlay.button("Pause", "pause")
 	auto_control = overlay.button("Auto", "auto")
 	speed_control = overlay.button("1x", "speed")
-	auto_cards_control = overlay.button("Auto Cards: OFF", "auto_cards")
 	build_control = overlay.button("Railgun", "build")
 	wave_control = overlay.button("WAVE 1", "wave_intel")
 	# Preserve a generous touch target without making the wave readout look like a HUD button.
@@ -251,13 +301,16 @@ func _create_runtime_buttons() -> void:
 	wave_control.add_theme_color_override("font_hover_color", UI_TEAL)
 	build_control.expand_icon = true
 	speed_control.tooltip_text = "Tap to cycle 1x, 2x, 3x, 4x, 5x, 10x"
-	for control in [upgrades_control, pause_control, auto_control, speed_control, auto_cards_control, build_control, wave_control]:
+	for control in [upgrades_control, pause_control, auto_control, speed_control, build_control, wave_control]:
 		add_child(control)
-	card_notice_label = Label.new()
-	card_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	card_notice_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card_notice_label.add_theme_color_override("font_color", UI_TEXT)
-	add_child(card_notice_label)
+
+func _load_equipment_mount_textures() -> void:
+	for blueprint_id in [EquipmentRegistry.RAILGUN_ID, EquipmentRegistry.SHIELD_CORE_ID, EquipmentRegistry.MICRO_MISSILE_RACK_ID]:
+		var equipment := EquipmentRegistry.definition(str(blueprint_id))
+		var mount_path := str(equipment.get("mount_art", ""))
+		if not mount_path.is_empty(): equipment_mount_textures[blueprint_id] = load(mount_path)
+		var overlay_path := str(equipment.get("overlay_art", ""))
+		if not overlay_path.is_empty(): equipment_overlay_textures[blueprint_id] = load(overlay_path)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and is_instance_valid(overlay):
@@ -277,7 +330,6 @@ func _process(delta: float) -> void:
 	in_process_frame = true
 	if status == "running":
 		runState.realElapsedSeconds = float(runState.get("realElapsedSeconds",0.0)) + maxf(0.0,delta)
-		_update_card_notice(delta)
 		_update_damage_feedback(minf(delta, 0.1))
 		_update_visual_effects(minf(delta, 0.1))
 		var remaining := minf(delta, 0.1) * _game_speed()
@@ -321,13 +373,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		manual_override = 1.0
 
 func reset_world(next_status: String) -> void:
-	cards = Cards.fresh()
-	card_notice = ""
-	card_notice_timer = 0.0
+	blueprint_notice = ""
+	blueprint_notice_timer = 0.0
 	reward_dirty = false
 	damage_numbers.clear()
 	enemy_damage_numbers.clear()
-	card_notices.clear()
+	run_new_blueprints.clear()
 	hull_damage_timer = 0.0
 	hull_damage_trail = 0.0
 	var size := get_viewport_rect().size
@@ -342,6 +393,7 @@ func reset_world(next_status: String) -> void:
 		"cash": 30.0,
 		"phase": "spawning",
 		"coinsEarned": 0.0,
+		"modules": 0,
 		"elapsedSeconds": 0.0,
 		"realElapsedSeconds": 0.0,
 		"fleetOrbitSign": 1.0,
@@ -354,7 +406,7 @@ func reset_world(next_status: String) -> void:
 	var player_max_hp := _get_player_max_hp()
 	player = {
 		"position": start,
-		"radius": PLAYER_RADIUS,
+		"radius": _player_radius(),
 		"hp": player_max_hp,
 		"max_hp": player_max_hp,
 		"shield": _stat("shield_capacity"),
@@ -369,6 +421,8 @@ func reset_world(next_status: String) -> void:
 	enemy_projectiles = []
 	particles = []
 	muzzle_flashes = []
+	mount_visuals.clear()
+	mount_aim_angles.clear()
 	rail_recoil = 0.0
 	rail_direction = Vector2.UP
 	gunship.reset()
@@ -389,6 +443,7 @@ func reset_world(next_status: String) -> void:
 	run_recorded = false
 	weapon_level = 1
 	run_id = ""
+	weapon_runtime_by_item_id = {}
 	save_timer = 0.0
 	last_boss_wave = 0
 	manual_override = 0.0
@@ -404,9 +459,15 @@ func reset_world(next_status: String) -> void:
 func start_run() -> void:
 	if not profile.activeRun.is_empty():
 		return
+	var active_id := _active_ship_id()
+	var active_state: Dictionary = profile.ships.get(active_id,{})
+	var validated: Dictionary = LoadoutSystem.validate(active_id,active_state.get("loadout",{}),profile.equipmentItems)
+	if not validated.valid:
+		active_state.loadout = validated.loadout; profile.ships[active_id] = active_state
+		save_error = not profile_store.save_profile(profile)
 	reset_world("running")
 	run_id = "%d-%d" % [Time.get_unix_time_from_system() * 1000, rng.randi()]
-	cards = Cards.fresh(hash(run_id))
+	_initialize_weapon_runtime()
 	runState.fleetOrbitSign = -1.0 if rng.randi() % 2 == 0 else 1.0
 	_save_run()
 	_refresh_overlay()
@@ -424,9 +485,10 @@ func _end_run(animate := false) -> void:
 			"wave": int(runState.wave),
 			"time_seconds": int(floor(float(runState.elapsedSeconds))),
 			"coins_earned": float(runState.coinsEarned),
-			"modules_earned": int(cards.modules),
+			"modules_earned": int(runState.modules),
 			"enemy_kills": run_enemy_kills,
 			"discovered_enemies": run_discovered_enemies,
+			"new_blueprints": run_new_blueprints,
 		})
 		metaProgress = profile
 		last_run_records = profile.get("lastRun", {}).get("newRecords", {})
@@ -471,7 +533,6 @@ func _update_world(delta: float) -> void:
 	_update_projectiles(delta)
 	_update_effects(delta)
 	_resolve_collisions()
-	_handle_card_progress()
 	_sync_legacy_run_fields()
 	save_timer += delta
 	if status == "running" and (reward_dirty or changed_wave or save_timer >= 10.0):
@@ -505,12 +566,14 @@ func _update_player(delta: float) -> void:
 	if distance < 1.0:
 		player.position = player_target
 		player_velocity_x = 0.0
+		player_motion_speed = 0.0
 		return
 
-	var step := minf(distance, PLAYER_MOVE_SPEED * delta)
+	var step := minf(distance, _player_move_speed() * delta)
 	var movement := offset / distance * step
 	player.position = position + movement
 	player_velocity_x = movement.x / maxf(delta, 0.000001)
+	player_motion_speed = movement.length() / maxf(delta, 0.000001)
 
 func _update_enemy_spawning(delta_ms: float) -> void:
 	if runState.phase != "spawning":
@@ -562,6 +625,9 @@ func _spawn_enemy_at(spawn_data: Dictionary, enemy_type_id := "") -> void:
 		"score_reward": stats.score_reward,
 		"movement_behavior": str(definition.get("movement_behavior", "chase")),
 		"attack_behavior": str(definition.get("attack_behavior", "contact")),
+		"resistances": definition.get("resistances",[]).duplicate(true),
+		"weaknesses": definition.get("weaknesses",[]).duplicate(true),
+		"immunities": definition.get("immunities",[]).duplicate(true),
 		"elite_modifier": elite_modifier,
 		"elite_label": _get_elite_modifier_label(elite_modifier),
 		"spawn_edge": spawn_edge,
@@ -616,17 +682,242 @@ func _nearest_target() -> Dictionary:
 			distance_limit = distance
 	return nearest
 
+func _active_weapon_loadout() -> Array:
+	var result := []
+	var ship := _active_ship()
+	var ship_state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	var loadout: Dictionary = ship_state.get("loadout",{})
+	var slot_enabled: Dictionary = ship_state.get("slot_enabled",{}) if ship_state.get("slot_enabled",{}) is Dictionary else {}
+	for slot in ship.get("slots",[]):
+		if str(slot.get("type","")) != "weapon": continue
+		var slot_id := str(slot.get("id",""))
+		if not bool(slot_enabled.get(slot_id,true)): continue
+		var item_id := str(loadout.get(slot_id,"")); if item_id.is_empty(): continue
+		var item: Dictionary = profile.equipmentItems.get(item_id,{})
+		var blueprint: Dictionary = EquipmentRegistry.definition(str(item.get("blueprint_id","")))
+		if item.is_empty() or blueprint.get("item_type","") != "weapon": continue
+		result.append({"item_id":item_id,"slot_id":str(slot.id),"item":item,"blueprint":blueprint,"anchor":slot.get("position",Vector2(0.5,0.5))})
+	return result
+
+func _initialize_weapon_runtime() -> void:
+	weapon_runtime_by_item_id = {}
+	for entry in _active_weapon_loadout():
+		var item: Dictionary = entry.item
+		var blueprint: Dictionary = entry.blueprint
+		var stats: Dictionary = _weapon_runtime_stats(entry)
+		var initial_fire := fire_timer / 1000.0 if str(item.blueprint_id) == EquipmentRegistry.RAILGUN_ID else 0.0
+		weapon_runtime_by_item_id[entry.item_id] = {"item_id":entry.item_id,"slot_id":entry.slot_id,"blueprint_id":str(item.blueprint_id),"family":str(blueprint.get("family",blueprint.get("weapon_family",""))),"damage_type":str(blueprint.get("damage_type","")),"ammo":int(stats.magazine),"magazine":int(stats.magazine),"reload_timer":0.0,"fire_timer":initial_fire,"target_id":-1,"last_shot_time":0.0,"anchor":entry.anchor}
+	_sync_railgun_runtime()
+
+func _weapon_runtime_stats(entry: Dictionary) -> Dictionary:
+	var item: Dictionary = entry.item
+	var blueprint_id := str(item.get("blueprint_id",""))
+	var blueprint: Dictionary = entry.get("blueprint",EquipmentRegistry.definition(blueprint_id))
+	var family := str(blueprint.get("family",blueprint.get("weapon_family","")))
+	var level := int(item.get("level",1))
+	var ship_damage := _stat("damage")
+	var base: Dictionary
+	if blueprint_id == EquipmentRegistry.MICRO_MISSILE_RACK_ID:
+		var missile := EquipmentRegistry.micro_missile_stats(level)
+		base = {"damage":EquipmentRegistry.damage_from_ship(blueprint_id,level,ship_damage) * float(missile.damage_multiplier),"interval":float(missile.fire_interval),"magazine":int(missile.magazine),"reload":float(missile.reload),"range":float(missile.range),"projectile_speed":float(missile.projectile_speed),"shots":MICRO_MISSILE_VOLLEY_COUNT + int(missile.volley_bonus),"crit":_stat("crit_chance"),"crit_multiplier":2.0,"width":1.0,"hits":1,"fragments":0,"rampage":0.0,"explosion_ratio":float(missile.explosion_ratio) * float(missile.explosion_ratio_multiplier),"explosion_radius":float(missile.explosion_radius) * float(missile.explosion_radius_multiplier),"super_chance":float(missile.super_chance),"super_multiplier":float(missile.super_multiplier),"super_radius_multiplier":float(missile.super_radius_multiplier),"splinter_count":int(missile.splinter_count),"splinter_damage_ratio":float(missile.splinter_damage_ratio),"small_explosion_chance":float(missile.small_explosion_chance),"fragment_count":int(missile.fragment_count),"fragment_damage_ratio":float(missile.fragment_damage_ratio),"echo_damage_ratio":float(missile.echo_damage_ratio),"echo_radius_multiplier":float(missile.echo_radius_multiplier)}
+	else:
+		var railgun := EquipmentRegistry.definition(EquipmentRegistry.RAILGUN_ID)
+		var railgun_base: Dictionary = EquipmentRegistry.railgun_stats(level)
+		base = {"damage":EquipmentRegistry.damage_from_ship(EquipmentRegistry.RAILGUN_ID,level,ship_damage),"interval":float(railgun_base.get("fire_interval",500.0)) / 1000.0,"magazine":int(railgun_base.get("magazine",6)),"reload":float(railgun_base.get("reload",3.0)),"range":_stat("range"),"projectile_speed":WeaponRegistry.PROJECTILE_SPEED,"shots":1 + int(railgun_base.get("additional_bullets",0)),"crit":_stat("crit_chance"),"crit_multiplier":2.0,"width":1.0,"hits":1 + int(railgun_base.get("penetration_bonus",0)),"fragments":int(railgun_base.get("shatter_fragments",0)),"rampage":float(railgun_base.get("rampage_per_penetration",0.0)),"rampage_cap":float(railgun_base.get("rampage_cap",0.0)),"void_burst_ratio":float(railgun_base.get("void_burst_ratio",0.0)),"void_burst_radius":float(railgun_base.get("void_burst_radius",0.0)),"shatter_damage_ratio":float(railgun_base.get("shatter_damage_ratio",0.0)),"milestone_damage_multiplier":float(railgun_base.get("damage_multiplier",1.0)),"milestone_crit_bonus":float(railgun_base.get("crit_bonus",0.0))}
+	var resolved := WeaponStatResolver.resolve(blueprint_id,family,level,base,{},float(base.get("crit",0.0)))
+	return resolved
+
+func _sync_railgun_runtime() -> void:
+	var railgun: Dictionary = weapon_runtime_by_item_id.get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
+	player.weapon = railgun
+
+func _runtime_ids_in_slot_order() -> Array:
+	var ordered := []
+	for entry in _active_weapon_loadout():
+		if weapon_runtime_by_item_id.has(str(entry.item_id)): ordered.append(str(entry.item_id))
+	return ordered
+
+func _runtime_target(runtime: Dictionary) -> Dictionary:
+	var nearest := {}; var stats: Dictionary = _weapon_runtime_stats({"item":profile.equipmentItems.get(str(runtime.item_id),{}),"blueprint":EquipmentRegistry.definition(str(runtime.blueprint_id))})
+	var target_range := _weapon_target_range(str(runtime.blueprint_id), stats)
+	var distance_limit := target_range * target_range
+	for enemy in enemies:
+		if float(enemy.hp) <= 0.0 or not _enemy_is_visible(enemy): continue
+		var distance: float = player.position.distance_squared_to(enemy.position)
+		if distance <= distance_limit: nearest = enemy; distance_limit = distance
+	return nearest
+
+func _weapon_target_range(blueprint_id: String, stats: Dictionary) -> float:
+	var target_range := float(stats.get("range", 0.0))
+	if blueprint_id == EquipmentRegistry.MICRO_MISSILE_RACK_ID:
+		# Missiles keep their own range progression and inherit the purchased
+		# player range bonus without inheriting the Railgun's 160-unit baseline twice.
+		target_range += maxf(0.0, _stat("range") - UpgradeRegistry.value("range", 0))
+	return target_range
+
+func _weapon_flight_distance(blueprint_id: String, stats: Dictionary, origin: Vector2, direction: Vector2) -> float:
+	if blueprint_id == EquipmentRegistry.MICRO_MISSILE_RACK_ID:
+		return _weapon_target_range(blueprint_id, stats) + MICRO_MISSILE_FLIGHT_BUFFER
+	return _projectile_travel(origin, direction)
+
+func _weapon_ammo_cost(blueprint_id: String) -> int:
+	return MICRO_MISSILE_VOLLEY_COUNT if blueprint_id == EquipmentRegistry.MICRO_MISSILE_RACK_ID else 1
+
+func _find_missile_target(position: Vector2, remaining_distance: float, excluded_ids: Array = []) -> Dictionary:
+	var nearest := {}
+	var distance_limit := remaining_distance * remaining_distance
+	for enemy in enemies:
+		var enemy_id := int(enemy.get("id", -1))
+		if float(enemy.get("hp", 0.0)) <= 0.0 or excluded_ids.has(enemy_id) or not _enemy_is_visible(enemy): continue
+		var distance := position.distance_squared_to(enemy.position)
+		if distance > distance_limit: continue
+		if nearest.is_empty() or distance < distance_limit or (is_equal_approx(distance, distance_limit) and enemy_id < int(nearest.get("id", INF))):
+			nearest = enemy
+			distance_limit = distance
+	return nearest
+
+func _update_railgun_heading(bullet: Dictionary) -> void:
+	# A Railgun shot is precision-targeted. Correct against the live target every
+	# frame so an enemy cannot sidestep the position it occupied when fired.
+	var target_id := int(bullet.get("target_id", -1))
+	if target_id < 0: return
+	for enemy in enemies:
+		if int(enemy.get("id", -1)) != target_id or float(enemy.get("hp", 0.0)) <= 0.0 or not _enemy_is_visible(enemy): continue
+		var direction: Vector2 = (enemy.position - bullet.position).normalized()
+		if direction.length_squared() > 0.000001:
+			bullet.velocity = direction * bullet.velocity.length()
+		return
+
+func _update_missile_heading(bullet: Dictionary, delta: float) -> void:
+	var boost_remaining := float(bullet.get("boost_remaining", 0.0))
+	if boost_remaining > 0.0:
+		bullet.boost_remaining = maxf(0.0, boost_remaining - delta)
+		return
+	var target := {}
+	var retargeted := false
+	var target_id := int(bullet.get("target_id", -1))
+	for enemy in enemies:
+		if int(enemy.get("id", -1)) == target_id and float(enemy.get("hp", 0.0)) > 0.0 and _enemy_is_visible(enemy):
+			target = enemy
+			break
+	if target.is_empty():
+		target = _find_missile_target(bullet.position, float(bullet.remaining_distance), bullet.get("hit_ids", []))
+		bullet.target_id = int(target.get("id", -1))
+		retargeted = not target.is_empty()
+	if target.is_empty(): return
+	if retargeted:
+		bullet.retarget_correction_remaining = minf(MICRO_MISSILE_RETARGET_CORRECTION_DISTANCE, float(bullet.remaining_distance))
+	var current_direction: Vector2 = bullet.velocity.normalized()
+	var desired_direction: Vector2 = (target.position - bullet.position).normalized()
+	if desired_direction.length_squared() <= 0.000001: return
+	var correction_active := float(bullet.get("retarget_correction_remaining", 0.0)) > 0.0
+	var turn_rate := MICRO_MISSILE_RETARGET_TURN_RATE if correction_active else MICRO_MISSILE_HOMING_TURN_RATE
+	var turn_limit := turn_rate * delta
+	var turn := clampf(current_direction.angle_to(desired_direction), -turn_limit, turn_limit)
+	bullet.velocity = current_direction.rotated(turn) * bullet.velocity.length()
+
+func _hardpoint_position(anchor: Vector2) -> Vector2:
+	return player.position + gunship.local_anchor_offset(anchor).rotated(gunship.bank)
+
+func _weapon_mount_position(runtime: Dictionary) -> Vector2:
+	var anchor: Vector2 = runtime.get("anchor",Vector2(0.5,0.5))
+	return _hardpoint_position(anchor)
+
+func _weapon_origin(runtime: Dictionary, direction: Vector2) -> Vector2:
+	return _weapon_mount_position(runtime) + direction * gunship.weapon_muzzle_offset()
+
 func _update_weapons(delta_ms: float) -> void:
-	var cycle := _railgun_stats()
-	var remaining := _tick_railgun_reload(delta_ms / 1000.0)
-	if float(player.weapon.reload_timer) > 0.0: return
-	var overshoot := maxf(0.0, remaining * 1000.0 - fire_timer)
-	fire_timer = maxf(0.0, fire_timer - remaining * 1000.0)
-	if fire_timer <= 0.000001 and _fire_at_nearest_enemy():
-		player.weapon.ammo = maxi(0, int(player.weapon.ammo)-1)
-		if int(player.weapon.ammo) == 0: player.weapon.reload_timer = float(cycle.reload)
-		fire_timer = maxf(0.0, _get_weapon_fire_interval() - overshoot) if int(player.weapon.ammo) > 0 else 0.0
-		if int(player.weapon.ammo) == 0: _tick_railgun_reload(overshoot / 1000.0)
+	if weapon_runtime_by_item_id.is_empty(): _initialize_weapon_runtime()
+	var railgun_runtime: Dictionary = weapon_runtime_by_item_id.get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
+	if not railgun_runtime.is_empty():
+		if int(player.get("weapon",{}).get("ammo",railgun_runtime.ammo)) != int(railgun_runtime.ammo) or not is_equal_approx(float(player.get("weapon",{}).get("reload_timer",railgun_runtime.reload_timer)),float(railgun_runtime.reload_timer)):
+			railgun_runtime.ammo = int(player.weapon.get("ammo",railgun_runtime.ammo)); railgun_runtime.reload_timer = float(player.weapon.get("reload_timer",railgun_runtime.reload_timer))
+		if weapon_runtime_by_item_id.size() == 1 and not is_equal_approx(float(fire_timer),float(railgun_runtime.fire_timer) * 1000.0): railgun_runtime.fire_timer = float(fire_timer) / 1000.0
+	var delta := delta_ms / 1000.0
+	for item_id in weapon_runtime_by_item_id:
+		var runtime: Dictionary = weapon_runtime_by_item_id[item_id]
+		var entry := {"item":profile.equipmentItems.get(str(runtime.item_id),{}),"blueprint":EquipmentRegistry.definition(str(runtime.blueprint_id))}
+		var stats := _weapon_runtime_stats(entry)
+		var remaining := _tick_runtime_reload(runtime,stats,delta)
+		if float(runtime.reload_timer) > 0.0: continue
+		runtime.fire_timer = maxf(0.0,float(runtime.fire_timer) - remaining)
+		if runtime.fire_timer <= 0.000001 and _fire_runtime_weapon(runtime,stats):
+			runtime.ammo = maxi(0,int(runtime.ammo)-_weapon_ammo_cost(str(runtime.blueprint_id)))
+			if int(runtime.ammo) == 0: runtime.reload_timer = float(stats.reload)
+			runtime.fire_timer = float(stats.interval) if int(runtime.ammo) > 0 else 0.0
+		weapon_runtime_by_item_id[item_id] = runtime
+	_sync_railgun_runtime()
+	if not railgun_runtime.is_empty() and weapon_runtime_by_item_id.size() == 1: fire_timer = float(railgun_runtime.fire_timer) * 1000.0
+
+func _tick_runtime_reload(runtime: Dictionary, stats: Dictionary, delta: float) -> float:
+	var delay := float(runtime.reload_timer)
+	if delay <= 0.0: return delta
+	runtime.reload_timer = maxf(0.0,delay-delta)
+	if runtime.reload_timer <= 0.000001:
+		runtime.reload_timer = 0.0; runtime.ammo = int(stats.magazine)
+	return maxf(0.0,delta-delay)
+
+func _fire_runtime_weapon(runtime: Dictionary, stats: Dictionary) -> bool:
+	var target := _runtime_target(runtime)
+	if target.is_empty(): return false
+	var direction: Vector2 = (target.position - player.position).normalized()
+	var muzzle := _weapon_origin(runtime,direction)
+	var shot_count := int(stats.shots)
+	var is_missile_weapon := str(runtime.blueprint_id) == EquipmentRegistry.MICRO_MISSILE_RACK_ID
+	if is_missile_weapon: _trigger_mount_visual(str(runtime.get("item_id","")),"missile")
+	var spread := MICRO_MISSILE_VOLLEY_SPREAD if is_missile_weapon else _get_weapon_spread()
+	for shot_index in range(shot_count):
+		var lane := float(shot_index) - float(shot_count - 1) / 2.0
+		var shot_direction := direction
+		if shot_count > 1: shot_direction = direction.rotated(lane * spread).normalized()
+		var origin := muzzle + Vector2(-direction.y,direction.x) * lane * MICRO_MISSILE_LANE_SPACING
+		var critical := _roll_critical(next_id,float(stats.get("crit",0.0)))
+		var super_missile := is_missile_weapon and _roll_critical(next_id + 100000, float(stats.get("super_chance",0.0)))
+		var flight_distance := _weapon_flight_distance(str(runtime.blueprint_id), stats, origin, shot_direction)
+		var projectile_damage := float(stats.damage) * (float(stats.get("super_multiplier",1.0)) if super_missile else 1.0)
+		var bullet := WeaponRegistry.build_projectile(next_id,origin,shot_direction,projectile_damage,critical,flight_distance)
+		bullet.velocity = shot_direction * float(stats.projectile_speed)
+		bullet.life = flight_distance / maxf(1.0,float(stats.projectile_speed))
+		bullet.remaining_distance = flight_distance
+		bullet.sourceEquipmentId = str(runtime.item_id); bullet.sourceBlueprintId = str(runtime.blueprint_id); bullet.weaponFamily = str(runtime.family); bullet.damageType = str(runtime.damage_type); bullet.resolvedDamage = float(stats.damage) * (2.0 if critical else 1.0)
+		bullet.visual_kind = "micro_missile" if is_missile_weapon else "railgun"
+		bullet.visual_trail_points = [origin]
+		if bullet.visual_kind == "micro_missile":
+			bullet.target_id = int(target.id)
+			bullet.launch_lane = lane
+			bullet.launch_delay = float(shot_index) * MICRO_MISSILE_SALVO_STAGGER_SECONDS
+			bullet.launched = shot_index == 0
+			bullet.boost_remaining = MICRO_MISSILE_BOOST_SECONDS
+			bullet.trail_points = [origin]
+		else:
+			bullet.target_id = int(target.id)
+		if critical: bullet.damage *= float(stats.crit_multiplier) / 2.0
+		bullet.resolvedDamage = float(bullet.damage)
+		bullet.projectile_speed = float(stats.projectile_speed)
+		bullet.radius *= float(stats.width); bullet.hits_left = int(stats.hits); bullet.hit_ids = []; bullet.fragments = int(stats.fragments); bullet.rampage = float(stats.rampage); bullet.rampage_cap = float(stats.get("rampage_cap",0.0)); bullet.shatter_damage_ratio = float(stats.get("shatter_damage_ratio",0.0))
+		bullet.is_super_missile = super_missile
+		bullet.void_burst_ratio = float(stats.get("void_burst_ratio",0.0))
+		bullet.void_burst_radius = float(stats.get("void_burst_radius",0.0))
+		if is_missile_weapon:
+			bullet.explosion_enabled = true
+			bullet.explosion_ratio = float(stats.get("explosion_ratio",0.0))
+			bullet.explosion_radius = float(stats.get("explosion_radius",0.0)) * (float(stats.get("super_radius_multiplier",1.0)) if super_missile else 1.0)
+			bullet.splinter_count = int(stats.get("splinter_count",0))
+			bullet.splinter_damage_ratio = float(stats.get("splinter_damage_ratio",0.0))
+			bullet.small_explosion_chance = float(stats.get("small_explosion_chance",0.0))
+			bullet.fragment_count = int(stats.get("fragment_count",0))
+			bullet.fragment_damage_ratio = float(stats.get("fragment_damage_ratio",0.0))
+			bullet.echo_damage_ratio = float(stats.get("echo_damage_ratio",0.0))
+			bullet.echo_radius_multiplier = float(stats.get("echo_radius_multiplier",1.0))
+		bullets.append(bullet)
+		if is_missile_weapon:
+			if bool(bullet.launched): _add_missile_muzzle_flash(origin,shot_direction,super_missile,str(runtime.item_id))
+		else:
+			_add_muzzle_flash(origin,shot_direction,critical,str(runtime.blueprint_id),str(runtime.item_id))
+		next_id += 1
+	runtime.target_id = int(target.id); runtime.last_shot_time = float(runState.elapsedSeconds)
+	audio_events.emit(AudioEvents.SHOOT,{"source":"player","weapon":runtime.blueprint_id})
+	return true
 
 func _fire_at_nearest_enemy() -> bool:
 	var nearest := _nearest_target()
@@ -647,6 +938,14 @@ func _fire_at_nearest_enemy() -> bool:
 		var muzzle_position := player_position + direction * float(player.radius) + muzzle_offset
 		var critical := _roll_critical(next_id)
 		var bullet := WeaponRegistry.build_projectile(next_id, muzzle_position, shot_direction, _get_weapon_damage(), critical, _projectile_travel(muzzle_position,shot_direction))
+		bullet.sourceEquipmentId = EquipmentRegistry.RAILGUN_INSTANCE_ID
+		bullet.sourceBlueprintId = EquipmentRegistry.RAILGUN_ID
+		bullet.weaponFamily = "railgun"
+		bullet.damageType = "kinetic"
+		bullet.target_id = int(nearest.id)
+		bullet.resolvedDamage = float(bullet.damage)
+		bullet.visual_kind = "railgun"
+		bullet.visual_trail_points = [muzzle_position]
 		var stats := _railgun_stats()
 		if critical: bullet.damage *= float(stats.crit_multiplier) / 2.0
 		bullet.radius *= float(stats.width)
@@ -655,13 +954,13 @@ func _fire_at_nearest_enemy() -> bool:
 		bullet.fragments = int(stats.fragments)
 		bullet.rampage = float(stats.rampage)
 		bullets.append(bullet)
-		_add_muzzle_flash(muzzle_position, shot_direction, critical)
+		_add_muzzle_flash(muzzle_position, shot_direction, critical,EquipmentRegistry.RAILGUN_ID)
 		next_id += 1
 	audio_events.emit(AudioEvents.SHOOT, { "source": "player", "weapon": WeaponRegistry.RAILGUN_ID })
 	return true
 
 func _get_weapon_fire_interval() -> float:
-	return _stat("fire_rate")
+	return float(EquipmentRegistry.railgun_stats(_railgun_level()).get("fire_interval",500.0))
 
 func _get_weapon_damage() -> float:
 	return float(_railgun_stats().damage)
@@ -729,10 +1028,29 @@ func _update_enemy_visual_state(enemy: Dictionary, velocity: Vector2) -> void:
 func _update_projectiles(delta: float) -> void:
 	for bullet in bullets:
 		bullet.previous_position = bullet.position
-		var distance := minf(float(bullet.remaining_distance), bullet.velocity.length() * delta)
+		var is_missile := str(bullet.get("visual_kind", "railgun")) == "micro_missile"
+		var travel_delta := delta
+		if is_missile and not bool(bullet.get("launched", true)):
+			var launch_delay := float(bullet.get("launch_delay", 0.0))
+			if launch_delay >= delta:
+				bullet.launch_delay = launch_delay - delta
+				continue
+			travel_delta = delta - launch_delay
+			bullet.launch_delay = 0.0
+			bullet.launched = true
+			_add_missile_muzzle_flash(bullet.position, bullet.velocity.normalized(), false,str(bullet.get("sourceEquipmentId","")))
+		if is_missile: _update_missile_heading(bullet, travel_delta)
+		else: _update_railgun_heading(bullet)
+		var distance := minf(float(bullet.remaining_distance), bullet.velocity.length() * travel_delta)
 		bullet.position += bullet.velocity.normalized() * distance
 		bullet.remaining_distance = maxf(0.0, float(bullet.remaining_distance) - distance)
-		bullet.life -= delta
+		bullet.life -= travel_delta
+		if is_missile:
+			bullet.retarget_correction_remaining = maxf(0.0, float(bullet.get("retarget_correction_remaining", 0.0)) - distance)
+			var is_small_missile := bool(bullet.get("is_small_missile", false))
+			_append_projectile_visual_samples(bullet,"trail_points",MICRO_MISSILE_SMALL_TRAIL_SAMPLE_DISTANCE if is_small_missile else MICRO_MISSILE_TRAIL_SAMPLE_DISTANCE,MICRO_MISSILE_SMALL_MAX_TRAIL_POINTS if is_small_missile else MICRO_MISSILE_MAX_TRAIL_POINTS)
+		else:
+			_append_projectile_visual_samples(bullet,"visual_trail_points",RAILGUN_TRAIL_SAMPLE_DISTANCE,RAILGUN_MAX_TRAIL_POINTS)
 
 	for projectile in enemy_projectiles:
 		EnemyWeapons.move_projectile(self, projectile, delta)
@@ -740,6 +1058,41 @@ func _update_projectiles(delta: float) -> void:
 		bullets = bullets.slice(bullets.size() - 140, bullets.size())
 	if enemy_projectiles.size() > 90:
 		enemy_projectiles = enemy_projectiles.slice(enemy_projectiles.size() - 90, enemy_projectiles.size())
+
+func _append_projectile_visual_samples(projectile: Dictionary, key: String, spacing: float, max_points: int) -> void:
+	var points: Array = projectile.get(key,[])
+	if points.is_empty(): points.append(Vector2(projectile.get("previous_position",projectile.position)))
+	var cursor := Vector2(points.back())
+	var destination := Vector2(projectile.position)
+	while cursor.distance_to(destination) >= spacing:
+		cursor = cursor.move_toward(destination,spacing)
+		points.append(cursor)
+		while points.size() > max_points: points.pop_front()
+	projectile[key] = points
+
+func _trim_visual_path(points_value: Variant, end: Vector2, max_length: float, direction := Vector2.ZERO) -> Array:
+	var points: Array = points_value if points_value is Array else []
+	var candidates: Array = []
+	for value in points:
+		var point := Vector2(value)
+		if direction == Vector2.ZERO or (point-end).dot(direction) <= 0.1: candidates.append(point)
+	if candidates.is_empty() or Vector2(candidates.back()).distance_squared_to(end) > 0.01: candidates.append(end)
+	var reversed: Array = [end]
+	var remaining := max_length
+	var cursor := end
+	for index in range(candidates.size()-2,-1,-1):
+		var point := Vector2(candidates[index])
+		var segment := cursor.distance_to(point)
+		if segment <= 0.001: continue
+		if segment >= remaining:
+			reversed.append(cursor.move_toward(point,remaining))
+			remaining = 0.0
+			break
+		reversed.append(point)
+		remaining -= segment
+		cursor = point
+	reversed.reverse()
+	return reversed
 
 func _update_effects(delta: float) -> void:
 	ShieldSystem.update(player, delta, _stat("shield_recharge"))
@@ -753,6 +1106,8 @@ func _resolve_collisions() -> void:
 	for bullet in bullets:
 		var start: Vector2 = bullet.get("previous_position", bullet.position)
 		var end: Vector2 = bullet.position
+		var is_missile := str(bullet.get("visual_kind", "railgun")) == "micro_missile"
+		if is_missile and not bool(bullet.get("launched", true)): continue
 		if not bullet.has("hit_ids"): bullet.hit_ids = []
 		if not bullet.has("hits_left"): bullet.hits_left = 1
 		var contacts: Array[Dictionary] = []
@@ -765,43 +1120,64 @@ func _resolve_collisions() -> void:
 			var target: Dictionary = contact.enemy
 			var impact := start.lerp(end,float(contact.fraction))
 			var prior_hits: int = bullet.hit_ids.size()
-			var damage := float(bullet.damage) * (1.0 + float(bullet.get("rampage",0.0))*mini(5,prior_hits))
-			_apply_damage_to_enemy(target,damage,bool(bullet.get("critical",false)))
+			var rampage_cap := float(bullet.get("rampage_cap",0.0))
+			var rampage_bonus := float(bullet.get("rampage",0.0)) * float(prior_hits)
+			if rampage_cap > 0.0: rampage_bonus = minf(rampage_cap,rampage_bonus)
+			var damage := float(bullet.damage) * (1.0 + rampage_bonus)
+			var interaction := DamageInteractionResolver.resolve({"damage":damage,"weaponFamily":bullet.get("weaponFamily",""),"damageType":bullet.get("damageType","")},target)
+			_apply_damage_to_enemy(target,float(interaction.damage),bool(bullet.get("critical",false)))
 			bullet.hit_ids.append(target.id)
 			bullet.hits_left = int(bullet.hits_left)-1
 			target.hit_flash = ENEMY_DAMAGE_FLASH_SECONDS
 			target.hit_visual_timer = ENEMY_DAMAGE_FLASH_SECONDS
-			_add_rail_impact(impact,bullet.velocity.normalized(),bool(bullet.get("critical",false)),RailVisuals.is_fragment(bullet))
+			if is_missile: _add_missile_impact(impact,bullet.velocity.normalized(),bool(bullet.get("is_super_missile",false)),bool(bullet.get("is_small_missile",false)))
+			else:
+				_add_rail_impact(impact,bullet.velocity.normalized(),bool(bullet.get("critical",false)),RailVisuals.is_fragment(bullet),str(bullet.get("sourceBlueprintId",EquipmentRegistry.RAILGUN_ID)))
+				if prior_hits == 0:
+					for dead_id in _apply_railgun_burst(bullet,impact,int(target.id)): removed_enemy_ids[dead_id] = true
 			audio_events.emit(AudioEvents.HIT,{"target":"enemy","critical":bool(bullet.get("critical",false))})
-			if prior_hits == 0:
+			if is_missile:
+				for dead_id in _apply_missile_explosion(bullet,impact,int(target.id)): removed_enemy_ids[dead_id] = true
+				fragments.append_array(_spawn_missile_children(bullet,impact,int(target.id)))
+			if prior_hits == 0 and not is_missile:
 				var targets: Array = enemies.filter(func(enemy): return enemy.id != target.id and enemy.hp > 0 and not removed_enemy_ids.has(enemy.id) and _get_playfield_rect(get_viewport_rect().size).has_point(enemy.position))
 				targets.sort_custom(func(a,b): return impact.distance_squared_to(a.position) < impact.distance_squared_to(b.position) if impact.distance_squared_to(a.position) != impact.distance_squared_to(b.position) else a.id < b.id)
+				if int(bullet.get("fragments",0)) > 0:
+					_append_effect(EffectRegistry.make("railgun_shatter_split",impact,28.0))
 				for index in range(int(bullet.get("fragments",0))):
 					var direction: Vector2 = bullet.velocity.normalized().rotated((index-(int(bullet.fragments)-1)/2.0)*0.18)
 					if not targets.is_empty(): direction = (targets[index % targets.size()].position-impact).normalized()
-					var fragment := WeaponRegistry.build_projectile(next_id,impact,direction,damage*0.5,false,_projectile_travel(impact,direction))
+					var fragment_damage_ratio := float(bullet.get("shatter_damage_ratio",0.5))
+					var fragment := WeaponRegistry.build_projectile(next_id,impact,direction,damage*fragment_damage_ratio,false,_projectile_travel(impact,direction))
 					fragment.radius = 1.6
 					fragment.is_fragment = true
 					fragment.hit_ids = [target.id]
 					fragment.hits_left = 1
 					fragment.fragments = 0
+					fragment.sourceEquipmentId = bullet.get("sourceEquipmentId","")
+					fragment.sourceBlueprintId = bullet.get("sourceBlueprintId","")
+					fragment.weaponFamily = bullet.get("weaponFamily","")
+					fragment.damageType = bullet.get("damageType","")
+					fragment.resolvedDamage = damage * fragment_damage_ratio
 					fragments.append(fragment)
 					next_id += 1
 			if target.hp <= 0:
 				removed_enemy_ids[target.id] = true
 				_grant_enemy_rewards(target)
 				_add_enemy_death_explosion(target,Color("#f97316"))
-			if target.hp > 0 or int(bullet.hits_left) <= 0:
+			if is_missile or target.hp > 0 or int(bullet.hits_left) <= 0:
 				removed_bullet_ids[bullet.id] = true
 				end = impact
 				break
-		if start.distance_squared_to(end) > 0.01:
+		if not is_missile and start.distance_squared_to(end) > 0.01:
 			var fragment_visual := RailVisuals.is_fragment(bullet)
 			var trace := EffectRegistry.make("rail_trace",RailVisuals.trace_start(start,end,fragment_visual))
 			trace.is_fragment = fragment_visual
 			trace.projectile_id = bullet.id
 			trace.end = end
 			trace.critical = bool(bullet.get("critical",false))
+			trace.source_blueprint_id = str(bullet.get("sourceBlueprintId",EquipmentRegistry.RAILGUN_ID))
+			trace.visual_points = _trim_visual_path(bullet.get("visual_trail_points",[start]),end,RAILGUN_FRAGMENT_VISUAL_TRAIL_LENGTH if fragment_visual else RAILGUN_VISUAL_TRAIL_LENGTH,bullet.velocity.normalized())
 			# Replace the previous visual segment, including substeps at 10x speed.
 			particles = particles.filter(func(effect): return effect.get("kind","") != "rail_trace" or effect.get("projectile_id",-1) != bullet.id)
 			_append_effect(trace)
@@ -839,11 +1215,16 @@ func _resolve_collisions() -> void:
 			_apply_damage_to_player(_get_incoming_damage(float(projectile.damage) * float(projectile.get("damage_multiplier", PROJECTILE_DAMAGE_MULTIPLIER))), "HIT", end, projectile.velocity)
 			removed_enemy_projectile_ids[projectile.id] = true
 			if projectile.get("weapon_id", "") == "boss_rocket":
-				_append_effect(EffectRegistry.make("explosion", end, 22.0))
+				var impact := EffectRegistry.make("enemy_missile_impact",end)
+				impact.direction = projectile.velocity.normalized()
+				_append_effect(impact)
 			audio_events.emit(AudioEvents.PLAYER_DAMAGE, {"source": "projectile"})
 		if str(projectile.get("weapon_id", "")).ends_with("railgun") and start.distance_squared_to(end) > 0.01:
 			var trace := EffectRegistry.make("enemy_trace", start)
 			trace.end = end
+			trace.projectile_id = int(projectile.id)
+			trace.visual_points = _trim_visual_path(projectile.get("visual_trail_points",[start]),end,95.0,projectile.velocity.normalized())
+			particles = particles.filter(func(effect): return effect.get("kind","") != "enemy_trace" or int(effect.get("projectile_id",-1)) != int(projectile.id))
 			_append_effect(trace)
 
 	enemies = enemies.filter(func(enemy): return not removed_enemy_ids.has(enemy.id))
@@ -852,6 +1233,112 @@ func _resolve_collisions() -> void:
 
 	if player.hp <= 0:
 		_end_run(true)
+
+func _apply_missile_explosion(bullet: Dictionary, origin: Vector2, primary_id: int) -> Array[int]:
+	var killed: Array[int] = []
+	if not bool(bullet.get("explosion_enabled", false)): return killed
+	var radius := float(bullet.get("explosion_radius", 0.0))
+	var ratio := float(bullet.get("explosion_ratio", 0.0))
+	if radius <= 0.0 or ratio <= 0.0: return killed
+	var is_small := bool(bullet.get("is_small_missile",false))
+	_append_effect(EffectRegistry.make("small_missile_explosion" if is_small else "missile_explosion",origin,radius * 2.0))
+	if not is_small and int(bullet.get("fragment_count",0)) > 0:
+		_append_effect(EffectRegistry.make("shatter_burst",origin,radius * 1.45))
+	var damage := float(bullet.get("damage", 0.0)) * ratio
+	for enemy in enemies:
+		if float(enemy.get("hp", 0.0)) <= 0.0 or not _enemy_is_visible(enemy): continue
+		if origin.distance_to(enemy.position) > radius + float(enemy.radius): continue
+		var interaction := DamageInteractionResolver.resolve({"damage":damage,"weaponFamily":bullet.get("weaponFamily",""),"damageType":bullet.get("damageType","")},enemy)
+		_apply_damage_to_enemy(enemy,float(interaction.damage),bool(bullet.get("critical",false)))
+		if enemy.hp <= 0.0:
+			killed.append(int(enemy.id))
+			# The direct impact target is finalized by _resolve_collisions so it is
+			# rewarded exactly once; splash-only kills are finalized here.
+			if int(enemy.id) != primary_id:
+				_grant_enemy_rewards(enemy)
+				_add_enemy_death_explosion(enemy,Color("#f97316"))
+	var echo_ratio := float(bullet.get("echo_damage_ratio",0.0))
+	if not is_small and bool(bullet.get("is_super_missile",false)) and echo_ratio > 0.0:
+		var echo_radius := radius * float(bullet.get("echo_radius_multiplier",1.0))
+		_append_effect(EffectRegistry.make("echo_detonation",origin,echo_radius * 2.0,0.25))
+		var echo_damage := float(bullet.get("damage",0.0)) * ratio * echo_ratio
+		for enemy in enemies:
+			if float(enemy.get("hp",0.0)) <= 0.0 or not _enemy_is_visible(enemy): continue
+			if origin.distance_to(enemy.position) > echo_radius + float(enemy.radius): continue
+			var echo_interaction := DamageInteractionResolver.resolve({"damage":echo_damage,"weaponFamily":bullet.get("weaponFamily",""),"damageType":bullet.get("damageType","")},enemy)
+			_apply_damage_to_enemy(enemy,float(echo_interaction.damage),bool(bullet.get("critical",false)))
+			if enemy.hp <= 0.0:
+				killed.append(int(enemy.id))
+				if int(enemy.id) != primary_id:
+					_grant_enemy_rewards(enemy)
+					_add_enemy_death_explosion(enemy,Color("#c77dff"))
+	return killed
+
+func _apply_railgun_burst(bullet: Dictionary, origin: Vector2, primary_id: int) -> Array[int]:
+	var killed: Array[int] = []
+	var ratio := float(bullet.get("void_burst_ratio",0.0))
+	var radius := float(bullet.get("void_burst_radius",0.0))
+	if ratio <= 0.0 or radius <= 0.0: return killed
+	_append_effect(EffectRegistry.make("railgun_void_burst",origin,radius * 2.0))
+	var damage := float(bullet.get("damage",0.0)) * ratio
+	for enemy in enemies:
+		if float(enemy.get("hp",0.0)) <= 0.0 or not _enemy_is_visible(enemy): continue
+		if origin.distance_to(enemy.position) > radius + float(enemy.radius): continue
+		var interaction := DamageInteractionResolver.resolve({"damage":damage,"weaponFamily":bullet.get("weaponFamily","railgun"),"damageType":bullet.get("damageType","kinetic")},enemy)
+		_apply_damage_to_enemy(enemy,float(interaction.damage),bool(bullet.get("critical",false)))
+		if enemy.hp <= 0.0:
+			killed.append(int(enemy.id))
+			if int(enemy.id) != primary_id:
+				_grant_enemy_rewards(enemy)
+				_add_enemy_death_explosion(enemy,Color("#4ddcff"))
+	return killed
+
+func _spawn_missile_children(bullet: Dictionary, origin: Vector2, primary_id: int) -> Array[Dictionary]:
+	var children: Array[Dictionary] = []
+	var speed := float(bullet.get("projectile_speed",bullet.get("velocity",Vector2.RIGHT).length()))
+	if speed <= 0.0: speed = WeaponRegistry.PROJECTILE_SPEED
+	var travel := maxf(120.0,float(bullet.get("remaining_distance",420.0)))
+	var source_damage := float(bullet.get("damage",0.0))
+	var source_id := str(bullet.get("sourceEquipmentId",""))
+	var blueprint_id := str(bullet.get("sourceBlueprintId",EquipmentRegistry.MICRO_MISSILE_RACK_ID))
+	var weapon_family := str(bullet.get("weaponFamily","missile"))
+	var damage_type := str(bullet.get("damageType","explosive"))
+	var base_direction: Vector2 = Vector2(bullet.get("velocity",Vector2.UP)).normalized()
+	var child_specs: Array[Dictionary] = []
+	for index in range(int(bullet.get("splinter_count",0))):
+		child_specs.append({"ratio":float(bullet.get("splinter_damage_ratio",0.25)),"angle":(index - (int(bullet.get("splinter_count",0))-1)/2.0) * 0.20,"explosion":rng.randf() < float(bullet.get("small_explosion_chance",0.0)),"small":true,"fragment":false})
+	for index in range(int(bullet.get("fragment_count",0))):
+		child_specs.append({"ratio":float(bullet.get("fragment_damage_ratio",0.25)),"angle":(index - (int(bullet.get("fragment_count",0))-1)/2.0) * 0.24,"explosion":false,"small":false,"fragment":true})
+	for spec in child_specs:
+		var direction: Vector2 = base_direction.rotated(float(spec.angle)).normalized()
+		var child := WeaponRegistry.build_projectile(next_id,origin,direction,source_damage * float(spec.ratio),false,travel)
+		child.velocity = direction * speed
+		child.life = travel / speed
+		child.remaining_distance = travel
+		child.radius = 2.4
+		child.visual_kind = "micro_missile"
+		child.launched = true
+		child.target_id = -1
+		child.hit_ids = [primary_id]
+		child.hits_left = 1
+		child.weaponFamily = weapon_family
+		child.damageType = damage_type
+		child.sourceEquipmentId = source_id
+		child.sourceBlueprintId = blueprint_id
+		child.projectile_speed = speed
+		child.is_small_missile = bool(spec.small)
+		child.is_fragment = bool(spec.get("fragment",false))
+		child.explosion_enabled = bool(spec.explosion)
+		child.explosion_radius = float(bullet.get("explosion_radius",0.0)) * 0.55
+		child.explosion_ratio = float(bullet.get("explosion_ratio",0.0)) * 0.55
+		child.small_explosion_chance = float(bullet.get("small_explosion_chance",0.0))
+		child.echo_damage_ratio = 0.0
+		child.echo_radius_multiplier = 1.0
+		child.splinter_count = 0
+		child.fragment_count = 0
+		children.append(child)
+		next_id += 1
+	return children
 
 func _apply_damage_to_enemy(enemy: Dictionary, damage: float, critical := false) -> void:
 	var before := float(enemy.hp)
@@ -862,7 +1349,7 @@ func _apply_damage_to_enemy(enemy: Dictionary, damage: float, critical := false)
 
 func _apply_damage_to_player(damage: float, source := "HIT", impact := Vector2.INF, incoming := Vector2.ZERO) -> Dictionary:
 	var before := float(player.hp)
-	var loss := ShieldSystem.absorb(player, damage)
+	var loss := ShieldSystem.absorb(player, damage, _shield_stats().recharge_delay)
 	if float(loss.shield) <= 0.0 and float(loss.hull) <= 0.0: return loss
 	gunship.hit(loss, player.position, impact, incoming, source)
 	if float(loss.shield) > 0.0:
@@ -902,9 +1389,10 @@ func _grant_enemy_rewards(enemy: Dictionary) -> void:
 		return
 	enemy.rewarded = true
 	var enemy_type_id := str(enemy.type_id)
-	if int(cards.choices) < Cards.MAX_CHOICES: cards.xp = int(cards.xp) + int(Cards.XP.get(enemy_type_id, 0))
 	if enemy_type_id == EnemyRegistry.BOSS_ID:
-		cards.modules = int(cards.modules) + 1
+		# Boss modules are the long-term weapon currency. Boss rewards stay fixed;
+		# module costs provide the pacing for long-term progression.
+		runState.modules = int(runState.get("modules", 0)) + 2
 		reward_dirty = true
 	runState.kills = int(runState.kills) + 1
 	runState.score = int(runState.score) + int(enemy.get("score_reward", 0))
@@ -924,7 +1412,8 @@ func _remove_expired_projectiles(removed_bullet_ids: Dictionary) -> void:
 	bullets = bullets.filter(func(bullet):
 		var position: Vector2 = bullet.position
 		var in_bounds := position.x > -24.0 and position.x < size.x + 24.0 and position.y > -24.0 and position.y < size.y + 24.0
-		return not removed_bullet_ids.has(bullet.id) and bullet.life > 0.0 and float(bullet.remaining_distance) > 0.0 and in_bounds
+		var is_missile := str(bullet.get("visual_kind", "railgun")) == "micro_missile"
+		return not removed_bullet_ids.has(bullet.id) and bullet.life > 0.0 and float(bullet.remaining_distance) > 0.0 and (is_missile or in_bounds)
 	)
 
 func _remove_expired_enemy_projectiles(removed_projectile_ids: Dictionary) -> void:
@@ -962,8 +1451,13 @@ func _add_sprite_effect(origin: Vector2, texture_key: String, height: float, lif
 		"texture_key": texture_key, "height": height, "rotation": rotation,
 		"layer": "front", "priority": 2, "delay": 0.0})
 
-func _add_muzzle_flash(origin: Vector2, direction: Vector2, critical: bool) -> void:
+func _trigger_mount_visual(instance_id: String, kind: String) -> void:
+	if instance_id.is_empty(): return
+	mount_visuals[instance_id] = {"kind":kind,"recoil":0.10 if kind == "railgun" else 0.0,"flash":0.12 if kind == "railgun" else 0.20}
+
+func _add_muzzle_flash(origin: Vector2, direction: Vector2, critical: bool, source_blueprint_id := EquipmentRegistry.RAILGUN_ID, source_instance_id := "") -> void:
 	rail_direction = direction
+	_trigger_mount_visual(source_instance_id,"railgun")
 	if not gunship.allow_weapon_pulse(): return
 	rail_recoil = 1.0
 	muzzle_flashes.append({
@@ -972,11 +1466,25 @@ func _add_muzzle_flash(origin: Vector2, direction: Vector2, critical: bool) -> v
 		"life": 0.075 if not critical else 0.11,
 		"max_life": 0.075 if not critical else 0.11,
 		"critical": critical,
+		"source_blueprint_id": source_blueprint_id,
 	})
 	if muzzle_flashes.size() > 16: muzzle_flashes.pop_front()
 
-func _roll_critical(_seed: int) -> bool:
-	return rng.randf() < float(_railgun_stats().crit)
+func _add_missile_muzzle_flash(origin: Vector2, direction: Vector2, is_super_missile: bool, source_instance_id := "") -> void:
+	_trigger_mount_visual(source_instance_id,"missile")
+	muzzle_flashes.append({
+		"position": origin,
+		"direction": direction.normalized(),
+		"life": 0.16,
+		"max_life": 0.16,
+		"kind": "micro_missile",
+		"is_super_missile": is_super_missile,
+	})
+	if muzzle_flashes.size() > 16: muzzle_flashes.pop_front()
+
+func _roll_critical(_seed: int, chance := -1.0) -> bool:
+	var effective_chance := float(_railgun_stats().crit) if chance < 0.0 else chance
+	return rng.randf() < effective_chance
 
 func _add_screen_shake(amount: float) -> void:
 	var settings: Dictionary = metaProgress.get("settings", {})
@@ -1129,27 +1637,107 @@ func _draw_hud(size: Vector2) -> void:
 	var f := ui_factor
 	var hud := CompactUI.hud_layout(size,f,hud_safe)
 	var area: Rect2 = hud.area
-	var x := area.position.x+8*f
 	var y := area.position.y
-	var left_width := minf(150*f,area.size.x*0.34)
-	# Open header: thin bars instead of a framed panel.
-	_draw_icon_text(font,Vector2(x,y+12*f),"%.0f / %.0f" % [player.hp,player.max_hp],HORIZONTAL_ALIGNMENT_LEFT,left_width,ceili(11*f),UI_TEAL)
-	_draw_capsule(Rect2(x,y+16*f,left_width,3*f),_with_alpha(UI_TEAL,0.18))
-	_draw_capsule(Rect2(x,y+16*f,left_width*clampf(float(player.hp)/player.max_hp,0,1),3*f),UI_TEAL)
-	_draw_icon_text(font,Vector2(x,y+29*f),"%.0f shield" % player.shield,HORIZONTAL_ALIGNMENT_LEFT,left_width,ceili(10*f),UI_CYAN)
-	_draw_capsule(Rect2(x,y+33*f,left_width,2*f),_with_alpha(UI_CYAN,0.15))
-	_draw_capsule(Rect2(x,y+33*f,left_width*clampf(float(player.shield)/maxf(1,player.max_shield),0,1),2*f),UI_CYAN)
-	var level_x := area.end.x-(260 if hud.short else 62)*f
-	_draw_icon_text(font,Vector2(level_x,y+12*f),"MAX" if int(cards.choices)>=Cards.MAX_CHOICES else "Lv.%d" % (int(cards.choices)+1),HORIZONTAL_ALIGNMENT_LEFT,58*f,ceili(11*f),UI_CYAN)
-	_draw_capsule(Rect2(level_x,y+19*f,52*f,3*f),_with_alpha(UI_CYAN,0.18))
-	_draw_capsule(Rect2(level_x,y+19*f,52*f*clampf(float(cards.xp)/Cards.threshold(cards),0,1),3*f),UI_CYAN)
-	var money_y := y+(44 if hud.short else 51)*f
-	var resources := "$ %s ◈ %s" % [_money(runState.cash),_money(runState.coinsEarned)]
-	if hud.short: resources += " ▣ %d" % cards.modules
-	_draw_icon_text(font,Vector2(x,money_y),resources,HORIZONTAL_ALIGNMENT_LEFT,(area.size.x-190*f) if not hud.short else 280*f,ceili(10*f),Color("#9bafbf"))
-	if not hud.short: _draw_icon_text(font,Vector2(x,y+64*f),"▣ %d" % cards.modules,HORIZONTAL_ALIGNMENT_LEFT,90*f,ceili(10*f),Color("#9bafbf"))
+	var header := Rect2(area.position+Vector2(5*f,5*f),Vector2(area.size.x-10*f,84*f))
+	# Reserve a dedicated band above the weapon strip so the defense box never
+	# sits behind a weapon card on compact or wide viewports.
+	var footer := Rect2(area.position+Vector2(5*f,area.size.y-155*f),Vector2(area.size.x-10*f,150*f))
+	# Header is a clean transparent information band. Popups are Canvas children
+	# and therefore render above this band when the run is paused.
+	draw_rect(header,Color(0.01,0.025,0.055,0.48))
+	# The footer follows the reference as a clean HUD surface without an outer border.
+	draw_rect(footer,Color(0.01,0.025,0.055,0.58))
+	var left_x := header.position.x+16*f
+	_draw_icon_text(font,Vector2(left_x,header.position.y+27*f),"SECTOR",HORIZONTAL_ALIGNMENT_LEFT,90*f,ceili(10*f),Color("#73efb4"))
+	_draw_icon_text(font,Vector2(left_x+12*f,header.position.y+62*f),"1",HORIZONTAL_ALIGNMENT_LEFT,54*f,ceili(28*f),Color("#a8ffd2"))
+	var center_x := header.get_center().x
+	var wave_label := "WAVE %d" % int(runState.wave)
+	_draw_centered_hud_text(font,Vector2(center_x,header.position.y+25*f),wave_label,ceili(14*f),UI_TEXT)
+	var progress := fmod(float(runState.elapsedSeconds),35.0)/35.0
+	var wave_bar := Rect2(center_x-70*f,header.position.y+40*f,140*f,5*f)
+	_draw_capsule(wave_bar,_with_alpha(Color("#79bb50"),0.20))
+	_draw_capsule(Rect2(wave_bar.position,Vector2(wave_bar.size.x*progress,wave_bar.size.y)),Color("#86d34e"))
+	_draw_centered_hud_text(font,Vector2(center_x,header.position.y+65*f),_format_time(float(runState.elapsedSeconds)),ceili(14*f),UI_TEXT)
+	var resources_right := header.end.x-18*f
+	_draw_resource(font,resources_right,header.position.y+26*f,"cash_v2",_money(runState.cash),Color("#f3d36a"),f)
+	_draw_resource(font,resources_right,header.position.y+50*f,"coins_v2",_money(runState.coinsEarned),Color("#ff75da"),f)
+	_draw_resource(font,resources_right,header.position.y+74*f,"modules_v2",str(runState.get("modules", 0)),Color("#73e4ff"),f)
+	# The reference footer keeps the weapon slots unchanged, with the defense
+	# readout centred above them as a single compact control strip.
+	var status_width := minf(270*f,footer.size.x-28*f)
+	var status_rect := Rect2(footer.get_center().x-status_width/2,footer.position.y+10*f,status_width,48*f)
+	_draw_glass_panel(status_rect,Color("#1b8fa8"),"",0.46)
+	var hp_ratio := clampf(float(player.hp)/maxf(1.0,float(player.max_hp)),0,1)
+	var shield_ratio := clampf(float(player.shield)/maxf(1.0,float(player.max_shield)),0,1)
+	var defense_bar_width := 96*f
+	_draw_capsule(Rect2(status_rect.position+Vector2(12*f,11*f),Vector2(defense_bar_width,6*f)),_with_alpha(UI_TEAL,0.22))
+	_draw_capsule(Rect2(status_rect.position+Vector2(12*f,11*f),Vector2(defense_bar_width*hp_ratio,6*f)),UI_TEAL)
+	_draw_icon_text(font,status_rect.position+Vector2(120*f,18*f),"HP %.0f / %.0f" % [player.hp,player.max_hp],HORIZONTAL_ALIGNMENT_LEFT,status_rect.size.x-126*f,ceili(11*f),UI_TEXT)
+	_draw_capsule(Rect2(status_rect.position+Vector2(12*f,29*f),Vector2(defense_bar_width,5*f)),_with_alpha(UI_CYAN,0.18))
+	_draw_capsule(Rect2(status_rect.position+Vector2(12*f,29*f),Vector2(defense_bar_width*shield_ratio,5*f)),UI_CYAN)
+	_draw_icon_text(font,status_rect.position+Vector2(120*f,36*f),"SH %.0f / %.0f" % [player.shield,player.max_shield],HORIZONTAL_ALIGNMENT_LEFT,status_rect.size.x-126*f,ceili(10*f),UI_CYAN)
 	if save_error:
-		_draw_icon_text(font,Vector2(x,y+hud.top+12*f),"SAVE FAILED · Pause to retry",HORIZONTAL_ALIGNMENT_LEFT,area.size.x-16*f,ceili(12*f),UI_ORANGE)
+		_draw_icon_text(font,Vector2(header.position.x,footer.position.y-6*f),"SAVE FAILED · Pause to retry",HORIZONTAL_ALIGNMENT_LEFT,area.size.x-16*f,ceili(12*f),UI_ORANGE)
+
+func _draw_centered_hud_text(font: Font, position: Vector2, value: String, pixels: int, color: Color) -> void:
+	var width := font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels).x
+	draw_string(font,position+Vector2(-width/2.0,0),value,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels,color)
+
+func _draw_resource(font: Font, right: float, y: float, icon_name: String, value: String, color: Color, scale: float) -> void:
+	var path := "res://assets/ui/icons/%s.svg" % icon_name
+	var texture: Texture2D = hud_icon_textures.get(path)
+	if texture == null:
+		texture = load(path)
+		hud_icon_textures[path] = texture
+	if texture != null:
+		var value_width := 64.0*scale
+		var icon_size := 16.0*scale
+		var icon_x := right-value_width-8.0*scale-icon_size
+		draw_texture_rect(texture,Rect2(Vector2(icon_x,y-12*scale),Vector2.ONE*icon_size),false,color)
+		draw_string(font,Vector2(right-value_width,y),value,HORIZONTAL_ALIGNMENT_RIGHT,value_width,ceili(12*scale),color)
+
+func _railgun_visual_colors(source_blueprint_id: String, critical: bool) -> Dictionary:
+	return {"outer":Color("#31dfff") if not critical else Color("#8ff6ff"),"core":Color("#e8fdff") if not critical else Color("#ffffff")}
+
+func _smoothed_visual_path(raw_points: Array, seed: float, flow_amount: float) -> PackedVector2Array:
+	if raw_points.size() < 2: return PackedVector2Array(raw_points)
+	var path := PackedVector2Array()
+	var subdivisions := 3
+	for index in range(raw_points.size()-1):
+		var p0 := Vector2(raw_points[maxi(0,index-1)])
+		var p1 := Vector2(raw_points[index])
+		var p2 := Vector2(raw_points[index+1])
+		var p3 := Vector2(raw_points[mini(raw_points.size()-1,index+2)])
+		for step in range(subdivisions):
+			var t := float(step)/float(subdivisions)
+			var t2 := t*t
+			var t3 := t2*t
+			path.append(0.5*((2.0*p1)+(-p0+p2)*t+(2.0*p0-5.0*p1+4.0*p2-p3)*t2+(-p0+3.0*p1-3.0*p2+p3)*t3))
+	path.append(Vector2(raw_points.back()))
+	if flow_amount <= 0.0 or path.size() < 3: return path
+	var flowed := path.duplicate()
+	for index in range(1,path.size()-1):
+		var progress := float(index)/float(path.size()-1)
+		var tangent := (path[index+1]-path[index-1]).normalized()
+		var wave := sin(progress*PI)*sin(seed*0.73+progress*PI*1.15)
+		flowed[index] += tangent.orthogonal()*flow_amount*wave
+	return flowed
+
+func _draw_visual_ribbon(path: PackedVector2Array, color: Color, head_width: float, tail_alpha: float, head_alpha: float) -> void:
+	if path.size() < 2: return
+	for index in range(path.size()-1):
+		var segment := path[index+1]-path[index]
+		if segment.length_squared() < 0.0001: continue
+		var end_progress := float(index+1)/float(path.size()-1)
+		var width := lerpf(0.08,head_width,pow(end_progress,0.72))
+		var segment_color := _with_alpha(color,lerpf(tail_alpha,head_alpha,pow(end_progress,1.25)))
+		draw_line(path[index],path[index+1],segment_color,width,true)
+
+func _draw_energy_trail(raw_points: Array, outer_color: Color, core_color: Color, outer_width: float, core_width: float, seed: float, flow_amount: float, opacity: float) -> void:
+	var path := _smoothed_visual_path(raw_points,seed,flow_amount)
+	_draw_visual_ribbon(path,outer_color,outer_width,0.0,0.10*opacity)
+	_draw_visual_ribbon(path,outer_color,outer_width*0.54,0.01*opacity,0.28*opacity)
+	_draw_visual_ribbon(path,core_color,core_width,0.04*opacity,0.92*opacity)
 
 func _draw_particles(layer := "back") -> void:
 	for particle in particles:
@@ -1160,26 +1748,69 @@ func _draw_particles(layer := "back") -> void:
 		if kind in ["explosion", "boss_explosion"]:
 			if explosion_frames.size() == 8:
 				_draw_centered_texture(explosion_frames[EffectRegistry.frame_index(progress)], particle.position, particle.height, 0.0, Color(1, 1, 1, 1))
+		elif kind in ["missile_explosion", "small_missile_explosion", "shatter_burst", "echo_detonation", "railgun_void_burst", "railgun_shatter_split"]:
+			var generated_frames: Array[Texture2D] = missile_impact_frames
+			if kind == "shatter_burst": generated_frames = subtle_shatter_burst_frames if subtle_shatter_burst_frames.size() == 8 else shatter_burst_frames
+			elif kind == "echo_detonation": generated_frames = echo_detonation_frames
+			elif kind == "railgun_void_burst": generated_frames = railgun_void_burst_frames
+			elif kind == "railgun_shatter_split": generated_frames = railgun_shatter_split_frames
+			if generated_frames.size() == 8:
+				_draw_centered_texture(generated_frames[EffectRegistry.frame_index(progress)],particle.position,particle.height,0.0,Color(1,1,1,alpha))
 		elif kind == "enemy_trace":
-			draw_line(particle.position, particle.end, Color(1, 0.24, 0.04, 0.45 * alpha), 3.0, true)
-			draw_line(particle.position, particle.end, Color(1, 0.95, 0.85, 0.95 * alpha), 0.9, true)
+			var direction: Vector2 = (particle.end-particle.position).normalized()
+			var enemy_points: Array = particle.get("visual_points",[particle.position,particle.end])
+			_draw_energy_trail(enemy_points,Color("#ff482f"),Color("#ffe6d2"),3.0,0.82,float(particle.get("projectile_id",0)),0.8,alpha)
+			draw_circle(particle.end,3.0,_with_alpha(Color("#ff482f"),0.10*alpha))
+			draw_line(particle.end-direction*4.5,particle.end,Color(1.0,0.94,0.88,0.94*alpha),0.9,true)
+			draw_circle(particle.end,1.15,Color(1.0,0.98,0.94,0.98*alpha))
 		elif kind == "enemy_muzzle":
 			var direction: Vector2 = particle.direction
-			draw_line(particle.position - direction * 2, particle.position + direction * 7 * alpha, Color(1, 0.92, 0.78, alpha), 1.7, true)
-			draw_circle(particle.position, 3 * alpha, Color(1, 0.32, 0.06, alpha * 0.7))
+			var rocket_flash := str(particle.get("weapon_id","")) == "boss_rocket"
+			var flash_length := 13.0 if rocket_flash else 9.0
+			draw_circle(particle.position,4.0*alpha,_with_alpha(Color("#ff3f24"),0.16*alpha))
+			draw_line(particle.position-direction*2.0,particle.position+direction*flash_length*alpha,_with_alpha(Color("#ff4b2f"),0.58*alpha),2.2,true)
+			draw_line(particle.position,particle.position+direction*(flash_length-2.0)*alpha,Color(1.0,0.88,0.68,0.94*alpha),0.8,true)
+			draw_circle(particle.position+direction*2.0,1.0,Color(1.0,0.98,0.90,alpha))
 		elif kind == "rail_trace":
 			var fragment_visual := bool(particle.get("is_fragment",false))
 			var direction: Vector2 = (particle.end-particle.position).normalized()
-			var length: float = particle.position.distance_to(particle.end)
-			var thickness := 3.0 if fragment_visual else 6.0
-			var texture := rail_visuals.texture("fragment" if fragment_visual else "pulse",progress)
-			draw_set_transform(particle.end,direction.angle())
-			draw_texture_rect(texture,Rect2(-length,-thickness/2,length,thickness),false,Color(1,1,1,alpha))
-			draw_set_transform(Vector2.ZERO)
+			var colors := _railgun_visual_colors(str(particle.get("source_blueprint_id",EquipmentRegistry.RAILGUN_ID)),bool(particle.get("critical",false)))
+			var visual_points: Array = particle.get("visual_points",[particle.position,particle.end])
+			_draw_energy_trail(visual_points,colors.outer,colors.core,1.8 if fragment_visual else 3.2,0.5 if fragment_visual else 0.85,float(particle.get("projectile_id",0)),0.55 if fragment_visual else 1.0,alpha)
+			var tip_radius := 0.8 if fragment_visual else 1.25
+			draw_circle(particle.end,tip_radius+2.0,_with_alpha(colors.outer,0.10*alpha))
+			draw_line(particle.end-direction*(3.0 if fragment_visual else 5.0),particle.end,Color(1,1,1,0.94*alpha),tip_radius,true)
+			draw_circle(particle.end,tip_radius,Color(1,1,1,0.98*alpha))
 		elif kind == "rail_impact":
 			var fragment_visual := bool(particle.get("is_fragment",false))
-			var texture := rail_visuals.texture("fragment_impact" if fragment_visual else "impact",progress)
-			_draw_centered_texture(texture,particle.position,5.0 if fragment_visual else 11.0,particle.direction.angle(),Color(1,1,1,alpha))
+			var colors := _railgun_visual_colors(str(particle.get("source_blueprint_id",EquipmentRegistry.RAILGUN_ID)),bool(particle.get("critical",false)))
+			var impact_radius := (2.5 if fragment_visual else 5.0)*(0.65+progress*0.7)
+			draw_circle(particle.position,impact_radius*1.8,_with_alpha(colors.outer,0.08*alpha))
+			draw_line(particle.position-particle.direction*impact_radius,particle.position+particle.direction*impact_radius,_with_alpha(colors.core,0.82*alpha),0.75 if fragment_visual else 1.1,true)
+			draw_line(particle.position-particle.direction.orthogonal()*impact_radius*0.65,particle.position+particle.direction.orthogonal()*impact_radius*0.65,_with_alpha(colors.outer,0.58*alpha),0.65,true)
+			draw_circle(particle.position,0.8 if fragment_visual else 1.4,Color(1,1,1,0.95*alpha))
+		elif kind == "missile_impact":
+			var missile_color := Color("#ffd45f") if bool(particle.get("is_super_missile",false)) else Color("#45dfff")
+			var impact_alpha := float(particle.get("visual_alpha",0.72))
+			if missile_impact_frames.size() == 8:
+				_draw_centered_texture(missile_impact_frames[EffectRegistry.frame_index(progress)],particle.position,particle.height,0.0,Color(1,1,1,alpha*impact_alpha))
+			else:
+				var radius := (2.5 + progress * 5.5) * float(particle.get("visual_scale",0.75))
+				draw_circle(particle.position,radius*1.35,_with_alpha(missile_color,0.08*alpha*impact_alpha))
+				draw_circle(particle.position,radius,_with_alpha(missile_color,0.16*alpha*impact_alpha))
+				draw_circle(particle.position,maxf(0.7,radius*0.25),Color(1.0,1.0,1.0,0.70*alpha*impact_alpha))
+				var direction: Vector2 = particle.direction
+				draw_line(particle.position-direction*radius*0.7,particle.position+direction*radius,_with_alpha(missile_color,0.62*alpha*impact_alpha),0.75,true)
+				draw_line(particle.position-direction.orthogonal()*radius*0.45,particle.position+direction.orthogonal()*radius*0.45,_with_alpha(missile_color,0.38*alpha*impact_alpha),0.55,true)
+		elif kind == "enemy_missile_impact":
+			var radius := 3.5+progress*8.0
+			var enemy_color := Color("#ff4a2d")
+			draw_circle(particle.position,radius*1.35,_with_alpha(enemy_color,0.08*alpha))
+			draw_circle(particle.position,radius,_with_alpha(enemy_color,0.16*alpha))
+			draw_circle(particle.position,maxf(1.0,radius*0.25),Color(1.0,0.96,0.86,0.94*alpha))
+			var direction: Vector2 = particle.direction
+			draw_line(particle.position-direction*radius*0.7,particle.position+direction*radius,_with_alpha(enemy_color,0.78*alpha),0.9,true)
+			draw_line(particle.position-direction.orthogonal()*radius*0.45,particle.position+direction.orthogonal()*radius*0.45,_with_alpha(Color("#ffb068"),0.48*alpha),0.7,true)
 		elif particle.has("texture_key"):
 			_draw_centered_texture(vfx_textures.get(particle.texture_key), particle.position, particle.height, particle.rotation, Color(1, 1, 1, alpha))
 		else:
@@ -1188,34 +1819,76 @@ func _draw_particles(layer := "back") -> void:
 			draw_circle(particle.position, particle.get("radius", 1.0), color)
 
 func _draw_bullets() -> void:
-	# Segment traces are retained briefly after collision; no sprite extends beyond impact.
-	pass
+	for bullet in bullets:
+		if str(bullet.get("visual_kind","railgun")) != "micro_missile":
+			var rail_direction: Vector2 = bullet.velocity.normalized()
+			var fragment_visual := RailVisuals.is_fragment(bullet)
+			var rail_length := RAILGUN_FRAGMENT_VISUAL_TRAIL_LENGTH if fragment_visual else RAILGUN_VISUAL_TRAIL_LENGTH
+			var rail_points := _trim_visual_path(bullet.get("visual_trail_points",[bullet.previous_position]),bullet.position,rail_length,rail_direction)
+			var rail_colors := _railgun_visual_colors(str(bullet.get("sourceBlueprintId",EquipmentRegistry.RAILGUN_ID)),bool(bullet.get("critical",false)))
+			_draw_energy_trail(rail_points,rail_colors.outer,rail_colors.core,1.8 if fragment_visual else 3.2,0.5 if fragment_visual else 0.85,float(bullet.get("id",0)),0.55 if fragment_visual else 1.0,1.0)
+			draw_circle(bullet.position,0.8 if fragment_visual else 1.25,Color.WHITE)
+			continue
+		if not bool(bullet.get("launched", true)): continue
+		var direction: Vector2 = bullet.velocity.normalized()
+		var is_super := bool(bullet.get("is_super_missile", false))
+		var is_small := bool(bullet.get("is_small_missile", false))
+		var body_scale := MICRO_MISSILE_SMALL_SCALE if is_small else (1.12 if is_super else 1.0)
+		var trail_color := Color("#ffd45f") if is_super else Color("#35d9ff")
+		var core_color := Color("#fff0a3") if is_super else Color("#d9faff")
+		var trail: Array = bullet.get("trail_points", [])
+		if trail.size() < 2: trail = [bullet.position-direction*(6.0 if is_small else 12.0),bullet.position]
+		var visual_trail := _trim_visual_path(trail,bullet.position,MICRO_MISSILE_SMALL_TRAIL_LENGTH if is_small else MICRO_MISSILE_TRAIL_LENGTH)
+		_draw_energy_trail(visual_trail,trail_color,core_color,1.9 if is_small else 3.6,0.62 if is_small else 0.98,float(bullet.get("id",0)),0.35 if is_small else 0.22,1.0)
+		var tip: Vector2 = bullet.position + direction * 5.0 * body_scale
+		var tail: Vector2 = bullet.position-direction*5.5*body_scale
+		var side: Vector2 = direction.orthogonal()*1.8*body_scale
+		draw_circle(bullet.position,5.0*body_scale,_with_alpha(trail_color,0.10))
+		draw_line(tail,tail-direction*(4.0*body_scale+sin(visual_time*31.0+float(bullet.get("id",0)))*1.2*body_scale),Color(1.0,0.55,0.12,0.78),1.1*body_scale,true)
+		draw_colored_polygon(PackedVector2Array([tip,tail+side,tail-side]),core_color)
+		draw_line(bullet.position-direction*1.0*body_scale,tip,Color.WHITE,0.8*body_scale,true)
+		draw_circle(tip,1.35*body_scale,Color.WHITE)
 
 func _draw_enemy_projectiles() -> void:
 	for projectile in enemy_projectiles:
 		var velocity: Vector2 = projectile.velocity
 		var direction: Vector2 = velocity.normalized()
 		if str(projectile.get("weapon_id", "")).ends_with("railgun"): continue
+		var trail: Array = projectile.get("visual_trail_points",[projectile.position-direction*12.0])
 		if projectile.get("weapon_id", "") == "boss_rocket":
+			var visual_trail := _trim_visual_path(trail,projectile.position,190.0)
+			_draw_energy_trail(visual_trail,Color("#ff432d"),Color("#ffd7ac"),3.8,1.0,float(projectile.get("id",0)),0.2,1.0)
 			var tip: Vector2 = projectile.position + direction * 5
-			var tail: Vector2 = projectile.position - direction * 4
-			var side := direction.orthogonal() * 2.2
-			draw_colored_polygon(PackedVector2Array([tip, tail + side, tail - side]), Color("#c7cdd2"))
-			draw_line(tail, tail - direction * (5 + 2 * sin(visual_time * 35)), Color(1, 0.3, 0.06, 0.85), 2.0, true)
-			draw_line(tail, tail - direction * 3, Color(1, 0.94, 0.6), 0.8, true)
+			var tail: Vector2 = projectile.position-direction*5.5
+			var side := direction.orthogonal()*1.8
+			draw_circle(projectile.position,5.0,_with_alpha(Color("#ff432d"),0.10))
+			draw_line(tail,tail-direction*(4.0+sin(visual_time*31.0+float(projectile.get("id",0)))*1.2),Color(1.0,0.24,0.08,0.82),1.1,true)
+			draw_colored_polygon(PackedVector2Array([tip,tail+side,tail-side]),Color("#ffd7ac"))
+			draw_line(projectile.position-direction,tip,Color(1.0,0.98,0.92),0.8,true)
+			draw_circle(tip,1.35,Color(1.0,0.98,0.92))
 			continue
-		var trail_start: Vector2 = projectile.position - direction * 14.0 * EFFECT_SCALE
-		draw_line(trail_start, projectile.position, Color(1.0, 0.16, 0.05, 0.18), 3.0 * EFFECT_SCALE)
-		draw_line(trail_start, projectile.position, Color(1.0, 0.76, 0.42, 0.42), 1.0 * EFFECT_SCALE)
-		draw_circle(projectile.position, projectile.radius + 4.0 * EFFECT_SCALE, Color(1.0, 0.14, 0.04, 0.09))
-		draw_circle(projectile.position, 2.5, Color("#ffad55"))
-		draw_circle(projectile.position, 1.0, Color("#fff4c4"))
+		var visual_trail := _trim_visual_path(trail,projectile.position,46.0)
+		_draw_energy_trail(visual_trail,Color("#ff482f"),Color("#ffe2c7"),2.8,0.8,float(projectile.get("id",0)),0.45,1.0)
+		draw_circle(projectile.position,projectile.radius+2.5,_with_alpha(Color("#ff482f"),0.09))
+		draw_circle(projectile.position,1.15,Color("#fff0dd"))
 
 func _draw_muzzle_flashes() -> void:
 	for flash in muzzle_flashes:
 		var progress := 1.0-clampf(float(flash.life)/maxf(0.01,float(flash.max_life)),0,1)
-		var texture := rail_visuals.texture("muzzle",progress)
-		_draw_centered_texture(texture,flash.position,9.0,flash.direction.angle(),Color(1,1,1,1.0-progress))
+		if str(flash.get("kind", "railgun")) == "micro_missile":
+			var color := Color("#ffd45f") if bool(flash.get("is_super_missile",false)) else Color("#ffad42")
+			var direction: Vector2 = flash.direction
+			draw_circle(flash.position,4.0*(1.0-progress),_with_alpha(color,0.20*(1.0-progress)))
+			draw_line(flash.position-direction*2.0,flash.position+direction*(10.0+progress*6.0),_with_alpha(color,0.88*(1.0-progress)),1.2,true)
+			draw_circle(flash.position+direction*3.0,1.4,Color.WHITE)
+			continue
+		var colors := _railgun_visual_colors(str(flash.get("source_blueprint_id",EquipmentRegistry.RAILGUN_ID)),bool(flash.get("critical",false)))
+		var direction: Vector2 = flash.direction
+		var flash_alpha := 1.0-progress
+		draw_circle(flash.position,3.5*flash_alpha,_with_alpha(colors.outer,0.14*flash_alpha))
+		draw_line(flash.position-direction*2.0,flash.position+direction*(8.0+progress*5.0),_with_alpha(colors.outer,0.52*flash_alpha),2.2,true)
+		draw_line(flash.position,flash.position+direction*(7.0+progress*4.0),_with_alpha(colors.core,0.96*flash_alpha),0.8,true)
+		draw_circle(flash.position+direction*2.0,1.0,Color(1,1,1,flash_alpha))
 
 func _draw_enemies() -> void:
 	var ordered_enemies := enemies.duplicate()
@@ -1237,7 +1910,7 @@ func _draw_enemies() -> void:
 			_draw_enemy_void_aura(enemy, flash, attack_charge, pulse)
 		var base_alpha: float = 0.95 + flash * 0.05
 		var tint := Color(1.0, 1.0 - flash * 0.18, 1.0 - flash * 0.35, clampf(base_alpha, 0.90, 1.0))
-		var height := visual_canvas_height
+		var height := visual_canvas_height * _gameplay_visual_scale()
 		if enemy_type_id == EnemyRegistry.BOSS_ID:
 			_draw_boss(enemy, height, tint)
 		elif texture:
@@ -1344,27 +2017,60 @@ func _draw_enemy_hp_feedback(enemy: Dictionary) -> void:
 
 func _draw_player() -> void:
 	gunship.draw(self)
+	var ship := _active_ship()
+	var loadout: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{}).get("loadout",{})
+	for hardpoint in ship.get("slots",[]):
+		var instance_id := str(loadout.get(str(hardpoint.get("id","")),""))
+		if instance_id.is_empty(): continue
+		var item: Dictionary = profile.get("equipmentItems",{}).get(instance_id,{})
+		var blueprint := EquipmentRegistry.definition(str(item.get("blueprint_id","")))
+		var kind := str(hardpoint.get("type",""))
+		if blueprint.is_empty() or str(blueprint.get("item_type","")) != kind: continue
+		var blueprint_id := str(blueprint.get("id", ""))
+		var texture: Texture2D = equipment_mount_textures.get(blueprint_id)
+		if texture == null: continue
+		var anchor: Vector2 = hardpoint.get("position",Vector2(0.5,0.5))
+		var visual: Dictionary = mount_visuals.get(instance_id,{})
+		var recoil := float(visual.get("recoil",0.0)) / 0.10
+		var flash := float(visual.get("flash",0.0)) / (0.20 if str(visual.get("kind","")) == "missile" else 0.12)
+		var center := _hardpoint_position(anchor)
+		var mount_scale := float(blueprint.get("mount_scale",1.0))
+		var height := gunship.mount_height_for(hardpoint,mount_scale)
+		var pulse := 1.0 + (0.025 * sin(visual_time * 7.0) if kind == "system" else 0.0)
+		_draw_centered_texture(texture,center,height * pulse,gunship.bank,Color(1.0,1.0,1.0,1.0))
+		var overlay_texture: Texture2D = equipment_overlay_textures.get(blueprint_id)
+		if overlay_texture != null:
+			var overlay_scale := float(blueprint.get("overlay_scale",1.0))
+			var overlay_height := gunship.mount_height_for(hardpoint,overlay_scale)
+			var overlay_rotation := float(mount_aim_angles.get(instance_id,gunship.bank)) if bool(blueprint.get("rotates_to_target",false)) else gunship.bank
+			var overlay_forward := Vector2.UP.rotated(overlay_rotation)
+			var overlay_center := center-overlay_forward*recoil*2.4
+			var overlay_pivot: Vector2 = blueprint.get("overlay_pivot",Vector2(0.5,0.5))
+			var overlay_pulse := 1.0 + (0.035 * flash if str(visual.get("kind","")) == "missile" else 0.0)
+			_draw_pivoted_texture(overlay_texture,overlay_center,overlay_height*overlay_pulse,overlay_pivot,overlay_rotation,Color.WHITE)
+		if kind == "system" and str(blueprint.get("id","")) == EquipmentRegistry.SHIELD_CORE_ID:
+			var core_pulse := 0.5 + 0.5 * sin(visual_time * 5.0)
+			var radius := height * (0.18 + core_pulse * 0.05 + gunship.shield_flash * 0.08)
+			draw_circle(center,radius,Color(0.12,0.82,1.0,0.07 + core_pulse * 0.06 + gunship.shield_flash * 0.16))
+			draw_arc(center,radius,0.0,TAU,16,Color(0.42,0.95,1.0,0.26 + core_pulse * 0.20),0.7,true)
+		elif flash > 0.0:
+			var flash_color := Color("#ffad42") if str(visual.get("kind","")) == "missile" else Color("#5deeff")
+			draw_circle(center,height * 0.20 * flash,Color(flash_color,0.18 * flash))
 
 func _draw_lcars_block(rect: Rect2, color: Color, alpha := 1.0) -> void:
 	draw_rect(rect, _with_alpha(color, alpha))
 
-func _update_card_notice(delta: float) -> void:
-	if app_backgrounded or wave_message_timer>0: return
-	card_notice_timer = maxf(0,card_notice_timer-delta)
-	if card_notice_timer<=0 and not card_notices.is_empty():
-		card_notice = card_notices.pop_front()
-		card_notice_timer = 3.5
-
-func _draw_card_notice(size: Vector2) -> void:
-	if card_notice_timer<=0: return
+func _draw_blueprint_notice(size: Vector2) -> void:
+	if blueprint_notice_timer <= 0.0: return
 	var hud := CompactUI.hud_layout(size,ui_factor,hud_safe)
 	var width := minf(340*ui_factor,hud.area.size.x-16*ui_factor)
 	var rect := Rect2(hud.area.get_center().x-width/2,hud.area.position.y+hud.top+8*ui_factor,width,64*ui_factor)
-	_draw_glass_panel(rect,Color("#80d9e8"),"",0.65)
-	draw_string(get_theme_default_font(),rect.position+Vector2(8,14)*ui_factor,"AUTO CARDS · EQUIPPED",HORIZONTAL_ALIGNMENT_LEFT,-1,ceili(10*ui_factor),Color("#80d9e8"))
+	var accent := UI_MAGENTA
+	_draw_glass_panel(rect,accent,"",0.65)
+	draw_string(get_theme_default_font(),rect.position+Vector2(8,14)*ui_factor,"BLUEPRINT UNLOCKED",HORIZONTAL_ALIGNMENT_LEFT,-1,ceili(10*ui_factor),accent)
 	var font := get_theme_default_font()
 	var lines := TextParagraph.new()
-	lines.add_string(card_notice,font,ceili(12*ui_factor))
+	lines.add_string(blueprint_notice,font,ceili(12*ui_factor))
 	lines.width = rect.size.x-16*ui_factor
 	lines.draw(get_canvas_item(),rect.position+Vector2(8,22)*ui_factor,UI_TEXT)
 
@@ -1372,7 +2078,7 @@ func _draw_wave_message(size: Vector2) -> void:
 	if status != "running":
 		return
 	if wave_message_timer <= 0.0 or wave_message == "":
-		_draw_card_notice(size)
+		_draw_blueprint_notice(size)
 		return
 
 	var alpha := clampf(wave_message_timer / 0.35, 0.0, 1.0)
@@ -1421,6 +2127,17 @@ func _draw_centered_texture(texture: Texture2D, center: Vector2, height: float, 
 	draw_texture_rect(texture, Rect2(Vector2(-width / 2.0, -height / 2.0), Vector2(width, height)), false, modulate)
 	draw_set_transform(active_draw_offset, 0.0, Vector2.ONE)
 
+func _draw_pivoted_texture(texture: Texture2D, pivot_position: Vector2, height: float, normalized_pivot: Vector2, rotation := 0.0, modulate := Color.WHITE) -> void:
+	if texture == null: return
+	var width := height * float(texture.get_width()) / maxf(1.0,float(texture.get_height()))
+	var pivot := Vector2(width*normalized_pivot.x,height*normalized_pivot.y)
+	draw_set_transform(pivot_position,rotation,Vector2.ONE)
+	draw_texture_rect(texture,Rect2(-pivot,Vector2(width,height)),false,modulate)
+	draw_set_transform(active_draw_offset,0.0,Vector2.ONE)
+
+func _gameplay_visual_scale() -> float:
+	return clampf(ui_factor, 1.0, MAX_GAMEPLAY_VISUAL_FACTOR)
+
 func _load_enemy_texture_set(enemy_type_id: String) -> Dictionary:
 	var frames := {}
 	for state in ENEMY_FRAME_STATES:
@@ -1451,6 +2168,19 @@ func _load_png_texture(path: String) -> Texture2D:
 		return null
 
 	return ImageTexture.create_from_image(image)
+
+func _load_vfx_atlas(path: String) -> Array[Texture2D]:
+	var frames: Array[Texture2D] = []
+	var atlas := _load_png_texture(path)
+	if atlas == null: return frames
+	var frame_size := atlas.get_size() / Vector2(4.0,2.0)
+	for row in range(2):
+		for column in range(4):
+			var frame := AtlasTexture.new()
+			frame.atlas = atlas
+			frame.region = Rect2(Vector2(column,row) * frame_size,frame_size)
+			frames.append(frame)
+	return frames
 
 func _get_player_max_hp() -> float:
 	return _stat("max_hp")
@@ -1534,13 +2264,20 @@ func _enemy_wave_stat_lines(definition: Dictionary, stats: Dictionary, detailed 
 	if weapon != "": lines.append(weapon)
 	return "\n".join(lines)
 
+func _enemy_damage_profile_lines(definition: Dictionary) -> String:
+	var lines: Array[String] = []
+	for entry in definition.get("resistances",[]):
+		lines.append("RESIST  %s  ×%.2f" % [str(entry.get("target_id","")),float(entry.get("multiplier",1.0))])
+	for entry in definition.get("weaknesses",[]):
+		lines.append("WEAK  %s  ×%.2f" % [str(entry.get("target_id","")),float(entry.get("multiplier",1.0))])
+	return "\n".join(lines)
+
 func _wave_intel_table_row(definition: Dictionary, wave: int, detailed: bool) -> Dictionary:
 	var enemy_id := str(definition.get("id", ""))
 	var stats: Dictionary = definition.get("stats", EnemyRegistry.get_stats(enemy_id, wave))
 	var base: Dictionary = definition.get("base_stats", {})
 	var guaranteed := bool(definition.get("guaranteed_boss", false))
-	var encountered_only := bool(definition.get("encountered_only", false))
-	var spawn := "BOSS" if guaranteed else ("ENCOUNTERED" if encountered_only else "%.0f%%" % (float(definition.get("spawn_chance", 0.0)) * 100.0))
+	var spawn := "10 WAVE" if guaranteed else "%.0f%%" % (float(definition.get("spawn_chance", 0.0)) * 100.0)
 	var hull := _format_stat_value(float(stats.get("hp", 0.0)))
 	var hit := _format_stat_value(float(stats.get("contact_damage", 0.0)))
 	var speed := _format_stat_value(float(stats.get("speed", 0.0)))
@@ -1613,18 +2350,24 @@ func _layout_buttons() -> void:
 	var screen_scale := get_viewport().get_stretch_transform().get_scale().x
 	if OS.has_feature("web"):
 		screen_scale = float(JavaScriptBridge.eval("window.innerWidth",true))/maxf(1,size.x)
-	ui_factor = 1.0/maxf(0.1,screen_scale)
+		ui_factor = 1.0/maxf(0.1,screen_scale)
+	elif OS.get_name() in ["Android", "iOS"]:
+		# Native phones expose the physical viewport, so scale from the game's
+		# compact reference size instead of leaving the command deck tiny.
+		var width_factor := size.x / REFERENCE_VIEWPORT_WIDTH
+		var height_factor := size.y / REFERENCE_VIEWPORT_HEIGHT
+		ui_factor = clampf(minf(width_factor, height_factor), 1.0, MAX_NATIVE_UI_FACTOR)
+	else:
+		ui_factor = 1.0/maxf(0.1,screen_scale)
 	hud_safe = _hud_safe_area(ui_factor)
 	var f := ui_factor
-	# Card choices use the CSS viewport width so mobile web viewports stack cards.
-	overlay.wide_cards = size.x / maxf(0.1, f) >= 600.0
 	overlay.rail_ui_factor = f
 	overlay.set_ui_factor(f)
-	for control in [upgrades_control,pause_control,auto_control,speed_control,auto_cards_control,build_control,wave_control]:
+	for control in [upgrades_control,pause_control,auto_control,speed_control,build_control,wave_control]:
 		control.custom_minimum_size.y = ceil(44*f)
 		control.add_theme_font_size_override("font_size",ceili(12*f))
 	wave_control.add_theme_font_size_override("font_size",ceili(14*f))
-	var rail_view := status=="card_choice" or menu_view in ["railgun","railgun_catalog","railgun_detail","build"]
+	var rail_view := menu_view in ["railgun","railgun_catalog","railgun_detail","build","hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail"]
 	# All menus fill the safe viewport height on mobile and desktop/web.
 	var safe_origin := Vector2(hud_safe.x,hud_safe.y) + Vector2.ONE * 6*f
 	var safe_size := size - Vector2(hud_safe.x+hud_safe.z,hud_safe.y+hud_safe.w) - Vector2.ONE * 12*f
@@ -1632,7 +2375,7 @@ func _layout_buttons() -> void:
 	# otherwise make the railgun panel wider than a small web/mobile viewport.
 	var available_width := maxf(1.0, safe_size.x)
 	var width := minf((624.0 if rail_view else 480.0)*f,available_width)
-	var choice_view := status == "card_choice"
+	var choice_view := false
 	# Keep a three-card choice grid inside the panel, including its panel padding,
 	# grid gaps, card borders and card-content insets.
 	var choice_grid_width := maxf(1.0,width - 12.0*f)
@@ -1648,25 +2391,21 @@ func _layout_buttons() -> void:
 	overlay_target_size = Vector2(width,height)
 	overlay.size = overlay_target_size
 	var hud := CompactUI.hud_layout(size,f,hud_safe)
-	var controls := [pause_control,speed_control,upgrades_control]
+	var controls := [pause_control,speed_control,upgrades_control,build_control]
 	for index in range(controls.size()):
 		if not is_instance_valid(controls[index]): continue
-		controls[index].position = hud.buttons[index + 1].position
-		controls[index].size = hud.buttons[index + 1].size
+		controls[index].position = hud.buttons[index].position
+		controls[index].size = hud.buttons[index].size
 	wave_control.position = hud.wave.position
 	wave_control.size = hud.wave.size
-	build_control.position = hud.weapon.position
-	build_control.size = hud.weapon.size
 	auto_control.position = hud.dodge.position
 	auto_control.size = hud.dodge.size
-	auto_cards_control.position = hud.cards.position
-	auto_cards_control.size = hud.cards.size
 
 func _update_buttons() -> void:
 	if not is_instance_valid(overview_control):
 		overview_control = overlay.button("","build")
 		add_child(overview_control)
-		overview_control.icon = load("res://assets/ui/icons/cards.svg")
+		overview_control.icon = load("res://assets/ui/icons/launch.svg")
 		pause_control.icon = load("res://assets/ui/icons/pause.svg")
 		pause_control.text = ""
 		for compact_button in [pause_control,overview_control,speed_control,upgrades_control]:
@@ -1677,56 +2416,54 @@ func _update_buttons() -> void:
 				compact_button.add_theme_stylebox_override(state,inset)
 		upgrades_control.icon = load("res://assets/ui/icons/shop.svg")
 		upgrades_control.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		auto_cards_control.icon = null
+		auto_control.icon = load("res://assets/ui/icons/dodge.svg")
+		auto_control.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		build_control.icon = overlay.illustration("hero")
 	_layout_buttons()
 	overview_control.visible = false
-	for icon_button in [pause_control,auto_cards_control,upgrades_control]:
+	for icon_button in [pause_control,upgrades_control]:
 		icon_button.add_theme_constant_override("icon_max_width",ceili(18*ui_factor))
 		icon_button.expand_icon = true
-	for control in [upgrades_control,pause_control,speed_control,auto_cards_control,build_control,wave_control]: control.visible = status=="running"
-	auto_control.visible = false
+	# Keep the right rail intentionally small: pause, speed and shop only.
+	for control in [upgrades_control,pause_control,speed_control]: control.visible = status=="running"
+	for control in [build_control,auto_control]: control.visible = false
+	wave_control.visible = status=="running"
 	speed_control.text = "%dx" % _game_speed()
 	upgrades_control.text = ""
 	auto_control.text = "Dodge ON" if bool(profile.autoDodgeEnabled) and bool(profile.autoDodgeUnlocked) else "Dodge OFF"
 	auto_control.disabled = not bool(profile.autoDodgeUnlocked)
 	auto_control.tooltip_text = "Unlock Auto-Dodge in Workshop after wave 30" if auto_control.disabled else "Toggle Auto-Dodge"
-	auto_cards_control.text = ("Auto Cards\nON" if profile.settings.get("autoCards",false) else "Auto Cards\nOFF")
 	build_control.text = ""
-	build_control.icon = null
-	wave_control.text = "WAVE %d" % int(runState.wave)
+	build_control.icon = load("res://assets/ui/icons/launch.svg")
+	# The wave number is rendered in the centre header. Keep this invisible
+	# touch target so the header remains the Wave Intel entry point.
+	wave_control.text = ""
 	wave_control.tooltip_text = "Wave Intel · pauses the run"
-	if not is_instance_valid(weapon_hud):
-		weapon_hud = WeaponHUDCard.new()
-		weapon_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		build_control.add_child(weapon_hud)
-		weapon_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		weapon_hud.art = overlay.illustration("hero")
 	var slot_layout := CompactUI.hud_layout(get_viewport_rect().size,ui_factor,hud_safe)
-	if empty_weapon_slots.is_empty():
-		for index in range(4):
-			var slot := WeaponHUDCard.new()
-			slot.empty = true
-			slot.selected = false
-			slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			add_child(slot)
-			empty_weapon_slots.append(slot)
-	for index in range(4):
-		var slot := empty_weapon_slots[index]
-		slot.visible = status == "running"
-		slot.position = slot_layout.slots[index+1].position
-		slot.size = slot_layout.slots[index+1].size
-		slot.units = ui_factor
-		slot.queue_redraw()
-	weapon_hud.units = ui_factor
-	weapon_hud.epic = Cards.epic_count(cards)>0
-	weapon_hud.stars = Cards.epic_count(cards) if weapon_hud.epic else mini(3,int(cards.choices))
-	weapon_hud.star_slots = 4 if weapon_hud.epic else 3
-	weapon_hud.epic_fraction = Cards.progress_fraction(cards)
-	var stats := _railgun_stats()
-	weapon_hud.update_state(float(player.weapon.reload_timer),float(stats.reload),int(player.weapon.ammo),int(stats.magazine),status=="running" and not app_backgrounded)
-	build_control.tooltip_text = "Railgun · Open build"
-	card_notice_label.visible = false
+	while weapon_huds.size() < 5:
+		var card := WeaponHUDCard.new(); card.mouse_filter = Control.MOUSE_FILTER_IGNORE; add_child(card); weapon_huds.append(card)
+	var active_ids: Array = _runtime_ids_in_slot_order()
+	for index in range(weapon_huds.size()):
+		var card = weapon_huds[index]
+		card.visible = status == "running"
+		card.position = slot_layout.slots[index].position; card.size = slot_layout.slots[index].size; card.units = ui_factor
+		if index >= active_ids.size():
+			card.empty = true; card.art = null; card.selected = false; card.reloading = false; card.stars = 0; card.star_slots = 4
+			card.queue_redraw()
+			continue
+		var runtime: Dictionary = weapon_runtime_by_item_id[active_ids[index]]
+		var runtime_entry := {"item":profile.equipmentItems.get(str(runtime.item_id),{}),"blueprint":EquipmentRegistry.definition(str(runtime.blueprint_id))}
+		var stats := _weapon_runtime_stats(runtime_entry)
+		card.empty = false
+		var card_blueprint := EquipmentRegistry.definition(str(runtime.blueprint_id))
+		var hud_path := str(card_blueprint.get("hud_art", ""))
+		card.art = load(hud_path) if not hud_path.is_empty() else overlay.illustration("hero")
+		var weapon_level_for_hud := int(runtime_entry.item.get("level",1))
+		card.epic = str(runtime_entry.item.get("rarity","common")) in ["epic","legendary"]; card.stars = mini(4,maxi(1,weapon_level_for_hud)); card.star_slots = 4; card.epic_fraction = 0.0; card.selected = true
+		card.update_state(float(runtime.reload_timer),float(stats.reload),int(runtime.ammo),int(stats.magazine),status=="running" and not app_backgrounded)
+	for index in range(empty_weapon_slots.size()): empty_weapon_slots[index].visible = false
+	weapon_hud = weapon_huds[0] if not weapon_huds.is_empty() else null
+	build_control.tooltip_text = "Open Hangar"
 
 func _clamp_player_to_viewport() -> void:
 	if player.is_empty():
@@ -1737,7 +2474,7 @@ func _clamp_player_to_viewport() -> void:
 func _clamp_point_to_playfield(point: Vector2) -> Vector2:
 	var size := get_viewport_rect().size
 	var playfield := _get_playfield_rect(size)
-	var inset := PLAYER_RADIUS + PLAYER_BOUNDS_PADDING
+	var inset := _player_radius() + PLAYER_BOUNDS_PADDING
 	return Vector2(
 		clampf(point.x, inset, maxf(inset, size.x - inset)),
 		clampf(point.y, playfield.position.y + inset, maxf(playfield.position.y + inset, playfield.end.y - inset))
@@ -1821,7 +2558,112 @@ func _format_compact_score(value: int) -> String:
 	return "%05d" % value
 
 func _stat(id: String) -> float:
-	return UpgradeRegistry.value(id, UpgradeRegistry.level(id, metaProgress.get("permanentUpgrades", {}), run_upgrades))
+	var workshop_levels := UpgradeRegistry.level(id,metaProgress.get("permanentUpgrades",{}),{})
+	var run_levels := UpgradeRegistry.level(id,{},run_upgrades)
+	var chassis_value := _ship_base_stat(id)
+	if id in ["damage","range","max_hp","regen"]:
+		var workshop_factor := UpgradeRegistry.workshop_multiplier(id,workshop_levels,chassis_value)
+		var run_factor := UpgradeRegistry.workshop_multiplier(id,run_levels,chassis_value)
+		return chassis_value * workshop_factor * run_factor
+	if id == "crit_chance":
+		# Critical Chance is a universal ship stat. The ship owns the baseline;
+		# Workshop and run levels add percentage points on top of it. Missing
+		# ship definitions intentionally resolve to a zero baseline.
+		return chassis_value + 0.01 * float(workshop_levels + run_levels)
+	if id == "armor":
+		return chassis_value + 0.025 * float(workshop_levels + run_levels)
+	if id in ["shield_capacity","shield_recharge"]:
+		if not _has_equipped_blueprint(EquipmentRegistry.SHIELD_CORE_ID): return 0.0
+		var module_stats := _shield_stats()
+		var module_base := float(EquipmentRegistry.definition(EquipmentRegistry.SHIELD_CORE_ID).get("base_stats",{}).get("capacity" if id == "shield_capacity" else "recharge",1.0))
+		var module_factor := float(module_stats.capacity if id == "shield_capacity" else module_stats.recharge) / maxf(0.01,module_base)
+		var workshop_factor := UpgradeRegistry.workshop_multiplier(id,workshop_levels)
+		var run_factor := UpgradeRegistry.workshop_multiplier(id,run_levels)
+		return module_base * module_factor * workshop_factor * run_factor
+	return UpgradeRegistry.value(id,workshop_levels + run_levels)
+
+func _workshop_display_value(id: String, levels: int) -> String:
+	var current := maxi(0, levels)
+	var base := _ship_base_stat(id)
+	var amount := 0.0
+	if id in ["damage", "range", "max_hp", "regen"]:
+		amount = base * UpgradeRegistry.workshop_multiplier(id, current, base)
+	elif id == "crit_chance":
+		amount = base + 0.01 * float(current)
+	elif id == "armor":
+		amount = base + 0.025 * float(current)
+	elif id in ["shield_capacity", "shield_recharge"]:
+		if not _has_equipped_blueprint(EquipmentRegistry.SHIELD_CORE_ID):
+			return "NO MODULE"
+		var module_stats := _shield_stats()
+		var stat_key := "capacity" if id == "shield_capacity" else "recharge"
+		var module_base := float(EquipmentRegistry.definition(EquipmentRegistry.SHIELD_CORE_ID).get("base_stats",{}).get(stat_key,1.0))
+		var module_factor := float(module_stats.get(stat_key, module_base)) / maxf(0.01, module_base)
+		amount = module_base * module_factor * UpgradeRegistry.workshop_multiplier(id, current)
+	else:
+		return UpgradeRegistry.display_value(id, current)
+
+	match id:
+		"armor": return "%d%%" % roundi(amount * 100.0)
+		"regen": return "%.1f HP/s" % amount
+		"range": return "%d units" % roundi(amount)
+		"shield_capacity", "shield_recharge": return "%.1f" % amount
+	return "%.0f" % amount
+
+func _shield_stats() -> Dictionary:
+	var item: Dictionary = profile.get("equipmentItems",{}).get(EquipmentRegistry.SHIELD_CORE_INSTANCE_ID,{})
+	return EquipmentRegistry.shield_core_stats(int(item.get("level",1)),{"capacity":float(item.get("legacy_capacity_bonus",0.0)),"recharge":float(item.get("legacy_recharge_bonus",0.0))})
+
+func _active_ship_id() -> String:
+	return str(profile.get("activeShipId",ShipRegistry.STARTER_SHIP_ID))
+
+func _active_ship() -> Dictionary:
+	return ShipRegistry.definition(_active_ship_id())
+
+func _ship_base_stat(id: String) -> float:
+	var state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	return ShipRegistry.upgraded_stat(_active_ship_id(),id,int(state.get("upgrade_level",0)))
+
+func _player_move_speed() -> float:
+	return _ship_base_stat("move_speed")
+
+func _player_radius() -> float:
+	return _ship_base_stat("collision_radius")
+
+func _railgun_instance() -> Dictionary:
+	return profile.get("equipmentItems",{}).get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
+
+func _railgun_level() -> int:
+	return int(_railgun_instance().get("level",1))
+
+func _highest_railgun_level() -> int:
+	var highest := 1
+	for item in profile.get("equipmentItems",{}).values():
+		var blueprint := EquipmentRegistry.definition(str(item.get("blueprint_id","")))
+		if str(blueprint.get("family",blueprint.get("weapon_family",""))) == "railgun":
+			highest = maxi(highest,int(item.get("level",1)))
+	return highest
+
+func _has_equipped_blueprint(blueprint_id: String) -> bool:
+	var state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	var enabled: Dictionary = state.get("slot_enabled",{}) if state.get("slot_enabled",{}) is Dictionary else {}
+	for slot_id in state.get("loadout",{}):
+		if not bool(enabled.get(str(slot_id),true)): continue
+		var instance_id = state.loadout[slot_id]
+		var item: Dictionary = profile.get("equipmentItems",{}).get(str(instance_id),{})
+		if str(item.get("blueprint_id","")) == blueprint_id: return true
+	return false
+
+func _is_loadout_slot_enabled(slot_id: String) -> bool:
+	var state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	var enabled: Dictionary = state.get("slot_enabled",{}) if state.get("slot_enabled",{}) is Dictionary else {}
+	return bool(enabled.get(slot_id,true))
+
+func _equipped_weapon_blueprints() -> Array:
+	var equipped := []
+	for entry in _active_weapon_loadout():
+		equipped.append(str(entry.blueprint.get("id", "")))
+	return equipped
 
 func _fleet_orbit_sign() -> float:
 	return -1.0 if float(runState.get("fleetOrbitSign", 1.0)) < 0.0 else 1.0
@@ -1865,11 +2707,11 @@ func _update_autopilot(delta: float) -> void:
 		return
 	if auto_timer <= 0.0:
 		auto_timer = 0.1
-		var bounds := _get_playfield_rect(get_viewport_rect().size).grow(-(PLAYER_RADIUS + PLAYER_BOUNDS_PADDING))
-		player_target = Autopilot.choose_target(player.position, bounds, enemies, enemy_projectiles, PLAYER_MOVE_SPEED)
+		var bounds := _get_playfield_rect(get_viewport_rect().size).grow(-(_player_radius() + PLAYER_BOUNDS_PADDING))
+		player_target = Autopilot.choose_target(player.position,bounds,enemies,enemy_projectiles,_player_move_speed())
 
 func _pause_run() -> void:
-	if status not in ["running", "card_choice"]:
+	if status != "running":
 		return
 	status = "paused"
 	runState.status = "paused"
@@ -1898,10 +2740,23 @@ func _setup_background_events() -> void:
 func _save_run() -> void:
 	if run_id == "" or status == "dead" or status == "menu":
 		return
+	var railgun_runtime_for_save: Dictionary = weapon_runtime_by_item_id.get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
+	if not railgun_runtime_for_save.is_empty() and player.has("weapon"):
+		railgun_runtime_for_save.ammo = int(player.weapon.get("ammo",railgun_runtime_for_save.ammo)); railgun_runtime_for_save.reload_timer = float(player.weapon.get("reload_timer",railgun_runtime_for_save.reload_timer))
+		if weapon_runtime_by_item_id.size() == 1: railgun_runtime_for_save.fire_timer = float(fire_timer) / 1000.0
+	var active_ship_id := _active_ship_id()
+	var active_state: Dictionary = profile.ships.get(active_ship_id,{})
+	var checked_loadout: Dictionary = LoadoutSystem.validate(active_ship_id,active_state.get("loadout",{}),profile.equipmentItems)
+	if not checked_loadout.valid:
+		active_state.loadout = checked_loadout.loadout
+		profile.ships[active_ship_id] = active_state
 	profile.activeRun = ProfileStore.encode({
-		"version": 1, "run_id": run_id, "runState": runState, "cards": cards,
+		"version": 3, "run_id": run_id, "runState": runState,
+		"active_ship_id": active_ship_id,
+		"combat_loadout": checked_loadout.loadout.duplicate(true),
 		"upgrades": run_upgrades, "player": player, "player_target": player_target,
 		"enemies": enemies, "bullets": bullets, "enemy_projectiles": enemy_projectiles,
+		"weapon_runtime": weapon_runtime_by_item_id,
 		"spawn_timer": spawn_timer, "fire_timer": fire_timer, "next_id": next_id,
 		"last_boss_wave": last_boss_wave, "rng_state": str(rng.state),
 		"enemy_kills": run_enemy_kills, "discovered": run_discovered_enemies,
@@ -1915,10 +2770,17 @@ func _save_run() -> void:
 	save_timer = 0.0
 
 func _restore_run() -> void:
-	selected_card = ""
 	var snapshot: Dictionary = ProfileStore.decode(profile.activeRun)
 	# Keep an unrecognized snapshot intact; do not silently replace it with a new run.
-	if int(snapshot.get("version", 0)) != 1 or not snapshot.has_all(["run_id", "player", "runState", "upgrades", "enemies", "bullets", "enemy_projectiles"]):
+	if int(snapshot.get("version",0)) != 3 or not snapshot.has_all(["run_id","player","runState","upgrades","enemies","bullets","enemy_projectiles","active_ship_id","combat_loadout","weapon_runtime"]):
+		save_error = true
+		return
+	if str(snapshot.active_ship_id) != _active_ship_id():
+		save_error = true
+		return
+	var snapshot_loadout: Dictionary = snapshot.combat_loadout if snapshot.combat_loadout is Dictionary else {}
+	var checked_snapshot: Dictionary = LoadoutSystem.validate(_active_ship_id(),snapshot_loadout,profile.equipmentItems)
+	if not checked_snapshot.valid or checked_snapshot.loadout != snapshot_loadout:
 		save_error = true
 		return
 	run_id = str(snapshot.run_id)
@@ -1929,7 +2791,11 @@ func _restore_run() -> void:
 	runState = snapshot.runState
 	if not runState.has("realElapsedSeconds"):
 		runState.realElapsedSeconds = float(runState.get("elapsedSeconds",0.0)) / maxf(1.0,float(_game_speed()))
-	cards = Cards.migrate(snapshot.get("cards", Cards.fresh(hash(run_id))))
+	# Legacy snapshots may contain a card payload. Card choices are retired; only
+	# boss module currency is retained in the run state.
+	if not runState.has("modules"):
+		var legacy_cards: Dictionary = snapshot.get("cards", {}) if snapshot.get("cards", {}) is Dictionary else {}
+		runState.modules = int(legacy_cards.get("modules", 0))
 	if not runState.has("fleetOrbitSign"):
 		var legacy_sign := 0.0
 		for saved_enemy in snapshot.enemies:
@@ -1942,9 +2808,16 @@ func _restore_run() -> void:
 	run_upgrades = UpgradeRegistry.defaults()
 	run_upgrades.merge(snapshot.upgrades, true)
 	player = snapshot.player
-	player.radius = PLAYER_RADIUS
+	player.radius = _player_radius()
+	var legacy_player_weapon_missing := not player.has("weapon")
+	weapon_runtime_by_item_id = snapshot.weapon_runtime if snapshot.weapon_runtime is Dictionary else {}
+	if weapon_runtime_by_item_id.is_empty(): _initialize_weapon_runtime()
 	if not player.has("weapon"): player.weapon = {}
-	WeaponRegistry.ensure_cycle(player.weapon, "railgun")
+	if legacy_player_weapon_missing:
+		var legacy_railgun: Dictionary = weapon_runtime_by_item_id.get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
+		if not legacy_railgun.is_empty():
+			legacy_railgun.ammo = int(_railgun_stats().magazine); legacy_railgun.reload_timer = 0.0; legacy_railgun.fire_timer = float(snapshot.get("fire_timer",0.0)) / 1000.0
+	_sync_railgun_runtime()
 	player.max_shield = _stat("shield_capacity")
 	if not player.has("shield_delay"):
 		player.shield = 0.0
@@ -1977,12 +2850,14 @@ func _restore_run() -> void:
 	for projectile in enemy_projectiles:
 		projectile.previous_position = projectile.position
 	spawn_timer = float(snapshot.spawn_timer)
-	fire_timer = float(snapshot.fire_timer)
+	fire_timer = float(snapshot.get("fire_timer",0.0))
 	next_id = int(snapshot.next_id)
 	last_boss_wave = int(snapshot.last_boss_wave)
 	rng.state = int(snapshot.rng_state)
 	run_enemy_kills = snapshot.enemy_kills
 	run_discovered_enemies = snapshot.discovered
+	var saved_new_blueprints: Variant = snapshot.get("new_blueprints",[])
+	run_new_blueprints = saved_new_blueprints if saved_new_blueprints is Array else []
 	manual_override = float(snapshot.get("manual_override", 1.0))
 	auto_timer = float(snapshot.get("auto_timer", 0.0))
 	_remap_viewport(snapshot.viewport, get_viewport_rect().size, Rect2(snapshot.get("playfield_position", _get_playfield_rect(snapshot.viewport).position), snapshot.get("playfield_size", _get_playfield_rect(snapshot.viewport).size)))
@@ -2018,24 +2893,35 @@ func _refresh_overlay() -> void:
 	if status == "running" or death_timer > 0.0:
 		overlay.hide()
 		return
-	if status == "card_choice" or menu_view in ["railgun", "railgun_catalog", "railgun_detail", "build"]:
-		overlay.set_overlay_background(null, false)
+	if menu_view in ["railgun","railgun_catalog","railgun_detail","build","hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","ship_systems"]:
+		overlay.set_overlay_background(COMMAND_DECK_BACKDROP, true)
 		last_layout_size = Vector2.ZERO
 		_layout_buttons()
-		overlay.show_railgun(self)
+		if menu_view in ["hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","build","ship_systems"]: overlay.show_hangar(self)
+		else: overlay.show_railgun(self)
 		# The panel builds its card grid dynamically; measure it again afterwards.
 		last_layout_size = Vector2.ZERO
 		_layout_buttons()
 		return
 	overlay.set_overlay_opacity(0.76 if status == "dead" else 0.96)
-	overlay.set_overlay_background(run_complete_background, status == "dead")
+	overlay.set_overlay_background(run_complete_background if status == "dead" else COMMAND_DECK_BACKDROP, true)
 	var entries := []
 	var actions := []
 	var tabs := []
 	var quantities := []
 	var title := "VOID DRIFTER"
 	var summary := "Hold position or drag to steer. Railgun fires automatically."
-	if menu_view == "shop" or menu_view == "workshop":
+	if menu_view == "ship_systems":
+		var ship: Dictionary = _active_ship()
+		var ship_state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+		var ship_level := int(ship_state.get("upgrade_level",0))
+		var ship_cap := ShipRegistry.SHIP_LEVEL_CAP
+		title = "CHASSIS BAY"
+		summary = "%s · %s · Lv.%d/%d\nChassis levels improve hull, recovery, armor and base attack. Movement speed is a fixed ship characteristic." % [str(ship.get("name","DRIFTER")).to_upper(),str(ship.get("rarity","common")).to_upper(),ship_level,ship_cap]
+		var ship_cost := ShipRegistry.upgrade_cost(ship_level)
+		entries = [{"text":"CHASSIS CALIBRATION\nLv.%d/%d · Hull %.0f · Regen %.2f/s · Armor %.1f%% · Attack %.1f\nNext: +8 hull · +0.04 regen · +0.3%% armor · +0.5 attack" % [ship_level,ship_cap,_ship_base_stat("max_hp"),_ship_base_stat("regen"),_ship_base_stat("armor") * 100.0,_ship_base_stat("damage")],"buttons":[{"text":"MAX LEVEL" if ship_level >= ship_cap else "Upgrade / ◈ %s" % _money(float(ship_cost)),"action":"ship_upgrade","disabled":ship_level >= ship_cap or float(profile.totalCoins) < ship_cost or not profile.activeRun.is_empty()}]}]
+		actions = [{"text":"Workshop","action":"workshop"},{"text":"Back to Hangar","action":"back"}]
+	elif menu_view == "shop" or menu_view == "workshop":
 		var workshop := menu_view == "workshop"
 		title = "WORKSHOP" if workshop else "RUN UPGRADES"
 		var wallet := float(profile.totalCoins) if workshop else float(runState.cash)
@@ -2048,16 +2934,25 @@ func _refresh_overlay() -> void:
 			if entry.category != shop_category: continue
 			var levels := UpgradeRegistry.level(entry.id, profile.permanentUpgrades, {} if workshop else run_upgrades)
 			var quote := UpgradeRegistry.quote(entry.id, profile.permanentUpgrades, run_upgrades, wallet, buy_quantity, workshop)
-			var next_value := "MAX" if levels == int(entry.cap) else UpgradeRegistry.display_value(entry.id, levels + maxi(1, int(quote.count)))
+			var next_level := levels + maxi(1, int(quote.count))
+			var current_value := _workshop_display_value(entry.id, levels) if workshop else UpgradeRegistry.display_value(entry.id, levels)
+			var next_value := "MAX" if levels == int(entry.cap) else (_workshop_display_value(entry.id, next_level) if workshop else UpgradeRegistry.display_value(entry.id, next_level))
 			var price := float(quote.cost) if int(quote.count) > 0 else UpgradeRegistry.cost(levels, workshop)
 			var caption := "MAX" if levels == int(entry.cap) else "Buy %d\n%s %s" % [maxi(1, int(quote.count)), _money(price), "◈" if workshop else "cash"]
-			entries.append({"upgrade_name": entry.name, "level": levels, "cap": entry.cap, "values": "%s -> %s" % [UpgradeRegistry.display_value(entry.id, levels), next_value], "purchase": {"text": caption, "action": "buy:%s:%d" % [entry.id, buy_quantity], "disabled": int(quote.count) == 0 or (workshop and not profile.activeRun.is_empty())}})
+			entries.append({"upgrade_name": entry.name, "level": levels, "cap": entry.cap, "values": "%s -> %s" % [current_value, next_value], "purchase": {"text": caption, "action": "buy:%s:%d" % [entry.id, buy_quantity], "disabled": int(quote.count) == 0 or (workshop and not profile.activeRun.is_empty())}})
 
 		if workshop and shop_category == "Utility":
 			entries.append({"text": "AUTO-DODGE / Permanent unlock\nReach wave 30, then spend ◈ 1,000.", "buttons": [{"text": "Unlocked" if profile.autoDodgeUnlocked else "Unlock / ◈ 1,000", "action": "unlock_auto", "disabled": bool(profile.autoDodgeUnlocked) or int(profile.highestWave) < 30 or float(profile.totalCoins) < 1000.0 or not profile.activeRun.is_empty()}]})
 		actions = [{"text": "Resume Run" if not workshop else "Back", "action": "resume" if not workshop else "back"}]
 		if workshop:
-			actions = [{"text": "Reset", "action": "reset_workshop", "inline": true, "disabled": profile_store.workshop_refund(profile) <= 0 or not profile.activeRun.is_empty()}, {"text": "Back", "action": "back"}]
+			actions = [{"text": "Reset", "action": "reset_workshop", "inline": true, "disabled": profile_store.workshop_refund(profile) <= 0 or not profile.activeRun.is_empty()}, {"text":"Chassis Bay","action":"ship_systems"}, {"text":"Back","action":"back"}]
+	elif menu_view == "settings":
+		title = "SETTINGS"
+		summary = "LOCAL GAME PREFERENCES"
+		entries = [
+			{"text":"SCREEN SHAKE\nVisual impact feedback during combat.","buttons":[{"text":"ON" if bool(profile.settings.get("screenShake",true)) else "OFF","action":"settings_shake"}]},
+		]
+		actions = [{"text":"Back", "action":"back"}]
 	elif menu_view == "developers":
 		title = "DEVELOPERS"
 		summary = "◈ %s / ▣ %d" % [_money(float(profile.totalCoins)),int(profile.railgunModules)]
@@ -2099,6 +2994,8 @@ func _refresh_overlay() -> void:
 		summary = "WAVE %d COMBAT INTEL" % detail_wave if full_intel else "ENEMY CODEX"
 		var arrival := "EVERY 10 WAVES" if codex_detail_id == EnemyRegistry.BOSS_ID else "FROM WAVE %d" % int(definition.unlock_wave)
 		var detail_values := _enemy_wave_stat_lines(definition, detail_stats, true)
+		var detail_profile := _enemy_damage_profile_lines(definition)
+		if discovered and not detail_profile.is_empty(): detail_values += "\n" + detail_profile
 		detail_values += "\nKILL  +%s cash / +◈ %s" % [_money(float(definition.base_stats.get("cash_reward", 0))), _money(float(definition.base_stats.get("coin_reward", 0)))]
 		entries.append({
 			"enemy_name": str(definition.name),
@@ -2140,36 +3037,41 @@ func _refresh_overlay() -> void:
 				var cycle := WeaponRegistry.cycle(str(entry.attack_behavior))
 				values.append("SALVO  %d / RELOAD  %.1fs" % [int(cycle.magazine),float(cycle.reload)])
 			values.append("KILL  +%s cash / +◈ %s" % [_money(float(stats.get("cash_reward", 0))), _money(float(stats.coin_reward))])
+			var profile_lines := _enemy_damage_profile_lines(entry)
+			if discovered and not profile_lines.is_empty(): values.append(profile_lines)
 			entries.append({"enemy_name": entry.name, "preview": _get_codex_preview(id, entry), "role": entry.role, "boss": id == EnemyRegistry.BOSS_ID, "discovered": discovered, "arrival": ("EVERY 10 WAVES" if id == EnemyRegistry.BOSS_ID else "FROM WAVE %d" % int(entry.unlock_wave)) if active else "ARCHIVE", "description": entry.description if discovered else "Encounter this enemy to reveal its combat data.", "stats": "\n".join(values) if discovered else "", "note": "Base values before armor / bonuses. Hull and damage grow after wave %d." % EnemyRegistry.GROWTH_START_WAVE if discovered and active else "", "kills": _get_enemy_total_kills(id), "action": "codex_enemy:" + id})
 		actions = [{"text": "Back", "action": "back"}]
 	elif status == "paused":
 		title = "RUN PAUSED"
 		summary = "Wave %d / %s\nCash %s / Run ◈ %s\nYour run is saved. No progress while away." % [int(runState.wave), _format_time(elapsed), _money(float(runState.cash)), _money(float(runState.coinsEarned))]
-		actions = [{"text": "Resume Run", "action": "resume"}, {"text": "Wave Intel", "action": "wave_intel"}, {"text": "Run Upgrades", "action": "shop", "disabled": not cards.offer.is_empty()}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Retire Run / Bank ◈", "action": "retire"}]
+		actions = [{"text": "Resume Run", "action": "resume"}, {"text": "Wave Intel", "action": "wave_intel"}, {"text": "Run Upgrades", "action": "shop"}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Retire Run / Bank ◈", "action": "retire"}]
 	elif status == "dead":
 		title = "RUN COMPLETE"
 		summary = ""
-		entries = [{"run_results": [
+		var run_results := [
 			{"wide":true, "label":"WAVE", "value":("%d\n[b]NEW RECORD[/b]" % int(runState.wave)) if last_run_records.values().any(func(record): return bool(record)) else str(int(runState.wave))},
 			{"label":"GAME TIME", "value":_format_time(float(runState.elapsedSeconds))},
 			{"label":"REAL TIME", "value":_format_time(float(runState.get("realElapsedSeconds",0.0)))},
 			{"label":"◈ COINS EARNED", "value":"◈ %s" % _money(float(runState.coinsEarned))},
-			{"label":"▣ BOSS MODULE EARNED", "value":"▣ +%d" % cards.modules}
-		]}]
+			{"label":"▣ BOSS MODULE EARNED", "value":"▣ +%d" % int(runState.get("modules", 0))}
+		]
+		for blueprint_id in run_new_blueprints:
+			var blueprint := EquipmentRegistry.definition(str(blueprint_id))
+			if not blueprint.is_empty():
+				run_results.append({"wide":true, "label":"NEW BLUEPRINT", "value":"[b]%s[/b]\nAvailable in Hangar" % str(blueprint.name)})
+		entries = [{"run_results": run_results}]
 		actions = [{"text": "Run Again", "action": "start"}, {"text": "Main Menu", "action": "menu"}]
 	else:
 		summary += "\n◈ %s / BEST WAVE %d" % [_money(float(profile.totalCoins)), int(profile.highestWave)]
-		entries = [{"text": "Defeat enemies for XP and choose your railgun cards. Bosses drop upgrade ▣.\n\nEnable Auto Cards to keep your run idle. Progress saves automatically."}]
-		actions = [{"text": "Start Run", "action": "start", "disabled": not profile.activeRun.is_empty()}, {"text": "Workshop", "action": "workshop", "disabled": not profile.activeRun.is_empty()}, {"text": "Enemy Codex", "action": "codex"}]
+		entries = [{"text": "Defeat enemies, bank resources and improve your ship modules in the Hangar. Every five Railgun levels unlocks a permanent milestone. Bosses drop upgrade ▣."}]
+		actions = [{"text": "Start Run", "action": "start", "disabled": not profile.activeRun.is_empty()}, {"text": "Hangar", "action": "hangar"}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Settings", "action": "settings"}]
 	if menu_view == "main" and status == "menu":
 		actions.append({"text":"Developers","action":"developers"})
 	if menu_view == "main" or menu_view == "pause":
 		if status == "menu":
-			actions.insert(1, {"text":"Railgun Lv.%d  ·  ▣ %d" % [profile.railgunLevel,profile.railgunModules],"action":"railgun"})
-			entries.append({"text":Cards.next_unlock(int(profile.railgunLevel),profile.get("railgunPreservedUnlocks",[]))})
+			entries.append({"text":"Railgun Lv.%d · next permanent milestone at Lv.%d" % [_railgun_level(),(floori(float(_railgun_level()) / 5.0) + 1) * 5]})
 		elif status == "paused":
-			actions.insert(1, {"text":_auto_cards_text(),"action":"auto_cards"})
-			actions.insert(2, {"text":"Railgun Build","action":"build"})
+			actions.insert(1,{"text":"Hangar","action":"hangar"})
 			actions.append({"text":"Dodge ON" if profile.autoDodgeEnabled else "Dodge OFF","action":"auto","disabled":not profile.autoDodgeUnlocked})
 	if save_error and status != "dead":
 		summary += "\nSave failed. Keep this tab open and retry."
@@ -2187,20 +3089,73 @@ func _refresh_overlay() -> void:
 	_layout_buttons()
 
 func _on_panel_action(action: String) -> void:
-	if action.begins_with("card:"):
-		if status == "card_choice" and cards.offer.has(action.get_slice(":",1)):
-			_choose_card(action.get_slice(":",1))
-			selected_card = ""
-	elif action == "equip_card":
-		if status == "card_choice" and not app_backgrounded and cards.offer.has(selected_card):
-			_choose_card(selected_card)
-			selected_card = ""
-	elif action == "card_detail_back":
-		menu_view = card_detail_origin
-	elif action.begins_with("card_info:"):
-		card_detail_origin = menu_view
-		card_detail = action.get_slice(":",1)
-		menu_view = "railgun_detail"
+	if action.begins_with("hangar_slot:"):
+		hangar_selected_slot = action.get_slice(":",1)
+		var installed := LoadoutSystem.installed_instance(profile,hangar_selected_slot)
+		if installed.is_empty(): menu_view = "equipment_picker"
+		else:
+			hangar_selected_equipment = str(installed.get("id",""))
+			# Loadout keeps the selected equipment in context below its bays. This
+			# preserves the player's place in the build rather than switching screens.
+			menu_view = "loadout"
+			overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("toggle_slot:"):
+		_toggle_loadout_slot(action.get_slice(":",1))
+	elif action.begins_with("blueprint_filter:"):
+		hangar_blueprint_filter = action.get_slice(":",1)
+		overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("blueprint_detail:"):
+		hangar_selected_equipment = action.get_slice(":",1)
+		menu_view = "blueprint_detail"
+		overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("view_blueprints:"):
+		hangar_blueprint_filter = action.get_slice(":",1)
+		menu_view = "blueprints"
+		overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("equip_reserve:"):
+		var reserve_id := action.get_slice(":",1)
+		_install_equipment(reserve_id,hangar_selected_slot)
+		if not _hangar_changes_locked() and str(LoadoutSystem.installed_instance(profile,hangar_selected_slot).get("id","")) == reserve_id:
+			hangar_selected_equipment = reserve_id
+			menu_view = "loadout"
+			overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("build_equipment:"):
+		var blueprint_id := action.get_slice(":",1)
+		_build_equipment(blueprint_id)
+		hangar_selected_equipment = blueprint_id
+		menu_view = "blueprint_detail"
+	elif action.begins_with("equipment_details:"):
+		hangar_selected_equipment = action.get_slice(":",1)
+		menu_view = "equipment_detail"
+		overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("upgrade_equipment_detail:"):
+		_upgrade_equipment(action.get_slice(":",1))
+	elif action.begins_with("equip_blueprint:"):
+		var desired_blueprint := action.get_slice(":",1)
+		for reserve_id in LoadoutSystem.reserve_items(profile):
+			if str(profile.equipmentItems.get(reserve_id,{}).get("blueprint_id","")) == desired_blueprint:
+				hangar_selected_equipment = reserve_id
+				menu_view = "loadout"
+				break
+	elif action.begins_with("request_unequip:"):
+		var requested_id := action.get_slice(":",1)
+		if _unequip_requires_confirmation(requested_id): hangar_pending_unequip = requested_id
+		else: _unequip_equipment(requested_id)
+	elif action == "confirm_unequip":
+		if not hangar_pending_unequip.is_empty(): _unequip_equipment(hangar_pending_unequip)
+		hangar_pending_unequip = ""
+		menu_view = "loadout"
+	elif action == "cancel_unequip":
+		hangar_pending_unequip = ""
+	elif action == "manage_loadout":
+		menu_view = "loadout"
+		overlay.scroll.scroll_vertical = 0
+	elif action == "blueprints":
+		menu_view = "blueprints"
+		overlay.scroll.scroll_vertical = 0
+	elif action == "ship_systems":
+		menu_view = "ship_systems"
+		overlay.scroll.scroll_vertical = 0
 	elif action.begins_with("wave_intel_tab:"):
 		wave_intel_tab = "stats" if action.get_slice(":", 1) == "stats" else "roster"
 		overlay.scroll.scroll_vertical = 0
@@ -2229,6 +3184,15 @@ func _on_panel_action(action: String) -> void:
 		buy_quantity = 10 if action.get_slice(":", 1) == "10" else 1
 	elif action.begins_with("buy:"):
 		_buy_upgrade(action.get_slice(":", 1), int(action.get_slice(":", 2)))
+	elif action == "ship_upgrade":
+		_upgrade_active_ship()
+	elif action.begins_with("install_equipment:"):
+		var install_parts := action.split(":")
+		if install_parts.size() >= 3: _install_equipment(install_parts[1],install_parts[2])
+	elif action.begins_with("unequip_equipment:"):
+		_unequip_equipment(action.get_slice(":",1))
+	elif action.begins_with("upgrade_equipment:"):
+		_upgrade_equipment(action.get_slice(":",1))
 	else:
 		match action:
 			"developers":
@@ -2253,19 +3217,19 @@ func _on_panel_action(action: String) -> void:
 					if not save_error: save_error = not profile_store.save_profile(profile)
 					reset_world("menu")
 					menu_view = "developers"
-			"auto_cards":
-				pointer_down = false
-				player_target = player.position
-				profile.settings.autoCards = not bool(profile.settings.get("autoCards",false))
-				_save_run()
-				_handle_card_progress()
 			"railgun", "railgun_catalog":
 				if status in ["menu", "dead"]: menu_view = action
 				overlay.scroll.scroll_vertical = 0
+			"hangar":
+				if status == "running": _pause_run()
+				if status in ["menu","dead","paused"]: menu_view = "hangar"
+				overlay.scroll.scroll_vertical = 0
 			"railgun_buy": _buy_railgun()
+			"build_railgun": _build_equipment(EquipmentRegistry.RAILGUN_ID)
+			"build_micro_missile": _build_equipment(EquipmentRegistry.MICRO_MISSILE_RACK_ID)
 			"build":
 				if status == "running": _pause_run()
-				if status == "paused": menu_view = "build"
+				if status == "paused": menu_view = "hangar"
 			"speed":
 				if status == "running":
 					profile.settings.gameSpeed = ProfileStore.GAME_SPEEDS[(ProfileStore.GAME_SPEEDS.find(_game_speed()) + 1) % ProfileStore.GAME_SPEEDS.size()]
@@ -2286,7 +3250,7 @@ func _on_panel_action(action: String) -> void:
 			"shop":
 				if status == "running":
 					_pause_run()
-				if status == "paused" and cards.offer.is_empty():
+				if status == "paused":
 					menu_view = "shop"
 			"wave_intel":
 				if status == "running":
@@ -2297,20 +3261,34 @@ func _on_panel_action(action: String) -> void:
 			"workshop":
 				if profile.activeRun.is_empty() and status in ["menu", "dead"]:
 					menu_view = "workshop"
+			"settings":
+				if status == "menu": menu_view = "settings"
+			"settings_shake":
+				if status == "menu":
+					profile.settings.screenShake = not bool(profile.settings.get("screenShake",true))
+					save_error = not profile_store.save_profile(profile)
 			"resume":
 				if status == "paused" and not app_backgrounded:
 					status = "running"
 					runState.status = "running"
 					menu_view = "main"
 					pointer_down = false
-					_handle_card_progress()
 			"retire":
 				if status == "paused":
 					_end_run()
 			"codex":
 				menu_view = "codex"
 				overlay.scroll.scroll_vertical = 0
-			"back": menu_view = "pause" if status == "paused" else "main"
+			"back":
+				if menu_view == "ship_systems": menu_view = "hangar"
+				elif menu_view == "workshop": menu_view = "ship_systems"
+				elif menu_view == "settings": menu_view = "main"
+				elif menu_view == "loadout": menu_view = "hangar"
+				elif menu_view == "equipment_picker": menu_view = "loadout"
+				elif menu_view == "equipment_detail": menu_view = "loadout"
+				elif menu_view == "blueprints": menu_view = "hangar"
+				elif menu_view == "blueprint_detail": menu_view = "blueprints"
+				else: menu_view = "pause" if status == "paused" else "main"
 			"menu": reset_world("menu")
 			"auto":
 				if profile.autoDodgeUnlocked:
@@ -2325,7 +3303,7 @@ func _on_panel_action(action: String) -> void:
 					profile.autoDodgeUnlocked = true
 					save_error = not profile_store.save_profile(profile)
 			"save":
-				if status in ["paused", "card_choice"]:
+				if status == "paused":
 					_save_run()
 				else:
 					save_error = not profile_store.save_profile(profile)
@@ -2335,7 +3313,7 @@ func _buy_upgrade(id: String, count: int) -> void:
 	var workshop := menu_view == "workshop"
 	if workshop and (not profile.activeRun.is_empty() or status not in ["menu", "dead"]):
 		return
-	if not workshop and (menu_view != "shop" or status != "paused" or not cards.offer.is_empty()):
+	if not workshop and (menu_view != "shop" or status != "paused"):
 		return
 	var wallet := float(profile.totalCoins) if workshop else float(runState.cash)
 	var quote := UpgradeRegistry.quote(id, profile.permanentUpgrades, run_upgrades, wallet, count, workshop)
@@ -2351,11 +3329,25 @@ func _buy_upgrade(id: String, count: int) -> void:
 		runState.cash = wallet - float(quote.cost)
 		run_upgrades[id] = int(run_upgrades.get(id, 0)) + int(quote.count)
 		if id == "max_hp":
+			var previous_max_hp := float(player.max_hp)
 			player.max_hp = _stat("max_hp")
-			player.hp = minf(float(player.max_hp), float(player.hp) + 20.0 * int(quote.count))
+			player.hp = minf(float(player.max_hp), float(player.hp) + maxf(0.0, float(player.max_hp) - previous_max_hp))
 		if id == "shield_capacity":
 			player.max_shield = _stat("shield_capacity")
 		_save_run()
+
+func _upgrade_active_ship() -> void:
+	if menu_view != "ship_systems" or status not in ["menu","dead"] or not profile.activeRun.is_empty(): return
+	var state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	var level := clampi(int(state.get("upgrade_level",0)),0,ShipRegistry.SHIP_LEVEL_CAP)
+	if level >= ShipRegistry.SHIP_LEVEL_CAP: return
+	var cost := ShipRegistry.upgrade_cost(level)
+	if float(profile.get("totalCoins",0.0)) < cost: return
+	profile.totalCoins -= cost
+	state.upgrade_level = level + 1
+	profile.ships[_active_ship_id()] = state
+	metaProgress = profile
+	save_error = not profile_store.save_profile(profile)
 
 func _append_effect(effect: Dictionary) -> void:
 	cosmetic_id += 1
@@ -2367,16 +3359,49 @@ func _append_effect(effect: Dictionary) -> void:
 		particles.remove_at(oldest)
 	particles.append(effect)
 
-func _add_rail_impact(origin: Vector2, direction: Vector2, critical: bool, fragment_visual := false) -> void:
+func _add_rail_impact(origin: Vector2, direction: Vector2, critical: bool, fragment_visual := false, source_blueprint_id := EquipmentRegistry.RAILGUN_ID) -> void:
 	var impact := EffectRegistry.make("rail_impact", origin)
 	impact.direction = direction
 	impact.critical = critical
 	impact.is_fragment = fragment_visual
+	impact.source_blueprint_id = source_blueprint_id
+	_append_effect(impact)
+
+func _add_missile_impact(origin: Vector2, direction: Vector2, is_super_missile: bool, is_small_missile := false) -> void:
+	var impact_height := 14.0 if is_super_missile else (6.0 if is_small_missile else 9.0)
+	var impact := EffectRegistry.make("missile_impact", origin, impact_height)
+	impact.direction = direction.normalized()
+	impact.is_super_missile = is_super_missile
+	impact.is_small_missile = is_small_missile
+	impact.visual_alpha = 0.46 if is_small_missile else (0.78 if is_super_missile else 0.62)
+	impact.visual_scale = 0.55 if is_small_missile else 0.75
 	_append_effect(impact)
 
 func _update_visual_effects(delta: float) -> void:
 	visual_time += delta
 	if not player.is_empty(): gunship.update(self, delta)
+	for instance_id in weapon_runtime_by_item_id:
+		var runtime: Dictionary = weapon_runtime_by_item_id[instance_id]
+		var blueprint := EquipmentRegistry.definition(str(runtime.get("blueprint_id","")))
+		if not bool(blueprint.get("rotates_to_target",false)): continue
+		var desired := gunship.bank
+		var target := _runtime_target(runtime)
+		if not target.is_empty():
+			var direction: Vector2 = target.position-_weapon_mount_position(runtime)
+			if direction.length_squared() > 0.0001: desired = direction.angle()+PI/2.0
+		var current := float(mount_aim_angles.get(instance_id,gunship.bank))
+		mount_aim_angles[instance_id] = lerp_angle(current,desired,1.0-exp(-delta*14.0))
+	for instance_id in mount_visuals:
+		var state: Dictionary = mount_visuals[instance_id]
+		state.recoil = maxf(0.0,float(state.get("recoil",0.0))-delta)
+		state.flash = maxf(0.0,float(state.get("flash",0.0))-delta)
+		mount_visuals[instance_id] = state
+	var expired_mount_visuals: Array[String] = []
+	for instance_id in mount_visuals:
+		var state: Dictionary = mount_visuals[instance_id]
+		if float(state.get("recoil",0.0)) <= 0.0 and float(state.get("flash",0.0)) <= 0.0:
+			expired_mount_visuals.append(str(instance_id))
+	for instance_id in expired_mount_visuals: mount_visuals.erase(instance_id)
 	rail_recoil = maxf(0.0, rail_recoil - delta * 12.0)
 	wave_message_timer = maxf(0.0, wave_message_timer - delta)
 	screen_shake = maxf(0.0, screen_shake - delta * 8.0)
@@ -2438,7 +3463,9 @@ func _draw_enemy_engines(enemy: Dictionary, height: float) -> void:
 		draw_line(origin, origin - forward * length * 0.6, Color(1, 0.8, 0.35, 0.9), 1.0, true)
 
 func _railgun_stats() -> Dictionary:
-	return Cards.stats(cards, int(profile.get("railgunLevel",1)), _stat("damage"), _stat("crit_chance"))
+	var railgun_base := EquipmentRegistry.railgun_stats(_railgun_level())
+	var base := {"damage":EquipmentRegistry.damage_from_ship(EquipmentRegistry.RAILGUN_ID,_railgun_level(),_stat("damage")),"interval":float(railgun_base.get("fire_interval",500.0)) / 1000.0,"magazine":int(railgun_base.get("magazine",6)),"reload":float(railgun_base.get("reload",3.0)),"range":_stat("range"),"projectile_speed":WeaponRegistry.PROJECTILE_SPEED,"shots":1 + int(railgun_base.get("additional_bullets",0)),"crit":_stat("crit_chance"),"crit_multiplier":2.0,"width":1.0,"hits":1 + int(railgun_base.get("penetration_bonus",0)),"fragments":int(railgun_base.get("shatter_fragments",0)),"rampage":float(railgun_base.get("rampage_per_penetration",0.0)),"rampage_cap":float(railgun_base.get("rampage_cap",0.0)),"void_burst_ratio":float(railgun_base.get("void_burst_ratio",0.0)),"void_burst_radius":float(railgun_base.get("void_burst_radius",0.0)),"shatter_damage_ratio":float(railgun_base.get("shatter_damage_ratio",0.0)),"milestone_damage_multiplier":float(railgun_base.get("damage_multiplier",1.0)),"milestone_crit_bonus":float(railgun_base.get("crit_bonus",0.0))}
+	return WeaponStatResolver.resolve(EquipmentRegistry.RAILGUN_ID,"railgun",_railgun_level(),base,{},_stat("crit_chance"))
 
 func _tick_railgun_reload(delta: float) -> float:
 	var delay := float(player.weapon.reload_timer)
@@ -2449,56 +3476,95 @@ func _tick_railgun_reload(delta: float) -> float:
 		player.weapon.ammo = int(_railgun_stats().magazine)
 	return maxf(0.0,delta-delay)
 
-func _auto_cards_text() -> String:
-	return "Auto Cards: ON" if bool(profile.get("settings",{}).get("autoCards",false)) else "Auto Cards: OFF"
-
-func _queue_card_notice(notice: String) -> void:
-	# A saved/resumed offer or repeated progress check must not replay the same popup.
-	if notice == card_notice or card_notices.has(notice): return
-	card_notices.append(notice)
-
-func _handle_card_progress() -> void:
-	if app_backgrounded or status not in ["running","card_choice"]: return
-	if not Cards.ensure_offer(cards,int(profile.railgunLevel),_stat("crit_chance"),profile.get("railgunPreservedUnlocks",[])): return
-	if bool(profile.settings.get("autoCards",false)):
-		_choose_card(Cards.auto_pick(cards),true)
-	else:
-		var newly_opened := status != "card_choice"
-		status = "card_choice"
-		runState.status = status
-		pointer_down = false
-		player_target = player.position
-		_save_run()
-		if newly_opened: _refresh_overlay()
-
-func _choose_card(id: String, automatic := false) -> void:
-	selected_card = ""
-	if not Cards.choose(cards,id): return
-	var entry := Cards.definition(id)
-	if automatic:
-		_queue_card_notice("%s · %s" % [entry.name,entry.short_effect.replace("\n"," · ")])
-	status = "running"
-	runState.status = status
-	menu_view = "main"
-	# Store the applied choice and the next offer together. No reroll on reload.
-	Cards.ensure_offer(cards,int(profile.railgunLevel),_stat("crit_chance"),profile.get("railgunPreservedUnlocks",[]))
-	if not cards.offer.is_empty() and not bool(profile.settings.get("autoCards",false)):
-		status = "card_choice"
-		runState.status = status
-	_save_run()
-	_refresh_overlay()
+func _queue_blueprint_notice(blueprint_id: String) -> void:
+	var blueprint := EquipmentRegistry.definition(blueprint_id)
+	if blueprint.is_empty(): return
+	blueprint_notice = str(blueprint.get("name", blueprint_id))
+	blueprint_notice_timer = 4.5
 
 func _buy_railgun() -> void:
-	var level := int(profile.railgunLevel)
-	if level >= Cards.MAX_LEVEL or not profile.activeRun.is_empty() or status not in ["menu","dead"]: return
-	var cost := Cards.price(level)
-	if profile.totalCoins < cost.coins or profile.railgunModules < cost.modules: return
-	profile.totalCoins -= cost.coins
-	profile.railgunModules -= cost.modules
-	profile.railgunCoinsSpent += cost.coins
-	profile.railgunModulesSpent += cost.modules
-	profile.railgunLevel += 1
-	save_error = not profile_store.save_profile(profile)
+	_upgrade_equipment(EquipmentRegistry.RAILGUN_INSTANCE_ID)
+
+func _build_equipment(blueprint_id: String) -> String:
+	if status not in ["menu","dead"] or not profile.activeRun.is_empty(): return ""
+	var blueprint := EquipmentRegistry.definition(blueprint_id)
+	if blueprint.is_empty() or blueprint_id not in profile.get("unlockedEquipmentBlueprints",[]): return ""
+	var instance_id := EquipmentRegistry.build_instance_id(blueprint_id,profile.equipmentItems)
+	if instance_id.is_empty() or profile.equipmentItems.has(instance_id): return ""
+	var cost: Dictionary = blueprint.get("build_cost",{})
+	if float(profile.totalCoins) < float(cost.get("coins",0)) or int(profile.railgunModules) < int(cost.get("modules",0)): return ""
+	var before := profile.duplicate(true)
+	profile.totalCoins -= float(cost.get("coins",0)); profile.railgunModules -= int(cost.get("modules",0))
+	profile.equipmentItems[instance_id] = {"id":instance_id,"blueprint_id":blueprint_id,"level":1,"coins_spent":int(cost.get("coins",0)),"modules_spent":int(cost.get("modules",0))}
+	profile.equipmentInventory = profile.equipmentItems.keys()
+	if not profile_store.save_profile(profile):
+		profile = before
+		save_error = true
+		return ""
+	save_error = false
+	return instance_id
+
+func _install_equipment(instance_id: String, slot_id: String) -> void:
+	if status not in ["menu","dead"] or not profile.activeRun.is_empty() or not profile.equipmentItems.has(instance_id): return
+	var state: Dictionary = profile.ships.get(_active_ship_id(),{}); var candidate: Dictionary = state.get("loadout",{}).duplicate(true)
+	if not candidate.has(slot_id) or not str(candidate.get(slot_id,"")).is_empty(): return
+	candidate[slot_id] = instance_id; var checked := LoadoutSystem.validate(_active_ship_id(),candidate,profile.equipmentItems)
+	if not checked.valid: return
+	state.loadout = checked.loadout; profile.ships[_active_ship_id()] = state; save_error = not profile_store.save_profile(profile)
+
+func _unequip_equipment(instance_id: String) -> void:
+	if status not in ["menu","dead"] or not profile.activeRun.is_empty(): return
+	var state: Dictionary = profile.ships.get(_active_ship_id(),{}); var candidate: Dictionary = state.get("loadout",{}).duplicate(true); var changed := false
+	for slot_id in candidate:
+		if str(candidate[slot_id]) == instance_id: candidate[slot_id] = ""; changed = true
+	if not changed: return
+	var checked := LoadoutSystem.validate(_active_ship_id(),candidate,profile.equipmentItems)
+	if not checked.valid: return
+	state.loadout = checked.loadout; profile.ships[_active_ship_id()] = state; save_error = not profile_store.save_profile(profile)
+
+func _toggle_loadout_slot(slot_id: String) -> void:
+	var state: Dictionary = profile.get("ships",{}).get(_active_ship_id(),{})
+	var loadout: Dictionary = state.get("loadout",{})
+	var instance_id := str(loadout.get(slot_id,""))
+	if instance_id.is_empty(): return
+	var enabled: Dictionary = state.get("slot_enabled",{}) if state.get("slot_enabled",{}) is Dictionary else {}
+	enabled[slot_id] = not bool(enabled.get(slot_id,true))
+	state.slot_enabled = enabled
+	profile.ships[_active_ship_id()] = state
+	metaProgress = profile
+	if status in ["running","paused"]:
+		_initialize_weapon_runtime()
+		player.max_shield = _stat("shield_capacity")
+		player.shield = minf(float(player.get("shield",0.0)),float(player.max_shield))
+		_save_run()
+	else:
+		save_error = not profile_store.save_profile(profile)
+	_refresh_overlay()
+
+func _hangar_changes_locked() -> bool:
+	return not profile.activeRun.is_empty() or status not in ["menu","dead"]
+
+func _unequip_requires_confirmation(instance_id: String) -> bool:
+	if _hangar_changes_locked(): return false
+	var item: Dictionary = profile.equipmentItems.get(instance_id,{})
+	var definition: Dictionary = EquipmentRegistry.definition(str(item.get("blueprint_id","")))
+	if str(definition.get("item_type","")) != "system": return false
+	var systems := 0
+	for slot in _active_ship().get("slots",[]):
+		if str(slot.get("type","")) != "system": continue
+		var installed := LoadoutSystem.installed_instance(profile,str(slot.get("id","")))
+		if not installed.is_empty(): systems += 1
+	return systems <= 1
+
+func _upgrade_equipment(instance_id: String) -> void:
+	if status not in ["menu","dead"] or not profile.activeRun.is_empty(): return
+	var item: Dictionary = profile.equipmentItems.get(instance_id,{})
+	if item.is_empty(): return
+	var blueprint_id := str(item.get("blueprint_id","")); var blueprint := EquipmentRegistry.definition(blueprint_id); var level := int(item.get("level",1)); var cap := ModuleProgression.level_cap(str(item.get("rarity","common")))
+	if level >= cap: return
+	var cost := EquipmentRegistry.upgrade_cost(blueprint_id,level)
+	if float(profile.totalCoins) < float(cost.get("coins",0)) or int(profile.railgunModules) < int(cost.get("modules",0)): return
+	profile.totalCoins -= float(cost.get("coins",0)); profile.railgunModules -= int(cost.get("modules",0)); item.level = level + 1; item.coins_spent = int(item.get("coins_spent",0)) + int(cost.get("coins",0)); profile.equipmentItems[instance_id] = item; save_error = not profile_store.save_profile(profile)
 
 func _projectile_travel(origin: Vector2, direction: Vector2) -> float:
 	var bounds := _get_playfield_rect(get_viewport_rect().size)

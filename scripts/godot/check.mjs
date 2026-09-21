@@ -1,7 +1,7 @@
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { findGodotBinary } from './find-godot.mjs';
+import { findGodotBinary, godotLogArgs } from './find-godot.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '../..');
@@ -16,7 +16,7 @@ if (!godotBinary) {
 
 const result = spawnSync(
   godotBinary,
-  ['--headless', '--path', projectDir, '--quit-after', '1', '--verbose'],
+  ['--headless', ...godotLogArgs('check'), '--path', projectDir, '--quit-after', '1', '--verbose'],
   {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -32,7 +32,13 @@ if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
 
-if (/SCRIPT ERROR|Parse Error|Failed to load script|\bERROR:/i.test(output)) {
+// macOS may report a harmless certificate-loader warning in headless mode.
+// It is unrelated to project loading and should not mask real script errors.
+const checkOutput = output.replace(
+  /ERROR: Condition "ret != noErr" is true\. Returning: ""\n\s+at: get_system_ca_certificates \(platform\/macos\/os_macos\.mm:1028\)\n?/g,
+  ''
+);
+if (/SCRIPT ERROR|Parse Error|Failed to load script|\bERROR:/i.test(checkOutput)) {
   console.error('Godot script parse/load error detected.');
   process.exit(1);
 }

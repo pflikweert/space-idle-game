@@ -2,6 +2,7 @@ extends SceneTree
 const Card = preload("res://scripts/systems/weapon_hud_card.gd")
 const Prior = preload("res://../../scripts/godot/visual-gunship-qa.gd")
 const UI = preload("res://scripts/systems/compact_ui.gd")
+const Equipment = preload("res://scripts/systems/equipment_registry.gd")
 var checks := 0
 func check(ok: bool, label: String) -> void:
 	checks += 1
@@ -10,6 +11,16 @@ func check(ok: bool, label: String) -> void:
 		quit(1)
 func _initialize() -> void: call_deferred("run_tests")
 func run_tests() -> void:
+	var railgun_definition := Equipment.definition(Equipment.RAILGUN_ID)
+	var railgun_hud_path := str(railgun_definition.get("hud_art",""))
+	check(str(railgun_definition.name) == "Railgun" and str(railgun_definition.rarity) == "normal","Railgun blueprint uses the visible name and normal rarity")
+	check(railgun_hud_path == "res://assets/ui/weapon_cards/starter_railgun.png","Railgun keeps its dedicated gameplay-slot portrait")
+	var railgun_hud: Texture2D = load(railgun_hud_path)
+	check(railgun_hud != null and railgun_hud.get_size() == Vector2(1254,1254),"Railgun HUD portrait has a stable square canvas")
+	var railgun_image := railgun_hud.get_image()
+	check(railgun_image.detect_alpha() != Image.ALPHA_NONE,"Railgun HUD portrait preserves transparent alpha")
+	var railgun_corners := [railgun_image.get_pixel(0,0),railgun_image.get_pixel(railgun_image.get_width()-1,0),railgun_image.get_pixel(0,railgun_image.get_height()-1),railgun_image.get_pixel(railgun_image.get_width()-1,railgun_image.get_height()-1)]
+	check(railgun_corners.all(func(color): return color.a == 0.0),"Railgun HUD portrait has transparent canvas corners")
 	var card := Card.new()
 	root.add_child(card)
 	card.update_state(2,2,0,6,true)
@@ -78,8 +89,8 @@ func run_tests() -> void:
 	game._add_damage_number(3,"SHIELD",Color.CYAN)
 	check(game.damage_numbers.size()==1 and game.damage_numbers[0].amount==5,"Rapid shield damage bundled")
 	check(not game.auto_control.visible,"Dodge removed from HUD")
-	check(game.empty_weapon_slots.size()==4,"Four noninteractive placeholders")
-	for slot in game.empty_weapon_slots: check(slot.empty and slot.mouse_filter==Control.MOUSE_FILTER_IGNORE,"Empty slots ignore input")
+	check(game.weapon_huds.size()==5,"Current gameplay HUD owns five dynamic weapon-slot cards")
+	for slot in game.weapon_huds: check(slot.mouse_filter==Control.MOUSE_FILTER_IGNORE,"Weapon-slot cards ignore input")
 	game.queue_free()
 	card.queue_free()
 	other.queue_free()

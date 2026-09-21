@@ -14,8 +14,21 @@ const VOID_SWARM_ID := "void_swarm"
 const KAMIKAZE_ID := "kamikaze"
 const SPLITTER_ID := "splitter"
 const ELITE_HUNTER_ID := "elite_hunter"
+const ARMORED_DRONE_ID := "armored_drone"
 
 const DEFINITIONS := {
+	"armored_drone": {
+		"id":"armored_drone", "asset_key":"armored_drone_v1", "name":"Armored Drone", "role":"Armored chaser",
+		"description":"A reinforced chaser with a kinetic shell that yields to explosive impact.", "status":"active", "unlock_wave":4,
+		"archetype":"armored_chaser", "movement_behavior":"spiral_orbit", "attack_behavior":"contact", "visual_color":Color("#f59e0b"),
+		"flight":{"orbit_strength":0.62,"approach_seconds":35.0,"approach_delay_seconds":1.0,"start_range":Vector2(0.56,0.72)},
+		"visual_canvas_height":110.0, "death_vfx_key":"enemy_death_medium", "death_vfx_height":72.0,
+		"base_stats":{"hp":36,"speed":38.0,"contact_damage":2,"contact_interval":0.55,"cash_reward":5,"coin_reward":3,"score_reward":36,"radius":17.0},
+		"scaling":{"hp_multiplier":1.115,"speed_multiplier":1.0,"damage_multiplier":1.14}, "spawn":{"weight":12,"min_run_level":4},
+		"abilities":["spiral_approach","contact_damage"],
+		"resistances":[{"target_kind":"damage_type","target_id":"kinetic","multiplier":0.75}],
+		"weaknesses":[{"target_kind":"damage_type","target_id":"explosive","multiplier":1.25}], "immunities":[],
+	},
 	"void_drone": {
 		"id": "void_drone",
 		"asset_key": "void_drone_v3",
@@ -35,6 +48,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 60, "min_run_level": 1 },
 		"abilities": ["spiral_approach", "contact_damage"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"red_scout": {
 		"id": "red_scout",
@@ -55,6 +69,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 20, "min_run_level": 3 },
 		"abilities": ["spiral_approach", "contact_damage"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"void_tank": {
 		"id": "void_tank",
@@ -75,6 +90,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 10, "min_run_level": 7 },
 		"abilities": ["spiral_approach", "contact_damage"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 
 	"void_boss": {
@@ -96,6 +112,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 0, "min_run_level": 10 },
 		"abilities": ["spiral_approach", "contact_damage", "guided_rockets"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"ranged_shooter": {
 		"id": "ranged_shooter",
@@ -116,6 +133,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 10, "min_run_level": 5 },
 		"abilities": ["spiral_approach", "range_control", "railgun_salvo"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"void_swarm": {
 		"id": "void_swarm",
@@ -136,6 +154,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 38, "min_run_level": 3 },
 		"abilities": ["cluster_spawn", "contact_damage"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"kamikaze": {
 		"id": "kamikaze",
@@ -156,6 +175,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 16, "min_run_level": 5 },
 		"abilities": ["charge_player", "explosive_contact"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"splitter": {
 		"id": "splitter",
@@ -176,6 +196,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 12, "min_run_level": 6 },
 		"abilities": ["split_on_death", "contact_damage"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 	"elite_hunter": {
 		"id": "elite_hunter",
@@ -196,6 +217,7 @@ const DEFINITIONS := {
 		"scaling": { "hp_multiplier": 1.115, "speed_multiplier": 1.0, "damage_multiplier": 1.14 },
 		"spawn": { "weight": 4, "min_run_level": 8 },
 		"abilities": ["elite_pressure", "charged_projectile"],
+		"resistances": [], "weaknesses": [], "immunities": [],
 	},
 }
 
@@ -209,10 +231,16 @@ const ELITE_MODIFIERS := {
 }
 
 static func get_definition(enemy_type_id: String) -> Dictionary:
-	return DEFINITIONS.get(enemy_type_id, DEFINITIONS[VOID_DRONE_ID])
+	var definition: Dictionary = DEFINITIONS.get(enemy_type_id, DEFINITIONS[VOID_DRONE_ID]).duplicate(true)
+	for key in ["resistances","weaknesses","immunities"]:
+		if not definition.has(key): definition[key] = []
+	return definition
 
 static func get_definitions() -> Dictionary:
-	return DEFINITIONS
+	var result := {}
+	for id in DEFINITIONS:
+		result[id] = get_definition(str(id))
+	return result
 
 static func get_stats(enemy_type_id: String, level: int, _elite_modifier := "") -> Dictionary:
 	var definition := get_definition(enemy_type_id)

@@ -2,9 +2,9 @@ extends RefCounted
 
 const RECHARGE_DELAY := 3.0
 
-static func absorb(player: Dictionary, damage: float) -> Dictionary:
+static func absorb(player: Dictionary, damage: float, recharge_delay := RECHARGE_DELAY) -> Dictionary:
 	if damage <= 0.0: return {"shield": 0.0, "hull": 0.0, "broken": false}
-	player.shield_delay = RECHARGE_DELAY
+	player.shield_delay = maxf(0.0,recharge_delay)
 	var before := maxf(0.0, float(player.get("shield", 0.0)))
 	var absorbed := minf(before, damage)
 	player.shield = before - absorbed

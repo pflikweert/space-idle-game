@@ -13,12 +13,23 @@ const LEVEL_PRICES := [
 	[180000,5400], [205000,6100], [225000,6750],
 ]
 
-const VERSION := 4
+const VERSION := 5
 const FIRST_CHOICE_XP := 160
 const XP_LEVEL_GROWTH := 2.0
 const MAX_CHOICES := 25
+const MAX_EXTRA_PRIMARY_PROJECTILES_PER_INSTANCE := 2
+const MAX_PRIMARY_PROJECTILES_PER_INSTANCE_VOLLEY := 3
+const MAX_SHATTER_FRAGMENTS_PER_PRIMARY := 4
+const MAX_SHATTER_FRAGMENTS_PER_INSTANCE_VOLLEY := 8
+const MAX_TOTAL_PROJECTILES_PER_INSTANCE_VOLLEY := 11
+const MAX_PIERCE_TARGETS_PER_PROJECTILE := 7
+const MAX_EXTRA_MAGAZINE := 10
+const MIN_RELOAD_FACTOR := 0.35
+const MIN_RELOAD_SECONDS := 0.8
+const MAX_CRITICAL_CHANCE := 1.0
+const MAX_RAMPAGE_STEPS := 5
 const EPIC_CHOICES := [4, 9, 16, 25]
-const XP := {"void_drone": 1, "red_scout": 2, "ranged_shooter": 3, "void_tank": 4, "void_boss": 15}
+const XP := {"void_drone": 1, "red_scout": 2, "ranged_shooter": 3, "void_tank": 4, "void_boss": 15, "armored_drone": 3}
 const CATALOG := [
 	{"id":"power", "art_key":"hero", "short_effect":"+20% damage", "name":"Power Railgun", "epic":false, "unlock":1, "cap":0, "effect":"+20% damage", "icon":"＋"},
 	{"id":"reload", "art_key":"hero", "short_effect":"Reload ×0.90", "name":"Quick Reload", "epic":false, "unlock":1, "cap":0, "effect":"Reload time ×0.90", "icon":"↻"},
@@ -31,6 +42,7 @@ const CATALOG := [
 	{"id":"critical", "art_key":"overcharge", "short_effect":"+5% crit chance", "name":"Critical Railgun", "epic":false, "unlock":10, "cap":3, "effect":"+5% critical chance", "icon":"✧"},
 	{"id":"shatter", "art_key":"shatter", "short_effect":"+2 fragments\n50% damage", "name":"Shatter Railgun", "epic":true, "unlock":14, "cap":4, "effect":"First hit: +2 aimed fragments at 50% damage", "icon":"⋔"},
 	{"id":"rampage", "art_key":"rampage", "short_effect":"+15% per hit\nMax 5 steps", "name":"Railgun Rampage", "epic":true, "unlock":18, "cap":4, "effect":"+15% damage per pierced enemy (max 5)", "icon":"ϟ"},
+	{"id":"super_missiles", "art_key":"overcharge", "short_effect":"30% chance per rocket\n3× damage · tighter turn", "name":"Super Missiles", "epic":true, "unlock":1, "cap":1, "requires_blueprint":"micro_missile_rack", "effect":"30% per rocket: gold Super Missile, 3× damage and faster homing", "icon":"✦"},
 ]
 
 static func definition(id: String) -> Dictionary:
@@ -41,7 +53,7 @@ static func definition(id: String) -> Dictionary:
 static func fresh(seed_value: int = 1) -> Dictionary:
 	var random := RandomNumberGenerator.new()
 	random.seed = seed_value
-	return {"version":VERSION, "xp":0, "choices":0, "ranks":{}, "offer":[], "rng":str(random.state), "modules":0}
+	return {"version":VERSION, "xp":0, "choices":0, "ranks":{"super_missiles":0}, "offer":[], "rng":str(random.state), "modules":0}
 
 static func threshold(state: Dictionary) -> int:
 	return ceili(FIRST_CHOICE_XP * pow(XP_LEVEL_GROWTH,clampi(int(state.choices),0,MAX_CHOICES)))
@@ -70,7 +82,13 @@ static func stars(state: Dictionary) -> String:
 static func is_unlocked(card: Dictionary, level: int, preserved: Array = []) -> bool:
 	return level >= int(card.unlock) or preserved.has(card.id)
 
-static func ensure_offer(state: Dictionary, level: int, base_crit := 0.0, preserved: Array = []) -> bool:
+static func effective_cap(card: Dictionary) -> int:
+	var cap := int(card.get("cap",0))
+	# Epic cards are build-defining choices: one equipped rank is the hard cap.
+	if bool(card.get("epic",false)): return 1
+	return cap
+
+static func ensure_offer(state: Dictionary, level: int, base_crit := 0.0, preserved: Array = [], equipped_blueprints: Array = []) -> bool:
 	if int(state.choices) >= MAX_CHOICES:
 		state.offer = []
 		return false
@@ -79,10 +97,16 @@ static func ensure_offer(state: Dictionary, level: int, base_crit := 0.0, preser
 	var pool: Array = []
 	for card in CATALOG:
 		if bool(card.epic) != is_epic(state) or not is_unlocked(card,level,preserved): continue
-		if int(card.cap) > 0 and int(state.ranks.get(card.id, 0)) >= int(card.cap): continue
+		var required_blueprint := str(card.get("requires_blueprint", ""))
+		if not required_blueprint.is_empty() and not equipped_blueprints.has(required_blueprint): continue
+		var cap := effective_cap(card)
+		if cap > 0 and int(state.ranks.get(card.id, 0)) >= cap: continue
 		if card.id == "critical" and base_crit + 0.05 * int(state.ranks.get("critical", 0)) >= 1.0: continue
 		pool.append(card.id)
 	var random := RandomNumberGenerator.new()
+	if pool.size() < 3:
+		state.offer = []
+		return false
 	random.state = int(state.rng)
 	for index in range(3):
 		var picked := random.randi_range(0, pool.size()-1)
@@ -101,6 +125,9 @@ static func auto_pick(state: Dictionary) -> String:
 
 static func choose(state: Dictionary, id: String) -> bool:
 	if int(state.choices) >= MAX_CHOICES or not state.offer.has(id) or int(state.xp) < threshold(state): return false
+	var selected := definition(id)
+	var cap := effective_cap(selected)
+	if cap > 0 and int(state.ranks.get(id,0)) >= cap: return false
 	state.xp = int(state.xp) - threshold(state)
 	state.choices = int(state.choices) + 1
 	state.ranks[id] = int(state.ranks.get(id, 0)) + 1
@@ -119,17 +146,20 @@ static func permanent_damage_multiplier(level: int) -> float:
 
 static func stats(state: Dictionary, level: int, base_damage: float, base_crit: float) -> Dictionary:
 	var ranks: Dictionary = state.ranks
+	var shots := mini(MAX_PRIMARY_PROJECTILES_PER_INSTANCE_VOLLEY,1 + mini(MAX_EXTRA_PRIMARY_PROJECTILES_PER_INSTANCE,int(ranks.get("twin",0))))
+	var fragments := mini(MAX_SHATTER_FRAGMENTS_PER_PRIMARY,2 * int(ranks.get("shatter",0)))
+	fragments = mini(fragments,mini(MAX_SHATTER_FRAGMENTS_PER_INSTANCE_VOLLEY,maxi(0,floori(float(MAX_TOTAL_PROJECTILES_PER_INSTANCE_VOLLEY) / float(maxi(1,shots))) - 1)))
 	return {
 		"damage": base_damage * permanent_damage_multiplier(level) * (1.0 + 0.20 * int(ranks.get("power",0)) + 0.50 * int(ranks.get("core",0)) + 0.25 * int(ranks.get("caliber",0))),
 		"crit": minf(1.0, base_crit + 0.05 * int(ranks.get("critical",0))),
 		"crit_multiplier": 2.0 + 0.10 * int(ranks.get("core",0)) + 0.25 * int(ranks.get("caliber",0)),
-		"reload": 3.0 * pow(0.90, int(ranks.get("reload",0))),
-		"magazine": 6 + int(ranks.get("magazine",0)),
-		"shots": 1 + int(ranks.get("twin",0)),
-		"hits": 1 + 2 * int(ranks.get("piercer",0)) + int(ranks.get("shredder",0)),
+		"reload": maxf(MIN_RELOAD_SECONDS,3.0 * maxf(MIN_RELOAD_FACTOR,pow(0.90, int(ranks.get("reload",0))))),
+		"magazine": 6 + mini(MAX_EXTRA_MAGAZINE,int(ranks.get("magazine",0))),
+		"shots": shots,
+		"hits": mini(MAX_PIERCE_TARGETS_PER_PROJECTILE,1 + 2 * int(ranks.get("piercer",0)) + int(ranks.get("shredder",0))),
 		"width": 1.0,
-		"fragments": 2 * int(ranks.get("shatter",0)),
-		"rampage": 0.15 * int(ranks.get("rampage",0)),
+		"fragments": fragments,
+		"rampage": 0.15 * mini(MAX_RAMPAGE_STEPS,int(ranks.get("rampage",0))),
 	}
 
 static func preview(id: String, state: Dictionary, level: int, damage: float, crit: float) -> String:
@@ -168,7 +198,10 @@ static func progress_fraction(state: Dictionary) -> float:
 	return 1.0
 
 static func migrate(state: Dictionary) -> Dictionary:
-	if int(state.get("version",1)) >= VERSION: return state
+	if int(state.get("version",1)) >= VERSION:
+		if not state.has("ranks") or not state.ranks is Dictionary: state.ranks = {}
+		state.ranks.super_missiles = int(state.ranks.get("super_missiles", 0))
+		return state
 	var n := int(state.choices)
 	var old_version := int(state.get("version",1))
 	var old_threshold := 40 + 20*n + 4*n*n
@@ -179,5 +212,7 @@ static func migrate(state: Dictionary) -> Dictionary:
 		state.offer = []
 	elif not state.offer.is_empty():
 		state.xp = maxi(int(state.xp),threshold(state))
+	if not state.has("ranks") or not state.ranks is Dictionary: state.ranks = {}
+	state.ranks.super_missiles = int(state.ranks.get("super_missiles", 0))
 	state.version = VERSION
 	return state

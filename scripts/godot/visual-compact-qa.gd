@@ -68,7 +68,7 @@ func capture() -> void:
 		game.status = "card_choice"
 		game._refresh_overlay()
 		await save_view("epic"+suffix)
-		game.profile.railgunLevel = 10
+		game._railgun_instance().level = 10
 		game.cards.choices = 24
 		game.cards.xp = Cards.threshold(game.cards)
 		game.cards.offer = ["core","shatter","rampage"]
@@ -87,7 +87,7 @@ func capture() -> void:
 		game.cards.modules = 1
 		game._end_run()
 		await save_view("result"+suffix)
-		game.profile.railgunLevel = 10
+		game._railgun_instance().level = 10
 		game._on_panel_action("railgun")
 		await save_view("max-level"+suffix)
 		game.save_error = true

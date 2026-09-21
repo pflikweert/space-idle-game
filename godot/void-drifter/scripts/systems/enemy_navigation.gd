@@ -3,6 +3,7 @@ extends RefCounted
 # Circumscribed opaque hull radius across all eight fixed idle/thrust canvases.
 # Measured at alpha >= 0.5, at the existing 0.48 display scale. Not hitboxes.
 const TYPES := {
+	"armored_drone": {"radius":17.0,"band":Vector2(0.56,0.72),"top":38.0,"turn":80.0,"orbit":0.62,"approach":35.0,"delay":1.0},
 	"void_drone": {"radius":9.35,"band":Vector2(0.38,0.48),"top":70.0,"turn":100.0,"orbit":0.76,"approach":25.0,"delay":0.75},
 	"red_scout": {"radius":16.36,"band":Vector2(0.84,0.92),"top":59.5,"turn":150.0,"orbit":0.46,"approach":115.0,"delay":3.0},
 	"void_tank": {"radius":19.68,"band":Vector2(0.70,0.80),"top":17.5,"turn":55.0,"orbit":0.56,"approach":230.0,"delay":8.0},

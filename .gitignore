@@ -49,6 +49,7 @@ app-example
 # generated native folders
 /ios
 /android
+/builds
 
 # editor
 .idea/

@@ -1,5 +1,7 @@
 extends PanelContainer
 
+const UI := preload("res://scripts/systems/ui_design_system.gd")
+
 signal selected(action: String)
 var title_label: RichTextLabel
 var summary_label: RichTextLabel
@@ -15,10 +17,12 @@ var ui_factor := 1.0
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.035, 0.04, 0.10, 0.96)
-	style.border_color = Color("#8bbdcb")
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
+	style.bg_color = Color(UI.INK, 0.94)
+	style.border_color = Color(UI.CYAN_SOFT, 0.9)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(10)
+	style.shadow_color = Color(UI.CYAN, 0.16)
+	style.shadow_size = 8
 	style.content_margin_left = 8
 	style.content_margin_right = 8
 	style.content_margin_top = 8
@@ -28,8 +32,10 @@ func _init() -> void:
 	background_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background_texture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background_texture.modulate = Color(1, 1, 1, 0.72)
+	background_texture.texture = load("res://assets/ui/theme/command_deck_backdrop_v1.png")
+	background_texture.modulate = Color(0.72, 0.86, 1.0, 0.14)
 	background_texture.z_index = 0
+	background_texture.visible = background_texture.texture != null
 	add_child(background_texture)
 	var body := VBoxContainer.new()
 	body.z_index = 1
@@ -39,30 +45,28 @@ func _init() -> void:
 	header.custom_minimum_size.y = 54
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var header_style := StyleBoxFlat.new()
-	header_style.bg_color = Color(0.02,0.12,0.18,0.50)
-	header_style.border_color = Color("#65eaff")
-	header_style.set_border_width_all(1)
-	header_style.border_width_left = 5
-	header_style.border_width_right = 5
-	header_style.corner_radius_top_left = 18
-	header_style.corner_radius_top_right = 5
-	header_style.corner_radius_bottom_left = 5
-	header_style.corner_radius_bottom_right = 18
-	header_style.shadow_color = Color(0.0,0.8,1.0,0.28)
-	header_style.shadow_size = 10
+	header_style.bg_color = Color(UI.SURFACE_RAISED, 0.94)
+	header_style.border_color = Color(UI.CYAN, 0.92)
+	header_style.set_border_width_all(2)
+	header_style.border_width_left = 8
+	header_style.border_width_right = 8
+	header_style.corner_radius_top_left = 25
+	header_style.corner_radius_top_right = 8
+	header_style.corner_radius_bottom_left = 8
+	header_style.corner_radius_bottom_right = 25
+	header_style.shadow_color = Color(UI.CYAN, 0.18)
+	header_style.shadow_size = 8
 	header.add_theme_stylebox_override("panel", header_style)
 	var header_content := VBoxContainer.new()
 	header.add_child(header_content)
 	title_label = _rich_label()
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_color_override("default_color", Color("#e9fbff"))
-	title_label.add_theme_font_size_override("font_size", 24)
+	UI.apply_rich_text(title_label, UI.DISPLAY_LARGE, UI.TEXT, true)
 	header_content.add_child(title_label)
 	summary_label = _rich_label()
 	summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary_label.add_theme_font_size_override("font_size", 15)
-	summary_label.add_theme_color_override("default_color", Color("#b9dbe4"))
+	UI.apply_rich_text(summary_label, UI.SECTION, UI.CYAN_SOFT, true)
 	header_content.add_child(summary_label)
 	body.add_child(header)
 	tabs_box = HBoxContainer.new()
@@ -89,6 +93,9 @@ func _clear(container: Node) -> void:
 
 func button(text: String, action: String, disabled := false) -> Button:
 	var control := Button.new()
+	var icon_path := _action_icon(action)
+	if not icon_path.is_empty() and ResourceLoader.exists(icon_path):
+		control.icon = load(icon_path)
 	if text.contains("◈"):
 		control.icon = load("res://assets/ui/icons/coin.svg")
 		text = text.replace("◈", "").strip_edges()
@@ -98,21 +105,27 @@ func button(text: String, action: String, disabled := false) -> Button:
 	control.text = text
 	control.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	control.disabled = disabled
-	control.custom_minimum_size.y = 44
+	control.custom_minimum_size.y = 50
 	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	control.add_theme_font_size_override("font_size", 19)
-	control.add_theme_color_override("default_color", Color("#e0e0ff"))
+	UI.apply_text(control, UI.BUTTON, UI.TEXT, true)
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := StyleBoxFlat.new()
-		style.bg_color = Color("#121228") if state != "pressed" else Color("#234052")
-		style.border_color = Color("#6070a0") if disabled else Color("#8bbdcb")
-		style.set_border_width_all(1)
-		style.set_corner_radius_all(4)
+		style.bg_color = Color(UI.SURFACE_RAISED) if state == "normal" else (Color("#123c4e") if state == "hover" else (Color("#062432") if state == "pressed" else Color("#111b29")))
+		style.border_color = UI.DISABLED if disabled else (UI.VIOLET if action.begins_with("blueprint") else UI.CYAN)
+		style.set_border_width_all(2)
+		style.corner_radius_top_left = 10
+		style.corner_radius_top_right = 4
+		style.corner_radius_bottom_left = 4
+		style.corner_radius_bottom_right = 10
+		style.shadow_color = Color(UI.CYAN, 0.16) if not disabled else Color.TRANSPARENT
+		style.shadow_size = 7 if not disabled else 0
+		style.content_margin_left = 10
+		style.content_margin_right = 10
 		control.add_theme_stylebox_override(state, style)
 	if action in ["start", "resume", "railgun_buy", "equip_card"]:
 		var primary = control.get_theme_stylebox("normal").duplicate()
-		primary.bg_color = Color("#b88f2d")
-		primary.border_color = Color("#edc254")
+		primary.bg_color = Color("#4e3810")
+		primary.border_color = UI.GOLD
 		control.add_theme_stylebox_override("normal", primary)
 	control.pressed.connect(func(): selected.emit(action))
 	return control
@@ -122,6 +135,14 @@ func show_content(title: String, summary: String, tabs: Array, entries: Array, a
 	title_label.text = title
 	summary_label.text = summary
 	header.visible = true
+	# Individual screens can temporarily shrink the content area (for example
+	# card choice and Hangar views). Restore the shared menu defaults whenever a
+	# new screen is built, otherwise the next menu can inherit a zero-height
+	# ScrollContainer and show only its header/footer.
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 0.0
+	rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	rows.custom_minimum_size.y = 0.0
 	_clear(tabs_box)
 	_clear(purchase_options)
 	purchase_options.visible = not quantities.is_empty()
@@ -148,8 +169,7 @@ func show_content(title: String, summary: String, tabs: Array, entries: Array, a
 		var label := _rich_label()
 		label.text = entry.text
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_size_override("font_size", 19)
-		label.add_theme_color_override("default_color", Color("#e0e0ff"))
+		UI.apply_rich_text(label, UI.BODY, UI.TEXT, true)
 		rows.add_child(label)
 		if entry.has("buttons"):
 			var row := HBoxContainer.new()
@@ -229,13 +249,21 @@ func set_overlay_background(texture: Texture2D, enabled := true) -> void:
 	background_texture.texture = texture
 	background_texture.visible = enabled and texture != null
 
+func _action_icon(action: String) -> String:
+	if action in ["start", "resume"]: return "res://assets/ui/icons/launch.svg"
+	if action == "manage_loadout": return "res://assets/ui/icons/loadout.svg"
+	if action == "ship_systems": return "res://assets/ui/icons/systems.svg"
+	if action == "blueprints" or action.begins_with("blueprint") or action.begins_with("view_blueprints"): return "res://assets/ui/icons/blueprints.svg"
+	if action == "back" or action.begins_with("back_"): return "res://assets/ui/icons/back.svg"
+	return ""
+
 func set_ui_factor(factor: float) -> void:
 	ui_factor = factor
 	_resize_controls(self, factor)
 
 func _resize_controls(node: Node, factor: float) -> void:
 	if node is Button:
-		node.custom_minimum_size.y = ceil(44.0 * factor)
+		node.custom_minimum_size.y = ceil(50.0 * factor)
 		node.add_theme_font_size_override("font_size", ceili(13.0 * factor))
 	elif node is TextureRect and node.has_meta("preview_size"):
 		node.custom_minimum_size = Vector2.ONE * minf(72,float(node.get_meta("preview_size"))) * factor
@@ -259,8 +287,7 @@ func _card_label(text: String, font_size: int, color: Color) -> RichTextLabel:
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.set_meta("base_font_size", mini(font_size, 15))
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("default_color", color)
+	UI.apply_rich_text(label, font_size, color, true)
 	return label
 
 func _add_upgrade_card(entry: Dictionary) -> void:
@@ -437,11 +464,7 @@ func _table_cell(text: String, is_name: bool, is_header: bool, detailed: bool) -
 	return cell
 
 func _rich_label() -> RichTextLabel:
-	var label := RichTextLabel.new()
-	label.bbcode_enabled = true
-	label.fit_content = true
-	label.scroll_active = false
-	return label
+	return UI.rich()
 
 func _icon_text(value: String, pixels: int) -> String:
 	var icons := {"◈":"coin","▣":"module","★":"star","☆":"star_empty","✦":"star","✓":"unlocked","◇":"lock","→":"arrow"}

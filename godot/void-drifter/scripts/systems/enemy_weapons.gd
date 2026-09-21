@@ -23,7 +23,7 @@ static func active_rockets(game, owner_id: int) -> int:
 static func pivot(game, enemy: Dictionary) -> Vector2:
 	var rocket := weapon_id(enemy) == "boss_rocket"
 	var definition: Dictionary = game._get_enemy_definition(str(enemy.type_id))
-	var scale: float = float(definition.visual_canvas_height) * game.COMBAT_SPRITE_SCALE / 512.0
+	var scale: float = float(definition.visual_canvas_height) * game.COMBAT_SPRITE_SCALE * game._gameplay_visual_scale() / 512.0
 	var anchor: Vector2 = LAUNCHERS[int(enemy.get("launcher_index", 0)) % 2] if rocket else Vector2(Weapons.cycle(weapon_id(enemy)).get("pivot", RAIL_PIVOT))
 	return enemy.position + ((anchor - Vector2(192, 256)) * scale).rotated(game._enemy_visual_rotation(enemy))
 
@@ -88,11 +88,13 @@ static func fire(game, enemy: Dictionary) -> void:
 		"position": start, "previous_position": start, "radius": 3.2 if rocket else 2.0,
 		"velocity": direction * (ROCKET_SPEED if rocket else Weapons.PROJECTILE_SPEED),
 		"damage": damage,
-		"damage_multiplier": 1.0, "life": life})
+		"damage_multiplier": 1.0, "life": life,
+		"visual_trail_points": [start]})
 	game.next_id += 1
 	# Detached real-time flash keeps its exact launcher/muzzle when the ship moves.
 	var flash: Dictionary = game.EffectRegistry.make("enemy_muzzle", start)
 	flash.direction = direction
+	flash.weapon_id = id
 	game._append_effect(flash)
 	enemy.attack_visual_timer = game.ENEMY_ATTACK_VISUAL_SECONDS
 	if rocket: enemy.launcher_index = (int(enemy.get("launcher_index", 0)) + 1) % 2
@@ -108,4 +110,5 @@ static func move_projectile(game, shot: Dictionary, delta: float) -> void:
 			var turn := clampf(wrapf(desired.angle() - velocity.angle(), -PI, PI), -ROCKET_TURN * step, ROCKET_TURN * step)
 			shot.velocity = velocity.rotated(turn)
 	shot.position += shot.velocity * step
+	game._append_projectile_visual_samples(shot,"visual_trail_points",5.0,48 if shot.get("weapon_id","") == "boss_rocket" else 24)
 	shot.life = maxf(0.0, float(shot.life) - delta)

@@ -3,6 +3,7 @@ export const FAST_HP_GROWTH_WAVES = 25;
 export const LATE_HP_MULTIPLIER = 1.025;
 
 export type EnemyTypeId =
+  | 'armored_drone'
   | 'void_boss'
   | 'void_drone'
   | 'red_scout'
@@ -14,6 +15,7 @@ export type EnemyTypeId =
   | 'elite_hunter';
 
 export type EnemyAssetKey =
+  | 'armored_drone_v1'
   | 'void_drone_v3'
   | 'red_scout_v3'
   | 'red_scout_drone'
@@ -45,6 +47,14 @@ export type EnemyAbility =
   | 'elite_pressure';
 
 export type EnemyStatus = 'active' | 'locked';
+
+export const DAMAGE_TYPES = ['kinetic', 'electricity', 'explosive', 'plasma', 'beam'] as const;
+export type DamageType = (typeof DAMAGE_TYPES)[number];
+export type DamageInteractionEntry = {
+  target_kind: 'family' | 'damage_type' | 'effect';
+  target_id: string;
+  multiplier: number;
+};
 
 export type EnemyDefinition = {
   id: EnemyTypeId;
@@ -79,6 +89,9 @@ export type EnemyDefinition = {
     minRunLevel: number;
   };
   abilities: EnemyAbility[];
+  resistances?: readonly DamageInteractionEntry[];
+  weaknesses?: readonly DamageInteractionEntry[];
+  immunities?: readonly DamageInteractionEntry[];
 };
 
 export type EnemyRuntimeStats = EnemyDefinition['baseStats'] & {
@@ -93,6 +106,17 @@ export type WaveIntelEntry = {
 };
 
 export const ENEMY_DEFINITIONS = [
+  {
+    id: 'armored_drone', assetKey: 'armored_drone_v1', name: 'Armored Drone', role: 'Armored chaser',
+    description: 'A reinforced chaser with a kinetic shell that yields to explosive impact.', status: 'active', unlockWave: 4,
+    archetype: 'armored_chaser', recommendedDisplaySize: 43, navigationRadius: 17,
+    flight: { orbitStrength: 0.62, approachSeconds: 35, approachDelaySeconds: 1, startRange: [0.56, 0.72] },
+    baseStats: { hp: 36, speed: 38, contactDamage: 2, contactInterval: 0.55, cashReward: 5, coinReward: 3, scoreReward: 36, radius: 17 },
+    scaling: { hpMultiplier: 1.115, speedMultiplier: 1, damageMultiplier: 1.14 }, spawn: { weight: 12, minRunLevel: 4 },
+    abilities: ['spiral_approach', 'contact_damage'],
+    resistances: [{ target_kind: 'damage_type', target_id: 'kinetic', multiplier: 0.75 }],
+    weaknesses: [{ target_kind: 'damage_type', target_id: 'explosive', multiplier: 1.25 }], immunities: [],
+  },
   {
     id: 'void_drone',
     navigationRadius: 9.35,
@@ -126,6 +150,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 1,
     },
     abilities: ['spiral_approach', 'contact_damage'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'red_scout',
@@ -160,6 +187,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 3,
     },
     abilities: ['spiral_approach', 'contact_damage'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'void_tank',
@@ -194,6 +224,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 7,
     },
     abilities: ['spiral_approach', 'contact_damage'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'void_boss',
@@ -228,6 +261,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 10,
     },
     abilities: ['spiral_approach', 'contact_damage', 'guided_rockets'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'ranged_shooter',
@@ -262,6 +298,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 5,
     },
     abilities: ['spiral_approach', 'range_control', 'railgun_salvo'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'void_swarm',
@@ -292,6 +331,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 3,
     },
     abilities: ['cluster_spawn', 'contact_damage'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'kamikaze',
@@ -322,6 +364,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 5,
     },
     abilities: ['charge_player', 'explosive_contact'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'splitter',
@@ -352,6 +397,9 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 6,
     },
     abilities: ['split_on_death', 'contact_damage'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
   {
     id: 'elite_hunter',
@@ -382,10 +430,22 @@ export const ENEMY_DEFINITIONS = [
       minRunLevel: 8,
     },
     abilities: ['elite_pressure', 'charged_projectile'],
+    resistances: [],
+    weaknesses: [],
+    immunities: [],
   },
 ] as const satisfies EnemyDefinition[];
 
 export const ACTIVE_ENEMY_TYPE_ID: EnemyTypeId = 'void_drone';
+
+export function getEnemyDamageProfile(enemyTypeId: EnemyTypeId) {
+  const definition = getEnemyDefinition(enemyTypeId);
+  return {
+    resistances: 'resistances' in definition ? definition.resistances : [],
+    weaknesses: 'weaknesses' in definition ? definition.weaknesses : [],
+    immunities: 'immunities' in definition ? definition.immunities : [],
+  };
+}
 
 export function getRunLevel(elapsedSeconds: number) {
   return 1 + Math.floor(elapsedSeconds / 35);

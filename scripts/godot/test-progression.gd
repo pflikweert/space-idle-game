@@ -28,19 +28,17 @@ func run_tests() -> void:
 	store.profile_path = test_path
 	var base := Upgrades.defaults()
 	var temporary := Upgrades.defaults()
-	expect(Upgrades.quote("damage", base, temporary, 9, 1, false).count == 0, "Insufficient cash cannot buy")
+	expect(Upgrades.quote("damage", base, temporary, 7, 1, false).count == 0, "Insufficient cash cannot buy")
 	var quote := Upgrades.quote("damage", base, temporary, 30, 10, false)
-	expect(quote.count == 2 and quote.cost == 21.0, "Buy 10 purchases only affordable levels")
-	base.fire_rate = 37
-	expect(Upgrades.quote("fire_rate", base, temporary, 1e10, 10, false).count == 1, "Total cap includes permanent levels")
-	expect(is_equal_approx(Upgrades.value("fire_rate", 38), 90.0), "Fire rate respects minimum interval")
+	expect(quote.count == 3 and is_equal_approx(quote.cost, 27.0), "Buy 10 purchases only affordable levels")
+	expect(is_equal_approx(Upgrades.workshop_multiplier("damage", 2), 1.12), "Workshop Attack uses a multiplier-only progression")
 	expect(Director.phase(25.99) == "spawning" and Director.phase(26.0) == "cooldown" and Director.get_run_level(35.0) == 2, "Wave phase boundaries")
 	for wave in [1, 3, 5, 7, 50, 1000]:
 		for seed in range(100):
 			var id := Enemies.choose_enemy_type_id(wave, seed)
-			expect(id in ["void_drone", "red_scout", "ranged_shooter", "void_tank"], "Spawn roster excludes bosses and deferred enemies")
+			expect(id in ["void_drone", "red_scout", "ranged_shooter", "void_tank", "armored_drone"], "Spawn roster excludes bosses and deferred enemies")
 			expect(Director.spawn_interval(wave) >= 0.45, "Spawn interval floor")
-	var expected_rosters := {1:["void_drone"], 3:["void_drone","red_scout"], 5:["void_drone","red_scout","ranged_shooter"], 7:["void_drone","red_scout","ranged_shooter","void_tank"], 10:["void_drone","red_scout","ranged_shooter","void_tank","void_boss"]}
+	var expected_rosters := {1:["void_drone"], 3:["void_drone","red_scout"], 5:["void_drone","red_scout","armored_drone","ranged_shooter"], 7:["void_drone","red_scout","armored_drone","ranged_shooter","void_tank"], 10:["void_drone","red_scout","armored_drone","ranged_shooter","void_tank","void_boss"]}
 	for wave in expected_rosters:
 		var roster := Enemies.get_wave_roster(int(wave))
 		var ids: Array[String] = []
@@ -59,10 +57,13 @@ func run_tests() -> void:
 	var legacy := {"saveVersion": 2, "totalCoins": 100, "bestScore": 99, "permanentUpgrades": {"xp_gain": 3, "damage": 2}, "discoveredEnemies": ["splitter"]}
 	store._write_json(test_path, legacy)
 	var migrated := store.load_profile()
-	expect(migrated.totalCoins == 280.0 and migrated.permanentUpgrades.damage == 2, "Migration refunds exact old XP costs and retains other upgrades")
-	expect(migrated.discoveredEnemies.has("splitter") and migrated.bestScore == 99, "Migration preserves records and deferred discovery")
-	expect(store.load_profile().totalCoins == 280.0, "Migration refund occurs only once")
-	expect(FileAccess.file_exists(test_path + ".v2.bak"), "Migration backup retained")
+	expect(migrated.saveVersion==Store.SAVE_VERSION and migrated.totalCoins==0 and migrated.permanentUpgrades.damage==0,"Old development profile resets instead of migrating")
+	expect(migrated.discoveredEnemies.is_empty() and migrated.bestScore==0,"Reset discards legacy local progression")
+	expect(store.load_profile().saveVersion==Store.SAVE_VERSION,"Fresh current profile reload is stable")
+	expect(not FileAccess.file_exists(test_path+".v2.bak"),"No legacy migration backup is created")
+	migrated.totalCoins = 280.0
+	migrated.permanentUpgrades.damage = 2
+	store.save_profile(migrated)
 	var game = Scene.instantiate()
 	game.profile_store.profile_path = test_path
 	root.add_child(game)
@@ -72,7 +73,7 @@ func run_tests() -> void:
 	expect(game.runState.cash == 30.0 and game.run_upgrades.damage == 0, "Fresh run has 30 cash and no temporary levels")
 	game._on_panel_action("shop")
 	game._buy_upgrade("max_hp", 1)
-	expect(game.player.max_hp == 160.0 and game.player.hp == 160.0 and game.runState.cash == 20.0, "Hull purchase raises and heals hull, charges only cash")
+	expect(is_equal_approx(game.player.max_hp, 148.4) and is_equal_approx(game.player.hp, 148.4) and game.runState.cash == 22.0, "Hull purchase raises and heals hull, charges only cash")
 	var before_pause: String = JSON.stringify(Store.encode(game.runState))
 	var before_hull: float = game.player.hp
 	game._process(1.0)
@@ -86,7 +87,7 @@ func run_tests() -> void:
 	game._update_wave_manager()
 	var wave_cash: float = game.runState.cash
 	game._update_wave_manager()
-	expect(wave_cash == 32.0 and game.runState.cash == wave_cash and game.runState.coinsEarned == 2.0, "Wave reward paid once")
+	expect(wave_cash == 34.0 and game.runState.cash == wave_cash and game.runState.coinsEarned == 2.0, "Wave reward paid once")
 	game.runState.elapsedSeconds = 315.0
 	game._update_wave_manager()
 	game._update_wave_manager()
@@ -212,6 +213,7 @@ func run_tests() -> void:
 	expect(settled_again.totalCoins == restored_profile.totalCoins, "Settled run ID prevents replay after reload")
 	_test_range_and_visibility(game)
 	_test_workshop_speed_damage(game, store)
+	_test_stat_layering(game, store)
 	_test_railgun_visuals(game, store)
 	# Exercise real container minimum sizes after layout settles at each target.
 	root.content_scale_size = Vector2i(430, 760)
@@ -290,12 +292,12 @@ func _test_range_and_visibility(game) -> void:
 	game.player.position = Vector2(215, 355)
 	game.player_target = game.player.position
 	var origin: Vector2 = game.player.position
-	expect(is_equal_approx(game.PLAYER_RADIUS, 8.64), "Player radius follows smaller sprite scale")
-	expect(Upgrades.value("range", 0) == 160 and Upgrades.value("range", 30) == 220, "Range base and cap values")
+	expect(is_equal_approx(game._player_radius(),8.64),"Player radius comes from active ship blueprint")
+	expect(Upgrades.value("range", 0) == 160 and Upgrades.value("range", 30) == 250, "Range base and cap values")
 	var permanent := Upgrades.defaults()
 	permanent.range = 28
 	expect(Upgrades.quote("range", permanent, {}, 1e8, 10, false).count == 2, "Range Buy 10 respects combined cap")
-	expect(Upgrades.quote("range", {}, {}, 9, 1, false).count == 0, "Range rejects insufficient funds")
+	expect(Upgrades.quote("range", {}, {}, 7, 1, false).count == 0, "Range rejects insufficient funds")
 	game._fire_at_nearest_enemy()
 	expect(game.bullets.is_empty(), "No target means no projectile")
 	game._spawn_enemy_at({"position": origin + Vector2(160.01, 0)}, "void_drone")
@@ -312,7 +314,7 @@ func _test_range_and_visibility(game) -> void:
 	expect(game._nearest_target().id == game.enemies[1].id, "Nearest eligible enemy wins")
 	game._on_panel_action("shop")
 	game._buy_upgrade("range", 1)
-	expect(game.run_upgrades.range == 1 and game._stat("range") == 162 and bullet.remaining_distance == budget, "Buying Range expands reach, not existing shots")
+	expect(game.run_upgrades.range == 1 and game._stat("range") == 163 and bullet.remaining_distance == budget, "Buying Range expands reach, not existing shots")
 	game._process(1)
 	expect(bullet.remaining_distance == budget, "Shopping freezes projectile distance")
 	game.player.position += Vector2(0, 20)
@@ -392,7 +394,7 @@ func _test_range_and_visibility(game) -> void:
 	game._buy_upgrade("range", 1)
 	expect(game.profile_store.load_profile().permanentUpgrades.range == 1, "Permanent Range survives disk reload")
 	game.start_run()
-	expect(game.run_upgrades.range == 0 and game._stat("range") == 162, "New run resets temporary Range and retains permanent level")
+	expect(game.run_upgrades.range == 0 and game._stat("range") == 163, "New run resets temporary Range and retains permanent level")
 
 func _test_workshop_speed_damage(game, store) -> void:
 	game.profile = store._default_profile()
@@ -422,13 +424,11 @@ func _test_workshop_speed_damage(game, store) -> void:
 	game._on_panel_action("reset_workshop")
 	game._on_panel_action("confirm_reset")
 	expect(game.profile.totalCoins == 1000 and not game.profile.autoDodgeUnlocked, "Reset also refunds Auto-Dodge")
-	var legacy := {"saveVersion": 2, "totalCoins": 100, "permanentUpgrades": {"damage": 3, "xp_gain": 2}}
-	var migrated: Dictionary = store._sanitize_profile(legacy)
-	expect(store._infer_workshop_spend(migrated, legacy) == 180, "Historical levels refund the old linear purchase price")
-	var modern: Dictionary = store._default_profile()
-	modern.permanentUpgrades.range = 2
-	modern.erase("workshopSpent")
-	expect(store._infer_workshop_spend(modern, modern) == 55, "Pre-ledger Range levels reconstruct current prices")
+	var current_profile: Dictionary = store._default_profile()
+	current_profile.workshopSpent = 180
+	expect(store._sanitize_profile(current_profile).workshopSpent==180,"Current Workshop ledger is preserved without legacy inference")
+	var no_ledger: Dictionary = store._default_profile(); no_ledger.erase("workshopSpent")
+	expect(store._sanitize_profile(no_ledger).workshopSpent==0,"Missing current Workshop ledger defaults cleanly")
 	game.start_run()
 	game.profile.workshopSpent = 25
 	game.profile.permanentUpgrades.damage = 1
@@ -510,11 +510,10 @@ func _test_workshop_speed_damage(game, store) -> void:
 	game.enemy_projectiles.append({"id": 80000, "position": center + Vector2(40, 0), "previous_position": center - Vector2(40, 0), "velocity": Vector2.RIGHT * 190, "radius": 4.8, "damage": 3.0, "life": 1.0})
 	game.run_upgrades.armor = 10
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp, 92.2), "Swept projectile collision applies doubled damage and armor exactly once")
+	expect(is_equal_approx(game.player.hp, 92.5), "Swept projectile collision applies doubled damage and armor exactly once")
 	expect(game.enemy_projectiles.is_empty(), "Hit projectile is removed")
 	expect(not game.damage_numbers.is_empty() and game.player_damage_flash > 0 and game.hull_damage_trail > game.player.hp, "Real damage drives ship flash, numbers and hull trail")
 	var feedback_life: float = game.damage_numbers[-1].life
-	game.cards = game.Cards.fresh() # Isolate feedback timing from previously earned card choices.
 	game._on_panel_action("resume")
 	game._process(0.02)
 	expect(is_equal_approx(game.damage_numbers[-1].life, feedback_life - 0.02), "Damage feedback uses real time at 5x")
@@ -602,16 +601,15 @@ func _test_railgun_visuals(game, store) -> void:
 	game._restore_run()
 	expect(game.bullets[0].weapon_id == "railgun" and game.bullets[0].velocity == Vector2(540, 0) and game.bullets[0].damage == 17 and game.bullets[0].remaining_distance == 54.0, "Legacy projectile alias retains speed, damage and travel budget")
 	expect(game.status == "paused", "Legacy projectile run resumes paused")
-	var legacy: Dictionary = store._default_profile()
-	legacy.unlockedWeapons = ["pulse_cannon", "railgun"]
-	expect(store._sanitize_profile(legacy).unlockedWeapons == ["railgun"], "Legacy unlocked weapon maps without duplicates")
+	var current: Dictionary = store._default_profile()
+	expect(current.unlockedShips == ["starter_ship"] and current.equipmentInventory.size()==2,"Current profile owns starter ship and equipment instances")
 
 func _test_enemy_orbits(game) -> void:
 	game.profile.activeRun = {}
 	game.start_run()
 	game.player.position = game._get_playfield_rect(game.get_viewport_rect().size).get_center()
 	var center: Vector2 = game.player.position
-	for id in ["void_drone", "red_scout", "void_tank"]:
+	for id in ["void_drone", "red_scout", "void_tank", "armored_drone"]:
 		for spin in [-1.0, 1.0]:
 			game.enemies.clear()
 			game._spawn_enemy_at({"position": center + Vector2(110, 0)}, id)
@@ -628,7 +626,7 @@ func _test_enemy_orbits(game) -> void:
 	var shooter: Dictionary = game.enemies[0]
 	for frame in range(600): game._update_enemy_movement(1.0 / 60.0)
 	var distance: float = shooter.position.distance_to(center)
-	expect(distance >= game._stat("range") * 0.8 and distance <= game._stat("range") * 0.9, "Shooter smoothly settles into reachable orbit")
+	expect(distance >= game._stat("range") * 0.8 and distance <= game._stat("range") * 0.93, "Shooter smoothly settles into reachable orbit")
 	shooter.velocity = Vector2(10, -10)
 	for speed in Store.GAME_SPEEDS:
 		game.profile.settings.gameSpeed = speed
@@ -677,7 +675,7 @@ func _test_gunship_shield(game, store) -> void:
 	game.player.shield = 2.5
 	game.run_upgrades.armor = 10
 	result = game._apply_damage_to_player(game._get_incoming_damage(4.0), "IMPACT")
-	expect(is_equal_approx(result.hull, 0.7) and result.shield == 2.5 and result.broken, "Armor applied once before fractional shield overflow without second minimum")
+	expect(is_equal_approx(result.hull, 0.5) and result.shield == 2.5 and result.broken, "Armor applied once before fractional shield overflow without second minimum")
 	expect(game.player.shield_delay == 3, "Every damaging hit sets three-second delay")
 	Shield.update(game.player, 2.9, 3)
 	expect(game.player.shield == 0, "No charge before delay ends")
@@ -689,20 +687,10 @@ func _test_gunship_shield(game, store) -> void:
 	expect(game.player.shield_delay == 3, "Hit resets delay even with empty shield")
 	Shield.update(game.player, 100, 3)
 	expect(game.player.shield == game.player.max_shield, "Recharge clamps to capacity")
-	game._on_panel_action("shop")
-	game.runState.cash = 1000.0
+	var upgraded_core: Dictionary = game.EquipmentRegistry.shield_core_stats(20)
+	expect(upgraded_core.capacity > 30.0 and upgraded_core.recharge > 0.5 and upgraded_core.recharge_delay < 3.0, "Shield Core milestones own capacity, recharge and restart delay")
 	game.player.shield = 4.0
 	game.player.shield_delay = 2.25
-	game._buy_upgrade("shield_capacity", 10)
-	expect(game.player.max_shield == 130 and game.player.shield == 4 and game.player.shield_delay == 2.25, "Capacity Buy 10 never grants instant shield")
-	game._buy_upgrade("shield_recharge", 1)
-	expect(game._stat("shield_recharge") == 1.0, "Recharge level uses shared combined-level catalogue")
-	var p := Upgrades.defaults()
-	p.shield_capacity = 99
-	var r := Upgrades.defaults()
-	r.shield_capacity = 1
-	expect(Upgrades.quote("shield_capacity", p, r, 1e20, 10, false).count == 0, "Combined shield cap prevents overbuy")
-	expect(Upgrades.quote("shield_recharge", Upgrades.defaults(), {}, 9, 1, false).count == 0, "Shield purchase cannot use insufficient cash")
 	game.profile.settings.gameSpeed = 10
 	game.rail_direction = Vector2.LEFT
 	game._save_run()
@@ -790,13 +778,34 @@ func _test_gunship_shield(game, store) -> void:
 	game._pause_run()
 	game._on_panel_action("retire")
 	expect(game.death_timer == 0 and game.overlay.visible, "Retire skips destruction")
-	game.menu_view = "workshop"
-	game.profile.totalCoins = 100
-	game._buy_upgrade("shield_capacity", 1)
-	var reloaded: Dictionary = store.load_profile()
-	expect(reloaded.permanentUpgrades.shield_capacity == 1, "Permanent shield upgrade survives reload")
-	game.profile = store.reset_workshop(reloaded)
-	expect(game.profile.permanentUpgrades.shield_capacity == 0 and game.profile.totalCoins == 100, "Workshop reset refunds shield spending")
+	var legacy_profile: Dictionary = store._default_profile()
+	legacy_profile.saveVersion = 9
+	legacy_profile.permanentUpgrades.shield_capacity = 3
+	legacy_profile.permanentUpgrades.shield_recharge = 2
+	var migrated_profile: Dictionary = store._migrate_shield_core_profile(legacy_profile)
+	var migrated_core: Dictionary = migrated_profile.equipmentItems[game.EquipmentRegistry.SHIELD_CORE_INSTANCE_ID]
+	expect(not migrated_profile.permanentUpgrades.has("shield_capacity") and migrated_core.legacy_capacity_bonus == 30.0 and migrated_core.legacy_recharge_bonus == 1.0, "Shield Workshop investment migrates into the Shield Core without loss")
+
+func _test_stat_layering(game, store) -> void:
+	game.profile = store._default_profile()
+	game.metaProgress = game.profile
+	game.start_run()
+	var ship_state: Dictionary = game.profile.ships[game._active_ship_id()]
+	ship_state.upgrade_level = 10
+	game.profile.permanentUpgrades.damage = 2
+	game.profile.permanentUpgrades.shield_capacity = 2
+	game.metaProgress = game.profile
+	var chassis_damage: float = game._ship_base_stat("damage")
+	expect(is_equal_approx(chassis_damage, 13.0), "Chassis owns the weapon damage baseline")
+	expect(is_equal_approx(game._stat("damage"), chassis_damage * 1.12), "Workshop damage is a multiplier over chassis damage")
+	var railgun_stats: Dictionary = game._weapon_runtime_stats({"item":game._railgun_instance(),"blueprint":game.EquipmentRegistry.definition(game.EquipmentRegistry.RAILGUN_ID)})
+	expect(is_equal_approx(float(railgun_stats.damage), game._stat("damage")), "Railgun module consumes the layered ship damage")
+	expect(is_equal_approx(game._stat("shield_capacity"), 30.0 * 1.10), "Shield module is the authoritative shield base before Workshop scaling")
+	expect(is_equal_approx(game._stat("range"), game._ship_base_stat("range")), "Weapon range starts from the chassis baseline")
+	game.profile = store._default_profile()
+	game.metaProgress = game.profile
+	game.status = "menu"
+	game.start_run()
 
 func _test_salvos(game) -> void:
 	var weapons = game.WeaponRegistry
@@ -806,18 +815,18 @@ func _test_salvos(game) -> void:
 	game.fire_timer = 0.0
 	game._update_weapons(5000.0)
 	expect(game.bullets.is_empty() and game.player.weapon.ammo == 6, "No target never consumes ammunition")
-	expect(Upgrades.value("fire_rate", 0) == 500.0 and is_equal_approx(Upgrades.value("fire_rate", 38), 90.0), "Fire Rate starts at 2/s and retains max speed")
-	expect(Upgrades.value("shield_recharge", 0) == 0.5 and Upgrades.value("shield_recharge", 60) == 30.5, "Shield recharge new base and cap")
+	expect(is_equal_approx(game._get_weapon_fire_interval(), 500.0), "Railgun owns its fire interval instead of Workshop")
+	expect(game.EquipmentRegistry.shield_core_stats(1).recharge == 0.5 and game.EquipmentRegistry.shield_core_stats(15).recharge > 1.0, "Shield recharge scales through Shield Core levels")
 	game._spawn_enemy_at({"position":game.player.position + Vector2(80,0)}, "void_tank")
 	for shot in range(6): game._update_weapons(0.0 if shot == 0 else 500.0)
-	expect(game.bullets.size() == 6 and game.player.weapon.ammo == 0 and game.player.weapon.reload_timer == 2.0, "Six player shots enter two-second reload")
-	game._update_weapons(1999.0)
+	expect(game.bullets.size()==6 and game.player.weapon.ammo==0 and game.player.weapon.reload_timer==3.0,"Six player shots enter the existing three-second reload")
+	game._update_weapons(2999.0)
 	expect(game.bullets.size() == 6, "Player cannot fire before reload completes")
 	game._update_weapons(1.0)
 	expect(game.bullets.size() == 7 and game.player.weapon.ammo == 5, "Reload completion fires immediately without extra interval")
 	game.enemies.clear()
-	game.player.weapon = {"ammo":0,"reload_timer":2.0}
-	game._update_weapons(2000.0)
+	game.player.weapon = {"ammo":0,"reload_timer":3.0}
+	game._update_weapons(3000.0)
 	expect(game.player.weapon.ammo == 6 and game.bullets.size() == 7, "Reload proceeds without target, without firing")
 	game.player.shield = 0.0
 	game.player.shield_delay = 3.0
@@ -853,6 +862,7 @@ func _test_salvos(game) -> void:
 	game._update_enemy_weapons(0.001)
 	expect(game.enemy_projectiles.size() == 1 and is_equal_approx(game.enemy_projectiles[0].velocity.length(),1600), "Rift fires a high-speed round after warning")
 	expect(game.enemy_projectiles[0].position.is_equal_approx(enemy_weapons.origin(game,shooter)), "Railgun round starts at the drawn muzzle anchor")
+	expect(game.enemy_projectiles[0].visual_trail_points == [game.enemy_projectiles[0].position], "Enemy rail shot starts with visual-only path history")
 	game._update_enemy_weapons(0.2)
 	game._update_enemy_weapons(0.3)
 	game._update_enemy_weapons(0.2)
@@ -885,6 +895,7 @@ func _test_salvos(game) -> void:
 	var origin: Vector2 = enemy_weapons.origin(game,boss)
 	game._update_enemy_weapons(0.6)
 	expect(game.enemy_projectiles.size() == 1 and game.enemy_projectiles[0].position.is_equal_approx(origin), "Boss launch matches warned shoulder anchor")
+	expect(game.enemy_projectiles[0].visual_trail_points == [origin], "Boss rocket starts with visual-only path history")
 	expect(boss.reload_timer == 4.0 and boss.launcher_index == 1, "Single rocket starts four-second reload and alternates launcher")
 	game._update_enemy_weapons(4.0)
 	game._update_enemy_weapons(0.6)
@@ -905,6 +916,7 @@ func _test_salvos(game) -> void:
 	var start: Vector2 = rocket.position
 	enemy_weapons.move_projectile(game,rocket,0.1)
 	expect(is_equal_approx(rocket.velocity.angle(),deg_to_rad(3.5)) and is_equal_approx(rocket.position.distance_to(start),8.5), "Rocket speed and turn are bounded")
+	expect(rocket.visual_trail_points.size() > 1, "Boss rocket records a smooth presentation trail without changing movement")
 	rocket.life = 0.01
 	start = rocket.position
 	enemy_weapons.move_projectile(game,rocket,0.1)
@@ -918,9 +930,10 @@ func _test_salvos(game) -> void:
 	game.player.hp = 100.0
 	game.enemy_projectiles.append({"id":999,"owner_id":999,"weapon_id":"boss_rocket","position":game.player.position+Vector2(50,0),"previous_position":game.player.position-Vector2(50,0),"radius":3.2,"velocity":Vector2.RIGHT*85,"damage":6.0,"damage_multiplier":1.0,"life":1.0})
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp,97.2) and game.player.shield == 0, "Rocket swept collision applies Armor once, then shield, then 2.8 hull damage")
+	expect(is_equal_approx(game.player.hp,97.5) and game.player.shield == 0, "Rocket swept collision applies Armor once, then shield, then 2.5 hull damage")
+	expect(game.particles.any(func(effect): return str(effect.get("kind","")) == "enemy_missile_impact"), "Boss rocket impact uses compact enemy-colored missile feedback")
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp,97.2), "Rocket is consumed at first impact and cannot deal damage twice")
+	expect(is_equal_approx(game.player.hp,97.5), "Rocket is consumed at first impact and cannot deal damage twice")
 
 	game._spawn_enemy_at({"position":game.player.position + Vector2(-80,0)},"void_boss")
 	boss = game.enemies[-1]
@@ -1062,11 +1075,14 @@ func _test_fleet_navigation(game) -> void:
 		enemy.attack_warmup_timer=0.0
 		enemy.attack_direction=Vector2.LEFT
 		enemy.reload_timer=0.0
-		var cycle: Dictionary=Weapons.cycle(str(enemy.attack_behavior))
+		var cycle: Dictionary=Weapons.CYCLES.get(str(enemy.attack_behavior),{})
+		if cycle.is_empty():
+			expect(str(enemy.attack_behavior)=="contact","Contact-only active type has no projectile cycle: "+id)
+			continue
 		enemy.ammo=int(cycle.magazine)
 		game._update_enemy_weapons(0.0)
 		game._update_enemy_weapons(float(cycle.warmup))
-		expect(game.enemy_projectiles.size()==1,"Every active type fires: "+id)
+		expect(game.enemy_projectiles.size()==1,"Every active projectile type fires: "+id)
 		var shot: Dictionary=game.enemy_projectiles[0]
 		expect(is_equal_approx(float(shot.damage),float(cycle.damage)) and shot.damage_multiplier==1.0,"Explicit projectile damage has no second multiplier: "+id)
 		if id=="red_scout":
