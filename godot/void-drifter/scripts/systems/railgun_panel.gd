@@ -8,6 +8,7 @@ const ShipRegistry := preload("res://scripts/systems/ship_registry.gd")
 const ModuleProgression := preload("res://scripts/systems/module_progression.gd")
 const WeaponStats := preload("res://scripts/systems/weapon_stat_resolver.gd")
 const Upgrades := preload("res://scripts/systems/upgrade_registry.gd")
+const CurrencyUI := preload("res://scripts/systems/ui_design_system.gd")
 const LOADOUT_DISPLAY_FONT := preload("res://assets/ui/fonts/Oxanium-Variable.ttf")
 var loadout_bold_font: FontVariation
 var wide_cards := false
@@ -210,7 +211,7 @@ func _show_ship_systems(game: Control) -> void:
 	rows.add_child(stats)
 	_add_chassis_stat_card(stats,"HULL", "%.0f" % game._ship_base_stat("max_hp"), "Effective %.0f" % game._stat("max_hp"), "+8 / level", Color("#75eaf5"), "res://assets/ui/icons/hull.svg")
 	_add_chassis_stat_card(stats,"REGEN", "%.2f /s" % game._ship_base_stat("regen"), "Effective %.2f /s" % game._stat("regen"), "+0.04 / level", Color("#69f0bc"), "res://assets/ui/icons/regen.svg")
-	_add_chassis_stat_card(stats,"ARMOR", "%.1f%%" % (game._ship_base_stat("armor") * 100.0), "Effective %.1f%%" % (game._stat("armor") * 100.0), "+0.3% / level", Color("#c68cff"), "res://assets/ui/icons/upgrade_chevrons.svg")
+	_add_chassis_stat_card(stats,"ARMOR", "Rating %.1f" % game._armor_rating(game._ship_base_stat("armor")), "Effective %.1f%% DR" % (game._armor_damage_reduction_for(game._stat("armor")) * 100.0), "+0.3 rating / level", Color("#c68cff"), "res://assets/ui/icons/upgrade_chevrons.svg")
 	_add_chassis_stat_card(stats,"ATTACK", "%.1f" % game._ship_base_stat("damage"), "Effective %.1f" % game._stat("damage"), "+0.5 / level", Color("#ffd45f"), "res://assets/ui/icons/hangar_damage.svg")
 
 	var next_panel := _hangar_panel(Color("#102033"),8)
@@ -224,7 +225,7 @@ func _show_ship_systems(game: Control) -> void:
 		next_stack.add_child(_loadout_label("All chassis improvements are unlocked.",11,Color("#c7e7ef")))
 	else:
 		next_stack.add_child(_loadout_label("NEXT CALIBRATION  ·  LV.%d" % next_level,12,Color("#b9f3ff")))
-		next_stack.add_child(_loadout_label("HULL +8   ·   REGEN +0.04/s   ·   ARMOR +0.3%%   ·   ATTACK +0.5",11,Color("#d7f7ff")))
+		next_stack.add_child(_loadout_label("HULL +8   ·   REGEN +0.04/s   ·   ARMOR RATING +0.3   ·   ATTACK +0.5",11,Color("#d7f7ff")))
 		next_stack.add_child(_loadout_label("Upgrade cost  ◈ %s" % game._money(float(cost)),12,Color("#ffd45f")))
 
 	var footer_actions := HBoxContainer.new()
@@ -232,7 +233,7 @@ func _show_ship_systems(game: Control) -> void:
 	footer.add_child(footer_actions)
 	footer_actions.add_child(_detail_action_button("UPGRADE CHASSIS", "ship_upgrade", locked or level >= cap or float(game.profile.totalCoins) < cost, accent, "res://assets/ui/icons/upgrade_chevrons.svg"))
 	footer_actions.add_child(_detail_action_button("WORKSHOP", "workshop", false, Color("#b965ff")))
-	footer.add_child(_hangar_button("BACK TO HANGAR", "back", false, Color("#8bbdcb")))
+	footer.add_child(_hangar_button("BACK TO LOADOUT", "back", false, Color("#8bbdcb")))
 	_add_resume_run_button(game)
 
 func _slot_count(ship: Dictionary, slot_type: String) -> int:
@@ -323,6 +324,7 @@ func _show_loadout(game: Control) -> void:
 		if str(slot.get("type","")) == "weapon": weapons += 1
 		else: systems += 1
 	show_content("DRIFTER LOADOUT","%d/%d WEAPONS  ·  %d/%d SYSTEMS" % [weapons,weapon_total,systems,system_total],[],[],[])
+	_add_active_ship_summary(game, ship)
 	if game.hangar_selected_equipment.is_empty():
 		for slot in ship.get("slots",[]):
 			var initial_item := Loadouts.installed_instance(game.profile,str(slot.get("id","")))
@@ -360,8 +362,38 @@ func _show_loadout(game: Control) -> void:
 				break
 	if not selected_item.is_empty(): _add_loadout_selection_detail(game,selected_item,narrow_loadout)
 	_add_reserve_summary(game)
-	footer.add_child(_hangar_button("BACK TO HANGAR","back",false,Color("#8bbdcb")))
+	footer.add_child(_hangar_button("BACK", "back", false, Color("#8bbdcb")))
 	_add_resume_run_button(game)
+
+func _add_active_ship_summary(game: Control, ship: Dictionary) -> void:
+	var state: Dictionary = game.profile.get("ships", {}).get(str(ship.get("id", "")), {})
+	var panel := _hangar_panel(Color("#071b2b"), 8)
+	panel.name = "ActiveShipSummary"
+	rows.add_child(panel)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 6 * rail_ui_factor)
+	panel.add_child(stack)
+	var identity := HBoxContainer.new()
+	identity.add_theme_constant_override("separation", 9 * rail_ui_factor)
+	stack.add_child(identity)
+	var art := TextureRect.new()
+	art.texture = load(str(ship.get("art", {}).get("hangar", "")))
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.custom_minimum_size = Vector2(58, 58) * rail_ui_factor
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	identity.add_child(art)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity.add_child(words)
+	words.add_child(_loadout_label("ACTIVE SHIP  ·  %s" % str(ship.get("name", "DRIFTER")).to_upper(), 14, Color("#f1fbff")))
+	words.add_child(_loadout_label("CHASSIS LV.%d/%d  ·  %d WEAPON  ·  %d SYSTEM" % [int(state.get("upgrade_level", 0)), ShipRegistry.SHIP_LEVEL_CAP, _slot_count(ship, "weapon"), _slot_count(ship, "system")], 10, Color("#a9c6d8")))
+	words.add_child(_loadout_label("HULL %.0f  ·  SHIELD %.0f  ·  ATTACK %.1f" % [game._stat("max_hp"), game._stat("shield_capacity"), game._stat("damage")], 10, Color("#d7f7ff")))
+	var routes := HBoxContainer.new()
+	routes.add_theme_constant_override("separation", 6 * rail_ui_factor)
+	stack.add_child(routes)
+	routes.add_child(_detail_action_button("CHASSIS BAY", "ship_systems", false, Color("#8bbdcb"), "res://assets/ui/icons/systems.svg"))
+	routes.add_child(_detail_action_button("BLUEPRINTS", "blueprints", false, Color("#b965ff"), "res://assets/ui/icons/blueprints.svg"))
 
 func _add_loadout_selection_detail(game: Control, item: Dictionary, compact := false) -> void:
 	var blueprint: Dictionary = Equipment.definition(str(item.get("blueprint_id","")))
@@ -622,9 +654,9 @@ func _equipment_upgrade_button(game: Control, item: Dictionary, blueprint: Dicti
 	caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	line.add_child(caption)
 	_add_upgrade_cost_separator(line,disabled)
-	_add_upgrade_cost(line,"res://assets/ui/icons/coin.svg",str(int(cost.get("coins",0))) if not at_cap else "--",disabled)
+	_add_upgrade_cost(line,CurrencyUI.currency_path("credits"),str(int(cost.get("coins",0))) if not at_cap else "--",disabled)
 	_add_upgrade_cost_separator(line,disabled)
-	_add_upgrade_cost(line,"res://assets/ui/icons/module.svg",str(int(cost.get("modules",0))) if not at_cap else "--",disabled)
+	_add_upgrade_cost(line,CurrencyUI.currency_path("boss_module"),str(int(cost.get("modules",0))) if not at_cap else "--",disabled)
 	control.pressed.connect(func(): selected.emit("upgrade_equipment_detail:%s" % str(item.get("id",""))))
 	return control
 
@@ -969,7 +1001,7 @@ func _show_blueprints(game: Control) -> void:
 			var unlocked: bool = game.profile.get("unlockedEquipmentBlueprints",[]).has(str(blueprint_id))
 			var caption := "%s\n%s · %s" % [str(blueprint.get("name","UNKNOWN")).to_upper(),_blueprint_status(game,str(blueprint_id)),str(blueprint.get("damage_type",blueprint.get("item_type",""))).to_upper()]
 			rows.add_child(_hangar_button(caption,"blueprint_detail:%s" % str(blueprint_id),false,Color("#00e5ff") if unlocked else Color("#597080")))
-	footer.add_child(_hangar_button("BACK TO HANGAR","back",false,Color("#8bbdcb")))
+	footer.add_child(_hangar_button("BACK TO LOADOUT","back",false,Color("#8bbdcb")))
 	_add_resume_run_button(game)
 
 func _show_blueprint_detail(game: Control) -> void:
@@ -1022,8 +1054,8 @@ func _add_blueprint_build_requirements(game: Control, blueprint: Dictionary) -> 
 	stack.add_theme_constant_override("separation",8 * rail_ui_factor)
 	panel.add_child(stack)
 	stack.add_child(_loadout_label("BUILD REQUIREMENTS",14,Color("#dffaff")))
-	_add_build_cost_row(stack,"res://assets/ui/icons/coin.svg","CREDITS",_format_build_amount(owned_coins),_format_build_amount(required_coins),coins_ready)
-	_add_build_cost_row(stack,"res://assets/ui/icons/module.svg","BOSS MODULES",str(owned_modules),str(required_modules),modules_ready)
+	_add_build_cost_row(stack,CurrencyUI.currency_path("credits"),"CREDITS",_format_build_amount(owned_coins),_format_build_amount(required_coins),coins_ready)
+	_add_build_cost_row(stack,CurrencyUI.currency_path("boss_module"),"BOSS MODULES",str(owned_modules),str(required_modules),modules_ready)
 	var state_text := "READY · ITEM WILL BE ADDED TO RESERVE"
 	var state_color := Color("#69f0bc")
 	if _hangar_locked(game):
@@ -1095,7 +1127,7 @@ func _hangar_permanent_level(game: Control, id: String) -> int:
 	return Upgrades.level(id, game.profile.get("permanentUpgrades", {}), {})
 
 func _hangar_stat_value(game: Control, id: String) -> float:
-	return game._stat(id)
+	return game._armor_damage_reduction() if id == "armor" else game._stat(id)
 
 func _add_hangar_stat_row(parent: Control, game: Control, label: String, icon_path: String, stat_id: String, accent: Color) -> void:
 	var row := PanelContainer.new()
@@ -1232,6 +1264,7 @@ func _add_loadout_slot_card(parent: Control, slot: Dictionary, blueprint: Dictio
 	var accent := _loadout_slot_accent(blueprint,empty)
 	var glow_color := _loadout_detail_glow_color(blueprint)
 	var shell := PanelContainer.new()
+	shell.name = "LoadoutSlot_%s" % str(slot.get("id", ""))
 	var shell_style := _loadout_slot_style(accent,empty)
 	if is_selected and not empty:
 		shell_style.bg_color = Color(glow_color,0.24)
@@ -1251,6 +1284,15 @@ func _add_loadout_slot_card(parent: Control, slot: Dictionary, blueprint: Dictio
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shell.add_child(frame)
+	# The card-wide selection hit area must be behind every visible child so the
+	# module switch remains an independent, clickable control.
+	var tap := Button.new()
+	tap.flat = true
+	tap.mouse_filter = Control.MOUSE_FILTER_PASS
+	tap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for state in ["normal","hover","pressed","disabled"]: tap.add_theme_stylebox_override(state,StyleBoxEmpty.new())
+	tap.pressed.connect(func(): selected.emit("hangar_slot:%s" % str(slot.get("id",""))))
+	shell.add_child(tap)
 	var padding := MarginContainer.new()
 	var inset_left := 16.0 if compact else 20.0
 	var inset_right := 8.0 if compact else 20.0
@@ -1264,14 +1306,6 @@ func _add_loadout_slot_card(parent: Control, slot: Dictionary, blueprint: Dictio
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation",4 * rail_ui_factor if compact else 12 * rail_ui_factor)
 	padding.add_child(line)
-	# Keep the card-wide selection hit area behind the content so the module
-	# switch receives the tap instead of the card button.
-	var tap := Button.new()
-	tap.flat = true
-	tap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for state in ["normal","hover","pressed","disabled"]: tap.add_theme_stylebox_override(state,StyleBoxEmpty.new())
-	tap.pressed.connect(func(): selected.emit("hangar_slot:%s" % str(slot.get("id",""))))
-	shell.add_child(tap)
 	var slot_code := _loadout_label(str(slot.get("id","")).to_upper(),13 if compact else 20,accent)
 	slot_code.custom_minimum_size = Vector2(26 if compact else 38,0) * rail_ui_factor
 	slot_code.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1325,32 +1359,31 @@ func _add_loadout_slot_card(parent: Control, slot: Dictionary, blueprint: Dictio
 		words.add_child(_loadout_label(_loadout_name_lines(str(blueprint.get("name","UNKNOWN"))),10 if compact else 15,module_color))
 		words.add_child(_loadout_label("Lv.%d" % int(item.get("level",1)),11 if compact else 16,accent))
 	if not empty:
-		var toggle := Button.new()
 		# A quiet pill keeps the enabled state visible without competing with the
 		# module name. The dot acts as the thumb and shifts with the state.
-		toggle.text = "●"
+		var toggle := PanelContainer.new()
 		toggle.tooltip_text = "Disable this slot during the run" if slot_enabled else "Enable this slot during the run"
-		toggle.custom_minimum_size = Vector2(46 if compact else 54,10 if compact else 12) * rail_ui_factor
+		toggle.custom_minimum_size = Vector2(32 if compact else 38,14 if compact else 16) * rail_ui_factor
 		toggle.size_flags_horizontal = Control.SIZE_SHRINK_END
 		toggle.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		toggle.alignment = HORIZONTAL_ALIGNMENT_RIGHT if slot_enabled else HORIZONTAL_ALIGNMENT_LEFT
-		toggle.add_theme_font_size_override("font_size",7 if compact else 8)
-		for toggle_state in ["normal","hover","pressed"]:
-			var toggle_style := StyleBoxFlat.new()
-			toggle_style.bg_color = Color("#123b43") if slot_enabled else Color("#1a2630")
-			toggle_style.border_color = Color("#69efc2") if slot_enabled else Color("#536a76")
-			toggle_style.set_border_width_all(1)
-			toggle_style.set_corner_radius_all(9)
-			toggle_style.content_margin_left = 2 * rail_ui_factor
-			toggle_style.content_margin_right = 2 * rail_ui_factor
-			toggle.add_theme_stylebox_override(toggle_state,toggle_style)
-		toggle.add_theme_color_override("font_color",Color("#8ff6d1") if slot_enabled else Color("#718894"))
-		toggle.pressed.connect(func(): selected.emit("toggle_slot:%s" % str(slot.get("id",""))))
-		var toggle_holder := CenterContainer.new()
-		toggle_holder.custom_minimum_size.x = (46 if compact else 54) * rail_ui_factor
-		toggle_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		line.add_child(toggle_holder)
-		toggle_holder.add_child(toggle)
+		var toggle_style := StyleBoxFlat.new()
+		toggle_style.bg_color = Color("#123b43") if slot_enabled else Color("#1a2630")
+		toggle_style.border_color = Color("#69efc2") if slot_enabled else Color("#536a76")
+		toggle_style.set_border_width_all(1)
+		toggle_style.set_corner_radius_all(8)
+		toggle.add_theme_stylebox_override("panel",toggle_style)
+		var knob := Label.new()
+		knob.text = "●"
+		knob.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if slot_enabled else HORIZONTAL_ALIGNMENT_LEFT
+		knob.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		knob.add_theme_font_size_override("font_size",8 if compact else 9)
+		knob.add_theme_color_override("font_color",Color("#8ff6d1") if slot_enabled else Color("#718894"))
+		toggle.add_child(knob)
+		toggle.gui_input.connect(func(event):
+			if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT) or (event is InputEventScreenTouch and event.pressed):
+				selected.emit("toggle_slot:%s" % str(slot.get("id","")))
+		)
+		line.add_child(toggle)
 
 func _equipment_stats(game: Control, item: Dictionary, blueprint: Dictionary) -> Dictionary:
 	if str(blueprint.get("item_type","")) == "weapon": return game._weapon_runtime_stats({"item":item,"blueprint":blueprint})
@@ -1481,7 +1514,7 @@ func _show_upgrade(game: Control, level: int) -> void:
 	var item: Dictionary = game._railgun_instance()
 	var rarity := str(item.get("rarity", "common")).to_upper()
 	var cap := 40 if rarity == "COMMON" else 80
-	show_content("[center]RAILGUN  Lv.%d[/center]" % level,"%s MODULE  ·  ◈ %s  ▣ %d" % [rarity,game._money(game.profile.totalCoins),game.profile.railgunModules],[],[],[])
+	show_content("[center]RAILGUN  Lv.%d[/center]" % level,"%s MODULE" % rarity,[],[],[])
 	var current: Dictionary = game._railgun_stats()
 	var next_item := item.duplicate(true)
 	next_item.level = mini(cap, level + 1)

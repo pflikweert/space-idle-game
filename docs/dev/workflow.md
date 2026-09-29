@@ -21,6 +21,10 @@ npm run godot:export:web
 Use `local-browser-testing.md` for web-facing changes. Do not start a long-lived
 server unless requested.
 
+For installing the Godot Android build on a connected USB device, use
+[`mobile-install.md`](mobile-install.md). It records the Android preset, the
+temporary JDK fallback, the non-incremental ADB install and the launcher check.
+
 ## Documentation
 
 `../project/void-drifter-game-reference.md` is the only canonical product

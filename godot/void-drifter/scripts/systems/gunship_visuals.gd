@@ -25,6 +25,7 @@ func load_art(game, ship: Dictionary) -> void:
 		textures[state] = game._load_png_texture(str(combat_states.get(state,"")))
 	textures.shield_idle = game._load_png_texture(str(art.get("shield_idle","")))
 	textures.shield_break = game._load_png_texture(str(art.get("shield_break","")))
+	textures.shield_impact = game._load_png_texture("res://assets/vfx/shield/shield-impact.png")
 
 func combat_height() -> float:
 	return float(presentation.get("combat_height",120.0))
@@ -42,6 +43,14 @@ func local_anchor_offset(anchor: Vector2) -> Vector2:
 
 func weapon_muzzle_offset() -> float:
 	return float(presentation.get("weapon_muzzle_offset",12.0))
+
+func shield_height() -> float:
+	return combat_height() * float(presentation.get("shield_height_multiplier",1.4))
+
+func deflector_radius() -> float:
+	# The authored radius follows the opaque outer hex boundary instead of the
+	# wider glow, keeping collision and the visible field in the same place.
+	return float(presentation.get("deflector_radius",shield_height() * 0.44))
 
 func reset(hp_fraction := 1.0) -> void:
 	bank = 0.0
@@ -128,15 +137,18 @@ func draw(game) -> void:
 		var point := center + Vector2(side * 24.0, 7.0).rotated(bank)
 		game.draw_line(point, point + Vector2(side * (2.0 + 3.0 * absf(sin(time * 22))), 0).rotated(bank), Color(0.35,0.9,1,0.7), 1.1, true)
 	var charged := float(game.player.shield) / maxf(1.0, float(game.player.max_shield))
-	var shield_height := combat_height() * float(presentation.get("shield_height_multiplier",1.4))
+	var shield_height := shield_height()
 	if charged > 0.0 and shield_visibility > 0.0:
 		var idle_alpha := (0.025 + charged * 0.085) * shield_visibility
 		game._draw_centered_texture(textures.shield_idle, center, shield_height, 0.0, Color(0.72,0.96,1.0,idle_alpha))
 	if shield_flash > 0.0:
 		var impact_progress := 1.0 - shield_flash / 0.24
 		var impact_alpha := sin(impact_progress * PI)
-		var impact_center := center + Vector2.from_angle(hit_angle) * shield_height * 0.32
+		var impact_center := center + Vector2.from_angle(hit_angle) * deflector_radius()
 		var blast_radius := lerpf(2.0, 8.0, impact_progress)
+		# The localized sprite reads as a deflection point, not a second full shield.
+		if textures.shield_impact != null:
+			game._draw_centered_texture(textures.shield_impact,impact_center,lerpf(28.0,42.0,impact_progress),hit_angle-PI,Color(0.48,0.94,1.0,impact_alpha*0.68))
 		# Keep shield contact feedback distinct from the continuous shield contour: this is
 		# a compact, blue energy burst rather than the old half-shield wave asset.
 		game.draw_circle(impact_center, blast_radius, Color(0.12,0.72,1.0,impact_alpha * 0.08))
@@ -152,7 +164,7 @@ func draw(game) -> void:
 		var break_alpha := (1.0 - break_progress) * 0.86
 		game._draw_centered_texture(textures.shield_break, center, lerpf(shield_height * 1.05,shield_height * 1.45,break_progress), 0.0, Color(0.72,0.96,1.0,break_alpha))
 	if hull_flash > 0.0:
-		var point := center + Vector2.from_angle(hit_angle) * 19.0
+		var point := center + Vector2.from_angle(hit_angle) * deflector_radius()
 		var alpha := hull_flash / 0.24
 		game.draw_circle(point, (4.0 if heavy_hit else 2.5) * alpha, Color(1,0.8,0.55,alpha))
 		for index in range(5):

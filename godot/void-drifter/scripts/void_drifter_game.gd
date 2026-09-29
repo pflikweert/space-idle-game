@@ -25,9 +25,16 @@ const REFERENCE_VIEWPORT_WIDTH := 430.0
 const REFERENCE_VIEWPORT_HEIGHT := 760.0
 const MAX_NATIVE_UI_FACTOR := 2.4
 const MAX_GAMEPLAY_VISUAL_FACTOR := 1.55
+const TIER_ONE_GOAL_WAVE := 100
+const TIER_ONE_REWARDS := [
+	{"id":"tier_1_w20", "wave":20, "type":"cache", "credits":10000, "modules":10, "title":"SECTOR CACHE", "detail":"Credits and Modules.", "badge":"W20", "art":"res://assets/ui/currency/credits_v1.png"},
+	{"id":"tier_1_w40", "wave":40, "type":"blueprint", "title":"RAILGUN", "detail":"Blueprint", "badge":"W40", "art":"res://assets/ui/weapon_cards/starter_railgun.png"},
+	{"id":"tier_1_w60", "wave":60, "type":"cache", "credits":50000, "modules":20, "title":"DEEP-SPACE CACHE", "detail":"Credits and Modules.", "badge":"W60", "art":"res://assets/ui/currency/boss_module_v1.png"},
+	{"id":"tier_1_w80", "wave":80, "type":"blueprint", "title":"MISSILE ARRAY", "detail":"Blueprint", "badge":"W80", "art":"res://assets/ui/weapon_cards/micro_missile_rack.png"},
+	{"id":"tier_1_w100", "wave":100, "type":"tier", "title":"TIER 2", "detail":"Sector unlock · New zone", "badge":"W100", "art":"res://assets/ui/icons/blueprints.svg"},
+]
 
 # Gameplay tuning
-const FIRST_ENEMY_SPAWN_DELAY := 1350.0
 const PLAYER_FIRE_INTERVAL := 500.0
 const PLAYER_BOUNDS_PADDING := 10.0
 # Sized for the 430px mobile reference viewport; canvas stretch handles smaller screens.
@@ -54,6 +61,8 @@ const ENEMY_DAMAGE_FLASH_SECONDS := 0.16
 const PLAYER_DAMAGE_FLASH_SECONDS := 0.38
 const FIRST_IMPACT_MULTIPLIER := 2.0
 const PROJECTILE_DAMAGE_MULTIPLIER := 2.0
+const ARMOR_RATING_MULTIPLIER := 100.0
+const ARMOR_DAMAGE_SCALE := 100.0
 const MICRO_MISSILE_HOMING_TURN_RATE := 8.0
 const MICRO_MISSILE_RETARGET_CORRECTION_DISTANCE := 42.0
 const MICRO_MISSILE_RETARGET_TURN_RATE := 15.0
@@ -70,6 +79,7 @@ const MICRO_MISSILE_SMALL_TRAIL_SAMPLE_DISTANCE := 3.0
 const MICRO_MISSILE_SMALL_MAX_TRAIL_POINTS := 10
 const MICRO_MISSILE_SMALL_TRAIL_LENGTH := 38.0
 const MICRO_MISSILE_SMALL_SCALE := 0.52
+const WEAPON_SLOT_FIRE_DELAY_SECONDS := 0.010
 const RAILGUN_TRAIL_SAMPLE_DISTANCE := 5.0
 const RAILGUN_MAX_TRAIL_POINTS := 24
 const RAILGUN_VISUAL_TRAIL_LENGTH := 105.0
@@ -144,6 +154,7 @@ var empty_weapon_slots: Array[Control] = []
 var enemy_damage_numbers: Array[Dictionary] = []
 var blueprint_notice := ""
 var blueprint_notice_timer := 0.0
+var fracture_field_home_backdrop: Texture2D
 var reward_dirty := false
 var buy_quantity := 1
 var damage_numbers: Array[Dictionary] = []
@@ -157,6 +168,11 @@ var codex_detail_id := ""
 var codex_detail_origin := "codex"
 var codex_detail_wave := 1
 var rng := RandomNumberGenerator.new()
+var encounter_seed := 0
+var encounter_state: Dictionary = {}
+var presentation_signals: Array[Dictionary] = []
+var sector_transition := {"from":"", "to":"", "remaining":0.0, "duration":1.25}
+var current_sector_id := "dead_relay"
 var run_id := ""
 var save_timer := 0.0
 var manual_override := 0.0
@@ -194,6 +210,7 @@ var runState := {
 }
 var run_upgrades := UpgradeRegistry.defaults()
 var menu_view := "main"
+var navigation_return_view := "main"
 var hangar_selected_slot := ""
 var hangar_selected_equipment := ""
 var hangar_blueprint_filter := "weapons"
@@ -228,7 +245,6 @@ var kills := 0
 var score := 0
 var elapsed := 0.0
 var background_time := 0.0
-var spawn_timer := FIRST_ENEMY_SPAWN_DELAY
 var fire_timer := PLAYER_FIRE_INTERVAL * 0.6
 var next_id := 1
 var pointer_down := false
@@ -276,6 +292,8 @@ func _ready() -> void:
 	_load_enemy_textures_from_registry()
 	for index in [0, 2]:
 		background_textures.append(load(PARALLAX_LAYERS[index].path))
+	for sector in BACKGROUND_SECTORS:
+		sector_textures.append(load(str(sector.path)))
 	reset_world("menu")
 	if not profile.activeRun.is_empty():
 		_restore_run()
@@ -397,6 +415,11 @@ func reset_world(next_status: String) -> void:
 		"elapsedSeconds": 0.0,
 		"realElapsedSeconds": 0.0,
 		"fleetOrbitSign": 1.0,
+		"encounterSeed": 0,
+		"encounterId": "",
+		"encounterCursor": 0,
+		"sectorId": "dead_relay",
+		"sectorThreatTier": 1,
 	}
 	run_upgrades = UpgradeRegistry.defaults()
 	run_enemy_kills = {}
@@ -433,7 +456,6 @@ func reset_world(next_status: String) -> void:
 	score = 0
 	elapsed = 0.0
 	background_time = 0.0
-	spawn_timer = FIRST_ENEMY_SPAWN_DELAY
 	fire_timer = PLAYER_FIRE_INTERVAL * 0.6
 	next_id = 1
 	pointer_down = false
@@ -446,6 +468,11 @@ func reset_world(next_status: String) -> void:
 	weapon_runtime_by_item_id = {}
 	save_timer = 0.0
 	last_boss_wave = 0
+	encounter_seed = 0
+	encounter_state = {}
+	presentation_signals.clear()
+	sector_transition = {"from":"", "to":"", "remaining":0.0, "duration":1.25}
+	current_sector_id = "dead_relay"
 	manual_override = 0.0
 	auto_timer = 0.0
 	stored_viewport = size
@@ -467,8 +494,11 @@ func start_run() -> void:
 		save_error = not profile_store.save_profile(profile)
 	reset_world("running")
 	run_id = "%d-%d" % [Time.get_unix_time_from_system() * 1000, rng.randi()]
+	encounter_seed = rng.randi()
+	runState.encounterSeed = encounter_seed
 	_initialize_weapon_runtime()
 	runState.fleetOrbitSign = -1.0 if rng.randi() % 2 == 0 else 1.0
+	_prepare_encounter(1)
 	_save_run()
 	_refresh_overlay()
 
@@ -547,16 +577,36 @@ func _update_wave_manager() -> bool:
 		runState.cash = float(runState.cash) + (10.0 + 2.0 * completed + _stat("cash_wave")) * _stat("cash_bonus")
 		runState.coinsEarned = float(runState.coinsEarned) + 2.0 * _stat("coin_bonus")
 		runState.wave = completed + 1
-		if int(runState.wave) % 10 == 0 and last_boss_wave != int(runState.wave):
-			last_boss_wave = int(runState.wave)
-			if _count_bosses() < DirectorSystem.MAX_BOSSES:
-				_spawn_enemy_at(_get_regular_spawn_position(EnemyRegistry.BOSS_ID), EnemyRegistry.BOSS_ID)
+		_prepare_encounter(int(runState.wave))
+		if DirectorSystem.phase(float(runState.elapsedSeconds)) == "spawning":
+			for instruction in DirectorSystem.spawn_instructions_due(encounter_state, 0.0):
+				_spawn_encounter_instruction(instruction)
 		wave_message = "BOSS INBOUND" if int(runState.wave) % 10 == 0 else "WAVE %d" % int(runState.wave)
 		wave_message_timer = 1.5
 		wave_pulse = 0.55
 		audio_events.emit(AudioEvents.WAVE_CLEAR, {"wave": completed})
 	runState.phase = DirectorSystem.phase(float(runState.elapsedSeconds))
 	return changed
+
+func _prepare_encounter(wave: int) -> void:
+	if encounter_seed == 0:
+		encounter_seed = absi(hash(run_id))
+	var previous_sector := current_sector_id
+	encounter_state = DirectorSystem.build_encounter(maxi(1, wave), encounter_seed, str(runState.get("encounterId", "")))
+	current_sector_id = str(encounter_state.get("sector", {}).get("id", "dead_relay"))
+	if previous_sector != "" and previous_sector != current_sector_id:
+		sector_transition = {"from":previous_sector, "to":current_sector_id, "remaining":1.25, "duration":1.25}
+		var sector_name := str(encounter_state.get("sector", {}).get("name", current_sector_id))
+		presentation_signals.append({"kind":"sector", "text":sector_name, "accent":"sector", "essential":true, "remaining":1.25, "duration":1.25})
+		wave_message = sector_name
+		wave_message_timer = 1.25
+	runState.encounterSeed = encounter_seed
+	runState.encounterId = str(encounter_state.get("id", ""))
+	runState.encounterCursor = 0
+	runState.sectorId = current_sector_id
+	runState.sectorThreatTier = int(encounter_state.get("sector", {}).get("threat_tier", 1))
+	if int(wave) % 10 == 0:
+		presentation_signals.append({"kind":"boss", "text":"%s INBOUND" % str(encounter_state.get("boss_variant", "BOSS")).replace("_", " ").to_upper(), "accent":"boss", "essential":true, "remaining":1.25, "duration":1.25})
 
 func _update_player(delta: float) -> void:
 	player_target = _clamp_point_to_playfield(player_target)
@@ -577,22 +627,31 @@ func _update_player(delta: float) -> void:
 
 func _update_enemy_spawning(delta_ms: float) -> void:
 	if runState.phase != "spawning":
-		spawn_timer = 0.0
 		return
-	spawn_timer -= delta_ms
-	if spawn_timer <= 0.0:
-		var interval := DirectorSystem.spawn_interval(int(runState.wave)) * 1000.0
-		# Preserve fractional frame time, but discard missed attempts after a long step.
-		spawn_timer = interval + fmod(spawn_timer, interval)
-		if enemies.size() - _count_bosses() < DirectorSystem.MAX_NORMAL:
-			_spawn_enemy()
+	if encounter_state.is_empty() or int(encounter_state.get("wave", 0)) != int(runState.wave):
+		_prepare_encounter(int(runState.wave))
+	var cycle_elapsed := fmod(float(runState.elapsedSeconds), DirectorSystem.WAVE_SECONDS)
+	for instruction in DirectorSystem.spawn_instructions_due(encounter_state, cycle_elapsed):
+		_spawn_encounter_instruction(instruction)
+	runState.encounterCursor = int(encounter_state.get("cursor", 0))
+
+func _spawn_encounter_instruction(instruction: Dictionary) -> void:
+	var enemy_type_id := str(instruction.get("enemy_id", EnemyRegistry.VOID_DRONE_ID))
+	var is_boss := enemy_type_id == EnemyRegistry.BOSS_ID
+	if is_boss:
+		last_boss_wave = int(runState.wave)
+		if _count_bosses() >= DirectorSystem.MAX_BOSSES: return
+	elif not bool(encounter_state.get("normal_spawns", true)) or enemies.size() - _count_bosses() >= DirectorSystem.MAX_NORMAL:
+		return
+	var position_data := _get_regular_spawn_position(enemy_type_id, str(instruction.get("edge", "")))
+	_spawn_enemy_at(position_data, enemy_type_id, instruction)
 
 func _spawn_enemy() -> void:
 	var run_level := int(runState.wave)
 	var enemy_type_id := _choose_enemy_type_id(run_level, rng.randi())
 	_spawn_enemy_at(_get_regular_spawn_position(enemy_type_id), enemy_type_id)
 
-func _spawn_enemy_at(spawn_data: Dictionary, enemy_type_id := "") -> void:
+func _spawn_enemy_at(spawn_data: Dictionary, enemy_type_id := "", encounter_instruction: Dictionary = {}) -> void:
 	var size := get_viewport_rect().size
 	var run_level := int(runState.wave)
 	var resolved_enemy_type_id := enemy_type_id
@@ -625,6 +684,13 @@ func _spawn_enemy_at(spawn_data: Dictionary, enemy_type_id := "") -> void:
 		"score_reward": stats.score_reward,
 		"movement_behavior": str(definition.get("movement_behavior", "chase")),
 		"attack_behavior": str(definition.get("attack_behavior", "contact")),
+		"weapon_enabled": bool(encounter_instruction.get("weapon_enabled", true)),
+		"formation": str(encounter_instruction.get("formation", "legacy")),
+		"encounter_role": str(encounter_instruction.get("primary_role", "legacy")),
+		"boss_variant": str(encounter_instruction.get("boss_variant", "")),
+		"boss_phase": 1,
+		"charge_warning_timer": 0.65 if resolved_enemy_type_id == EnemyRegistry.KAMIKAZE_ID else 0.0,
+		"reward_multiplier": float(encounter_instruction.get("reward_multiplier", 1.0)),
 		"resistances": definition.get("resistances",[]).duplicate(true),
 		"weaknesses": definition.get("weaknesses",[]).duplicate(true),
 		"immunities": definition.get("immunities",[]).duplicate(true),
@@ -650,11 +716,11 @@ func _spawn_enemy_at(spawn_data: Dictionary, enemy_type_id := "") -> void:
 		enemies[-1].fire_cooldown = rng.randf_range(0.5, float(WeaponRegistry.cycle(str(definition.attack_behavior)).reload))
 	_mark_enemy_discovered(resolved_enemy_type_id)
 
-func _get_regular_spawn_position(enemy_type_id: String) -> Dictionary:
+func _get_regular_spawn_position(enemy_type_id: String, requested_edge := "") -> Dictionary:
 	var bounds := _get_playfield_rect(get_viewport_rect().size)
 	var stats := EnemyRegistry.get_stats(enemy_type_id, int(runState.wave))
 	var edges := ["top", "right", "bottom", "left"]
-	var edge: String = edges[rng.randi_range(0, 3)]
+	var edge: String = requested_edge if requested_edge in edges else edges[rng.randi_range(0, 3)]
 	var inset := float(stats.radius) * COMBAT_SPRITE_SCALE + 4.0
 	var position := bounds.position + Vector2(rng.randf(), rng.randf()) * bounds.size
 	if edge == "top":
@@ -741,9 +807,10 @@ func _runtime_target(runtime: Dictionary) -> Dictionary:
 	var nearest := {}; var stats: Dictionary = _weapon_runtime_stats({"item":profile.equipmentItems.get(str(runtime.item_id),{}),"blueprint":EquipmentRegistry.definition(str(runtime.blueprint_id))})
 	var target_range := _weapon_target_range(str(runtime.blueprint_id), stats)
 	var distance_limit := target_range * target_range
+	var mount_position := _weapon_mount_position(runtime)
 	for enemy in enemies:
 		if float(enemy.hp) <= 0.0 or not _enemy_is_visible(enemy): continue
-		var distance: float = player.position.distance_squared_to(enemy.position)
+		var distance: float = mount_position.distance_squared_to(enemy.position)
 		if distance <= distance_limit: nearest = enemy; distance_limit = distance
 	return nearest
 
@@ -834,6 +901,7 @@ func _update_weapons(delta_ms: float) -> void:
 			railgun_runtime.ammo = int(player.weapon.get("ammo",railgun_runtime.ammo)); railgun_runtime.reload_timer = float(player.weapon.get("reload_timer",railgun_runtime.reload_timer))
 		if weapon_runtime_by_item_id.size() == 1 and not is_equal_approx(float(fire_timer),float(railgun_runtime.fire_timer) * 1000.0): railgun_runtime.fire_timer = float(fire_timer) / 1000.0
 	var delta := delta_ms / 1000.0
+	var slot_fire_delay := 0.0
 	for item_id in weapon_runtime_by_item_id:
 		var runtime: Dictionary = weapon_runtime_by_item_id[item_id]
 		var entry := {"item":profile.equipmentItems.get(str(runtime.item_id),{}),"blueprint":EquipmentRegistry.definition(str(runtime.blueprint_id))}
@@ -841,7 +909,8 @@ func _update_weapons(delta_ms: float) -> void:
 		var remaining := _tick_runtime_reload(runtime,stats,delta)
 		if float(runtime.reload_timer) > 0.0: continue
 		runtime.fire_timer = maxf(0.0,float(runtime.fire_timer) - remaining)
-		if runtime.fire_timer <= 0.000001 and _fire_runtime_weapon(runtime,stats):
+		if runtime.fire_timer <= 0.000001 and _fire_runtime_weapon(runtime,stats,slot_fire_delay):
+			slot_fire_delay += WEAPON_SLOT_FIRE_DELAY_SECONDS
 			runtime.ammo = maxi(0,int(runtime.ammo)-_weapon_ammo_cost(str(runtime.blueprint_id)))
 			if int(runtime.ammo) == 0: runtime.reload_timer = float(stats.reload)
 			runtime.fire_timer = float(stats.interval) if int(runtime.ammo) > 0 else 0.0
@@ -857,10 +926,11 @@ func _tick_runtime_reload(runtime: Dictionary, stats: Dictionary, delta: float) 
 		runtime.reload_timer = 0.0; runtime.ammo = int(stats.magazine)
 	return maxf(0.0,delta-delay)
 
-func _fire_runtime_weapon(runtime: Dictionary, stats: Dictionary) -> bool:
+func _fire_runtime_weapon(runtime: Dictionary, stats: Dictionary, slot_fire_delay := 0.0) -> bool:
 	var target := _runtime_target(runtime)
 	if target.is_empty(): return false
-	var direction: Vector2 = (target.position - player.position).normalized()
+	var mount_position := _weapon_mount_position(runtime)
+	var direction: Vector2 = (target.position - mount_position).normalized()
 	var muzzle := _weapon_origin(runtime,direction)
 	var shot_count := int(stats.shots)
 	var is_missile_weapon := str(runtime.blueprint_id) == EquipmentRegistry.MICRO_MISSILE_RACK_ID
@@ -876,6 +946,7 @@ func _fire_runtime_weapon(runtime: Dictionary, stats: Dictionary) -> bool:
 		var flight_distance := _weapon_flight_distance(str(runtime.blueprint_id), stats, origin, shot_direction)
 		var projectile_damage := float(stats.damage) * (float(stats.get("super_multiplier",1.0)) if super_missile else 1.0)
 		var bullet := WeaponRegistry.build_projectile(next_id,origin,shot_direction,projectile_damage,critical,flight_distance)
+		var projectile_launch_delay := slot_fire_delay + (float(shot_index) * MICRO_MISSILE_SALVO_STAGGER_SECONDS if is_missile_weapon else 0.0)
 		bullet.velocity = shot_direction * float(stats.projectile_speed)
 		bullet.life = flight_distance / maxf(1.0,float(stats.projectile_speed))
 		bullet.remaining_distance = flight_distance
@@ -885,12 +956,14 @@ func _fire_runtime_weapon(runtime: Dictionary, stats: Dictionary) -> bool:
 		if bullet.visual_kind == "micro_missile":
 			bullet.target_id = int(target.id)
 			bullet.launch_lane = lane
-			bullet.launch_delay = float(shot_index) * MICRO_MISSILE_SALVO_STAGGER_SECONDS
-			bullet.launched = shot_index == 0
+			bullet.launch_delay = projectile_launch_delay
+			bullet.launched = projectile_launch_delay <= 0.0
 			bullet.boost_remaining = MICRO_MISSILE_BOOST_SECONDS
 			bullet.trail_points = [origin]
 		else:
 			bullet.target_id = int(target.id)
+		bullet.launch_delay = projectile_launch_delay
+		bullet.launched = projectile_launch_delay <= 0.0
 		if critical: bullet.damage *= float(stats.crit_multiplier) / 2.0
 		bullet.resolvedDamage = float(bullet.damage)
 		bullet.projectile_speed = float(stats.projectile_speed)
@@ -973,19 +1046,42 @@ func _get_weapon_spread() -> float:
 
 func _update_enemy_movement(delta: float) -> void:
 	var active := enemies.filter(func(enemy): return EnemyNavigation.TYPES.has(str(enemy.type_id)))
-	EnemyNavigation.update(active, player.position, _stat("range"), _get_playfield_rect(get_viewport_rect().size), _fleet_orbit_sign(), delta)
+	EnemyNavigation.update(active, player.position, _stat("range"), _get_playfield_rect(get_viewport_rect().size), _fleet_orbit_sign(), delta, _player_deflector_radius())
 	for enemy in enemies:
+		_update_boss_phase(enemy)
 		enemy.contact_cooldown = maxf(0.0, float(enemy.get("contact_cooldown",0.0))-delta)
+		enemy.charge_warning_timer = maxf(0.0, float(enemy.get("charge_warning_timer",0.0))-delta)
 		if not EnemyNavigation.TYPES.has(str(enemy.type_id)):
 			enemy.velocity = _get_enemy_desired_direction(enemy,player.position)*float(enemy.speed)
 			enemy.position += enemy.velocity*delta
 		_update_enemy_visual_direction(enemy,enemy.velocity,delta)
 		_update_enemy_visual_state(enemy,enemy.velocity)
 
+func _update_boss_phase(enemy: Dictionary) -> void:
+	if str(enemy.get("type_id", "")) != EnemyRegistry.BOSS_ID: return
+	var hp_ratio := float(enemy.get("hp", 0.0)) / maxf(1.0, float(enemy.get("max_hp", 1.0)))
+	var next_phase := 1 if hp_ratio > 0.70 else (2 if hp_ratio > 0.35 else 3)
+	var previous := int(enemy.get("boss_phase", 1))
+	if previous == next_phase: return
+	enemy.boss_phase = next_phase
+	if next_phase > previous:
+		wave_message = "%s  PHASE %d" % [str(enemy.get("boss_variant", "DREADNOUGHT")).replace("_", " ").to_upper(), next_phase]
+		wave_message_timer = 0.8
+		presentation_signals.append({"kind":"boss_phase", "text":"%s  PHASE %d" % [str(enemy.get("boss_variant", "DREADNOUGHT")).replace("_", " ").to_upper(), next_phase], "accent":"boss", "essential":true, "remaining":0.8, "duration":0.8})
+		if str(enemy.get("boss_variant", "")) == "rift_carrier" and next_phase in [2, 3]:
+			var escort_id := "void_swarm" if next_phase == 2 else "splitter"
+			for index in range(2):
+				if enemies.size() - _count_bosses() >= DirectorSystem.MAX_NORMAL: break
+				var edge := _edge_for_boss_escort(index)
+				_spawn_enemy_at(_get_regular_spawn_position(escort_id, edge), escort_id, {"formation":"boss_escort", "primary_role":"escort", "weapon_enabled":true})
+
+func _edge_for_boss_escort(index: int) -> String:
+	return ["left", "right"][index % 2]
+
 func _get_enemy_desired_direction(enemy: Dictionary, player_position: Vector2) -> Vector2:
 	if EnemyNavigation.TYPES.has(str(enemy.type_id)):
 		EnemyNavigation.initialize(enemy, null, _fleet_orbit_sign())
-		return EnemyNavigation.preferred_velocity(enemy,player_position,_stat("range"),_get_playfield_rect(get_viewport_rect().size),0.0).normalized()
+		return EnemyNavigation.preferred_velocity(enemy,player_position,_stat("range"),_get_playfield_rect(get_viewport_rect().size),0.0,_player_deflector_radius()).normalized()
 	# Archived designs keep their historical fallback; they are not spawned.
 	var direction: Vector2 = (player_position-enemy.position).normalized()
 	match str(enemy.get("movement_behavior","chase")):
@@ -997,6 +1093,8 @@ func _get_enemy_desired_direction(enemy: Dictionary, player_position: Vector2) -
 func _update_enemy_weapons(delta: float) -> void:
 	if player.is_empty(): return
 	for enemy in enemies:
+		if not bool(enemy.get("weapon_enabled", true)):
+			continue
 		EnemyWeapons.update(self, enemy, delta)
 
 func _fire_enemy_projectile(enemy: Dictionary) -> void:
@@ -1018,7 +1116,7 @@ func _update_enemy_visual_state(enemy: Dictionary, velocity: Vector2) -> void:
 	var next_state := "idle"
 	if float(enemy.get("hit_visual_timer", 0.0)) > 0.0 or float(enemy.get("hit_flash", 0.0)) > 0.0:
 		next_state = "hit"
-	elif float(enemy.get("attack_warmup_timer", 0.0)) > 0.0 or float(enemy.get("attack_visual_timer", 0.0)) > 0.0:
+	elif float(enemy.get("attack_warmup_timer", 0.0)) > 0.0 or float(enemy.get("attack_visual_timer", 0.0)) > 0.0 or float(enemy.get("charge_warning_timer", 0.0)) > 0.0:
 		next_state = "attack"
 	elif velocity.length_squared() > 9.0:
 		next_state = "thrust"
@@ -1030,7 +1128,7 @@ func _update_projectiles(delta: float) -> void:
 		bullet.previous_position = bullet.position
 		var is_missile := str(bullet.get("visual_kind", "railgun")) == "micro_missile"
 		var travel_delta := delta
-		if is_missile and not bool(bullet.get("launched", true)):
+		if not bool(bullet.get("launched", true)):
 			var launch_delay := float(bullet.get("launch_delay", 0.0))
 			if launch_delay >= delta:
 				bullet.launch_delay = launch_delay - delta
@@ -1038,7 +1136,8 @@ func _update_projectiles(delta: float) -> void:
 			travel_delta = delta - launch_delay
 			bullet.launch_delay = 0.0
 			bullet.launched = true
-			_add_missile_muzzle_flash(bullet.position, bullet.velocity.normalized(), false,str(bullet.get("sourceEquipmentId","")))
+			if is_missile:
+				_add_missile_muzzle_flash(bullet.position, bullet.velocity.normalized(), bool(bullet.get("is_super_missile",false)),str(bullet.get("sourceEquipmentId","")))
 		if is_missile: _update_missile_heading(bullet, travel_delta)
 		else: _update_railgun_heading(bullet)
 		var distance := minf(float(bullet.remaining_distance), bullet.velocity.length() * travel_delta)
@@ -1107,7 +1206,7 @@ func _resolve_collisions() -> void:
 		var start: Vector2 = bullet.get("previous_position", bullet.position)
 		var end: Vector2 = bullet.position
 		var is_missile := str(bullet.get("visual_kind", "railgun")) == "micro_missile"
-		if is_missile and not bool(bullet.get("launched", true)): continue
+		if not bool(bullet.get("launched", true)): continue
 		if not bullet.has("hit_ids"): bullet.hit_ids = []
 		if not bullet.has("hits_left"): bullet.hits_left = 1
 		var contacts: Array[Dictionary] = []
@@ -1163,6 +1262,8 @@ func _resolve_collisions() -> void:
 					next_id += 1
 			if target.hp <= 0:
 				removed_enemy_ids[target.id] = true
+				if str(target.get("type_id", "")) == EnemyRegistry.SPLITTER_ID:
+					_spawn_split_fragments(target.position)
 				_grant_enemy_rewards(target)
 				_add_enemy_death_explosion(target,Color("#f97316"))
 			if is_missile or target.hp > 0 or int(bullet.hits_left) <= 0:
@@ -1187,20 +1288,20 @@ func _resolve_collisions() -> void:
 		if removed_enemy_ids.has(enemy.id):
 			continue
 
-		if _circles_overlap(player.position, player.radius, enemy.position, enemy.radius):
-			if float(enemy.contact_cooldown) <= 0.0:
+		if _circles_overlap(player.position, _player_deflector_radius(), enemy.position, enemy.radius):
+			if float(enemy.get("contact_cooldown", 0.0)) <= 0.0:
 				var impact := not bool(enemy.get("has_contacted", false))
-				_apply_damage_to_player(_get_incoming_damage(float(enemy.contact_damage) * (FIRST_IMPACT_MULTIPLIER if impact else 1.0)), "IMPACT" if impact else "CONTACT", enemy.position, player.position - enemy.position)
+				_apply_damage_to_player(_get_incoming_damage(float(enemy.get("contact_damage", 0.0)) * (FIRST_IMPACT_MULTIPLIER if impact else 1.0)), "IMPACT" if impact else "CONTACT", enemy.position, player.position - enemy.position)
 				enemy.has_contacted = true
 				enemy.contact_hits_in_pass = int(enemy.get("contact_hits_in_pass", 0)) + 1
 				var definition: Dictionary = EnemyRegistry.get_definition(str(enemy.type_id))
 				enemy.contact_cooldown = float(definition.base_stats.get("contact_interval", 1.0))
 				if int(enemy.contact_hits_in_pass) >= 2 and not bool(enemy.get("contact_latched", false)):
-					EnemyNavigation.restart_after_contact(enemy, _stat("range"))
+					EnemyNavigation.restart_after_contact(enemy, _stat("range"), _player_deflector_radius())
 			var away: Vector2 = enemy.position - player.position
 			if away.length_squared() < 0.01:
 				away = Vector2.RIGHT.rotated(float(enemy.id) * 2.4)
-			enemy.position = player.position + away.normalized() * (float(player.radius) + float(enemy.radius) + 0.1)
+			enemy.position = player.position + away.normalized() * (_player_deflector_radius() + float(enemy.radius) + 0.1)
 	_separate_enemies()
 
 	for projectile in enemy_projectiles:
@@ -1209,7 +1310,7 @@ func _resolve_collisions() -> void:
 
 		var start: Vector2 = projectile.get("previous_position", projectile.position)
 		var end: Vector2 = projectile.position
-		var fraction := WeaponRegistry.hit_fraction(start, end, player.position, float(player.radius) + float(projectile.radius))
+		var fraction := WeaponRegistry.hit_fraction(start, end, player.position, _player_deflector_radius() + float(projectile.radius))
 		if fraction != INF:
 			end = start.lerp(end, fraction)
 			_apply_damage_to_player(_get_incoming_damage(float(projectile.damage) * float(projectile.get("damage_multiplier", PROJECTILE_DAMAGE_MULTIPLIER))), "HIT", end, projectile.velocity)
@@ -1233,6 +1334,12 @@ func _resolve_collisions() -> void:
 
 	if player.hp <= 0:
 		_end_run(true)
+
+func _spawn_split_fragments(origin: Vector2) -> void:
+	for index in range(3):
+		if enemies.size() - _count_bosses() >= DirectorSystem.MAX_NORMAL: break
+		var fragment := {"position":origin + Vector2.from_angle(TAU * index / 3.0) * 8.0, "edge":"top"}
+		_spawn_enemy_at(fragment, EnemyRegistry.VOID_SWARM_ID, {"formation":"split_fragment", "primary_role":"fragment", "weapon_enabled":true, "reward_multiplier":0.0})
 
 func _apply_missile_explosion(bullet: Dictionary, origin: Vector2, primary_id: int) -> Array[int]:
 	var killed: Array[int] = []
@@ -1388,6 +1495,8 @@ func _grant_enemy_rewards(enemy: Dictionary) -> void:
 	if bool(enemy.get("rewarded", false)):
 		return
 	enemy.rewarded = true
+	if float(enemy.get("reward_multiplier", 1.0)) <= 0.0:
+		return
 	var enemy_type_id := str(enemy.type_id)
 	if enemy_type_id == EnemyRegistry.BOSS_ID:
 		# Boss modules are the long-term weapon currency. Boss rewards stay fixed;
@@ -1575,6 +1684,7 @@ func _draw_background(size: Vector2) -> void:
 	if status == "dead" and run_complete_background != null:
 		_draw_texture_cover(run_complete_background, Rect2(Vector2.ZERO, size), Color(1, 1, 1, 0.88))
 		return
+	_draw_sector_background(size)
 	# Only a distant star field and one soft nebula; no combat-obscuring foreground.
 	if background_textures.size() >= 2:
 		_draw_scrolling_layers([background_textures[0]], [{"speed": 3.0, "opacity": 0.52}], size)
@@ -1595,11 +1705,20 @@ func _draw_sector_background(size: Vector2) -> void:
 
 	var sector_index := _get_active_sector_index()
 	var sector = BACKGROUND_SECTORS[sector_index]
-	_draw_texture_cover(
-		sector_textures[sector_index],
-		Rect2(Vector2.ZERO, size),
-		Color(1, 1, 1, sector.opacity)
-	)
+	var transition_remaining := float(sector_transition.get("remaining", 0.0))
+	if transition_remaining > 0.0:
+		var transition_duration := maxf(0.001, float(sector_transition.get("duration", 1.25)))
+		var progress := 1.0 - clampf(transition_remaining / transition_duration, 0.0, 1.0)
+		var from_index := _sector_texture_index(str(sector_transition.get("from", "")))
+		if from_index >= 0 and from_index < sector_textures.size():
+			var from_sector = BACKGROUND_SECTORS[from_index]
+			_draw_texture_cover(sector_textures[from_index], Rect2(Vector2.ZERO, size), Color(1, 1, 1, float(from_sector.opacity) * (1.0 - progress)))
+		_draw_texture_cover(sector_textures[sector_index], Rect2(Vector2.ZERO, size), Color(1, 1, 1, float(sector.opacity) * progress))
+		return
+	_draw_texture_cover(sector_textures[sector_index], Rect2(Vector2.ZERO, size), Color(1, 1, 1, sector.opacity))
+
+func _sector_texture_index(sector_id: String) -> int:
+	return ["dead_relay", "ion_wake", "fracture_field", "hunters_wake"].find(sector_id)
 
 func _draw_scrolling_layers(textures: Array, layer_defs: Array, size: Vector2) -> void:
 	var layer_count := mini(textures.size(), layer_defs.size())
@@ -1649,7 +1768,7 @@ func _draw_hud(size: Vector2) -> void:
 	draw_rect(footer,Color(0.01,0.025,0.055,0.58))
 	var left_x := header.position.x+16*f
 	_draw_icon_text(font,Vector2(left_x,header.position.y+27*f),"SECTOR",HORIZONTAL_ALIGNMENT_LEFT,90*f,ceili(10*f),Color("#73efb4"))
-	_draw_icon_text(font,Vector2(left_x+12*f,header.position.y+62*f),"1",HORIZONTAL_ALIGNMENT_LEFT,54*f,ceili(28*f),Color("#a8ffd2"))
+	_draw_icon_text(font,Vector2(left_x+12*f,header.position.y+62*f),str(DirectorSystem.sector_for_wave(int(runState.wave)).name),HORIZONTAL_ALIGNMENT_LEFT,150*f,ceili(16*f),Color("#a8ffd2"))
 	var center_x := header.get_center().x
 	var wave_label := "WAVE %d" % int(runState.wave)
 	_draw_centered_hud_text(font,Vector2(center_x,header.position.y+25*f),wave_label,ceili(14*f),UI_TEXT)
@@ -1659,9 +1778,9 @@ func _draw_hud(size: Vector2) -> void:
 	_draw_capsule(Rect2(wave_bar.position,Vector2(wave_bar.size.x*progress,wave_bar.size.y)),Color("#86d34e"))
 	_draw_centered_hud_text(font,Vector2(center_x,header.position.y+65*f),_format_time(float(runState.elapsedSeconds)),ceili(14*f),UI_TEXT)
 	var resources_right := header.end.x-18*f
-	_draw_resource(font,resources_right,header.position.y+26*f,"cash_v2",_money(runState.cash),Color("#f3d36a"),f)
-	_draw_resource(font,resources_right,header.position.y+50*f,"coins_v2",_money(runState.coinsEarned),Color("#ff75da"),f)
-	_draw_resource(font,resources_right,header.position.y+74*f,"modules_v2",str(runState.get("modules", 0)),Color("#73e4ff"),f)
+	_draw_resource(font,resources_right,header.position.y+26*f,"cash",_money(runState.cash),Color("#69e6b5"),f)
+	_draw_resource(font,resources_right,header.position.y+50*f,"credits",_money(runState.coinsEarned),Color("#f3d36a"),f)
+	_draw_resource(font,resources_right,header.position.y+74*f,"boss_module",str(runState.get("modules", 0)),Color("#b66cff"),f)
 	# The reference footer keeps the weapon slots unchanged, with the defense
 	# readout centred above them as a single compact control strip.
 	var status_width := minf(270*f,footer.size.x-28*f)
@@ -1684,7 +1803,7 @@ func _draw_centered_hud_text(font: Font, position: Vector2, value: String, pixel
 	draw_string(font,position+Vector2(-width/2.0,0),value,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels,color)
 
 func _draw_resource(font: Font, right: float, y: float, icon_name: String, value: String, color: Color, scale: float) -> void:
-	var path := "res://assets/ui/icons/%s.svg" % icon_name
+	var path := UI.currency_path(icon_name)
 	var texture: Texture2D = hud_icon_textures.get(path)
 	if texture == null:
 		texture = load(path)
@@ -1693,7 +1812,7 @@ func _draw_resource(font: Font, right: float, y: float, icon_name: String, value
 		var value_width := 64.0*scale
 		var icon_size := 16.0*scale
 		var icon_x := right-value_width-8.0*scale-icon_size
-		draw_texture_rect(texture,Rect2(Vector2(icon_x,y-12*scale),Vector2.ONE*icon_size),false,color)
+		draw_texture_rect(texture,Rect2(Vector2(icon_x,y-12*scale),Vector2.ONE*icon_size),false,Color.WHITE)
 		draw_string(font,Vector2(right-value_width,y),value,HORIZONTAL_ALIGNMENT_RIGHT,value_width,ceili(12*scale),color)
 
 func _railgun_visual_colors(source_blueprint_id: String, critical: bool) -> Dictionary:
@@ -1820,6 +1939,7 @@ func _draw_particles(layer := "back") -> void:
 
 func _draw_bullets() -> void:
 	for bullet in bullets:
+		if not bool(bullet.get("launched", true)): continue
 		if str(bullet.get("visual_kind","railgun")) != "micro_missile":
 			var rail_direction: Vector2 = bullet.velocity.normalized()
 			var fragment_visual := RailVisuals.is_fragment(bullet)
@@ -1829,7 +1949,6 @@ func _draw_bullets() -> void:
 			_draw_energy_trail(rail_points,rail_colors.outer,rail_colors.core,1.8 if fragment_visual else 3.2,0.5 if fragment_visual else 0.85,float(bullet.get("id",0)),0.55 if fragment_visual else 1.0,1.0)
 			draw_circle(bullet.position,0.8 if fragment_visual else 1.25,Color.WHITE)
 			continue
-		if not bool(bullet.get("launched", true)): continue
 		var direction: Vector2 = bullet.velocity.normalized()
 		var is_super := bool(bullet.get("is_super_missile", false))
 		var is_small := bool(bullet.get("is_small_missile", false))
@@ -2005,7 +2124,8 @@ func _draw_enemy_hp_feedback(enemy: Dictionary) -> void:
 		var bounds := _get_playfield_rect(get_viewport_rect().size)
 		rect.position.x = clampf(rect.position.x, bounds.position.x + 4.0, bounds.end.x - bar_width - 4.0)
 		rect.position.y = clampf(rect.position.y, bounds.position.y + 28.0, bounds.end.y - 12.0)
-		draw_string(get_theme_default_font(), rect.position - Vector2(0, 5), "DREADNOUGHT  %d%%" % ceili(hp_percent * 100.0), HORIZONTAL_ALIGNMENT_CENTER, bar_width, 13, Color("#ffd6a3"))
+		var boss_label := str(enemy.get("boss_variant", "missile_dreadnought")).replace("_", " ").to_upper()
+		draw_string(get_theme_default_font(), rect.position - Vector2(0, 5), "%s  %d%%" % [boss_label, ceili(hp_percent * 100.0)], HORIZONTAL_ALIGNMENT_CENTER, bar_width, 13, Color("#ffd6a3"))
 	draw_rect(rect.grow(1.0), Color(0.0, 0.0, 0.0, 0.65))
 	draw_rect(rect, Color(0.28, 0.03, 0.08, 0.72))
 	draw_rect(Rect2(rect.position, Vector2(rect.size.x * hp_percent, rect.size.y)), UI_ORANGE if is_boss or hp_percent < 0.35 else UI_MAGENTA)
@@ -2185,9 +2305,20 @@ func _load_vfx_atlas(path: String) -> Array[Texture2D]:
 func _get_player_max_hp() -> float:
 	return _stat("max_hp")
 
+func _armor_rating(normalized_armor: float) -> float:
+	return maxf(0.0, normalized_armor) * ARMOR_RATING_MULTIPLIER
+
+func _armor_damage_reduction_for(normalized_armor: float) -> float:
+	var rating := _armor_rating(normalized_armor)
+	return rating / (rating + ARMOR_DAMAGE_SCALE)
+
+func _armor_damage_reduction() -> float:
+	return _armor_damage_reduction_for(_stat("armor"))
+
 func _get_incoming_damage(raw_damage: float) -> float:
 	# Never inflate a newly fractional weapon hit up to one whole damage point.
-	return maxf(minf(1.0, raw_damage), raw_damage * (1.0 - _stat("armor")))
+	var mitigated_damage := raw_damage * (1.0 - _armor_damage_reduction())
+	return maxf(minf(1.0, raw_damage), mitigated_damage)
 
 func _mark_enemy_discovered(enemy_type_id: String) -> void:
 	if not run_discovered_enemies.has(enemy_type_id):
@@ -2367,10 +2498,14 @@ func _layout_buttons() -> void:
 		control.custom_minimum_size.y = ceil(44*f)
 		control.add_theme_font_size_override("font_size",ceili(12*f))
 	wave_control.add_theme_font_size_override("font_size",ceili(14*f))
-	var rail_view := menu_view in ["railgun","railgun_catalog","railgun_detail","build","hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail"]
+	var rail_view := menu_view in ["railgun","railgun_catalog","railgun_detail","build","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail"]
 	# All menus fill the safe viewport height on mobile and desktop/web.
-	var safe_origin := Vector2(hud_safe.x,hud_safe.y) + Vector2.ONE * 6*f
-	var safe_size := size - Vector2(hud_safe.x+hud_safe.z,hud_safe.y+hud_safe.w) - Vector2.ONE * 12*f
+	# The overlay owns the top edge of the safe viewport. A symmetric 6px inset
+	# here created a visible gap above the header on mobile, where the browser's
+	# safe-area is already included in hud_safe.y. Keep only the bottom breathing
+	# room so the footer remains clear of the device edge.
+	var safe_origin := Vector2(hud_safe.x + 6*f,hud_safe.y)
+	var safe_size := size - Vector2(hud_safe.x+hud_safe.z,hud_safe.y+hud_safe.w) - Vector2(12*f,6*f)
 	# Bound the panel against the actual viewport. The logical stretch factor can
 	# otherwise make the railgun panel wider than a small web/mobile viewport.
 	var available_width := maxf(1.0, safe_size.x)
@@ -2463,7 +2598,7 @@ func _update_buttons() -> void:
 		card.update_state(float(runtime.reload_timer),float(stats.reload),int(runtime.ammo),int(stats.magazine),status=="running" and not app_backgrounded)
 	for index in range(empty_weapon_slots.size()): empty_weapon_slots[index].visible = false
 	weapon_hud = weapon_huds[0] if not weapon_huds.is_empty() else null
-	build_control.tooltip_text = "Open Hangar"
+	build_control.tooltip_text = "Open Loadout"
 
 func _clamp_player_to_viewport() -> void:
 	if player.is_empty():
@@ -2511,7 +2646,8 @@ func _get_stable_direction_from_velocity(velocity: Vector2, fallback: String) ->
 	return fallback
 
 func _get_active_sector_index() -> int:
-	return 0
+	var index := DirectorSystem.SECTORS.find(current_sector_id)
+	return maxi(0, index)
 
 func _get_enemy_forward_direction(enemy: Dictionary) -> Vector2:
 	if not player.is_empty():
@@ -2582,33 +2718,91 @@ func _stat(id: String) -> float:
 		return module_base * module_factor * workshop_factor * run_factor
 	return UpgradeRegistry.value(id,workshop_levels + run_levels)
 
-func _workshop_display_value(id: String, levels: int) -> String:
-	var current := maxi(0, levels)
+func _upgrade_display_value(id: String, permanent_levels: int, temporary_levels: int) -> Dictionary:
+	var total_levels := maxi(0, permanent_levels + temporary_levels)
 	var base := _ship_base_stat(id)
-	var amount := 0.0
-	if id in ["damage", "range", "max_hp", "regen"]:
-		amount = base * UpgradeRegistry.workshop_multiplier(id, current, base)
-	elif id == "crit_chance":
-		amount = base + 0.01 * float(current)
-	elif id == "armor":
-		amount = base + 0.025 * float(current)
-	elif id in ["shield_capacity", "shield_recharge"]:
-		if not _has_equipped_blueprint(EquipmentRegistry.SHIELD_CORE_ID):
-			return "NO MODULE"
-		var module_stats := _shield_stats()
-		var stat_key := "capacity" if id == "shield_capacity" else "recharge"
-		var module_base := float(EquipmentRegistry.definition(EquipmentRegistry.SHIELD_CORE_ID).get("base_stats",{}).get(stat_key,1.0))
-		var module_factor := float(module_stats.get(stat_key, module_base)) / maxf(0.01, module_base)
-		amount = module_base * module_factor * UpgradeRegistry.workshop_multiplier(id, current)
-	else:
-		return UpgradeRegistry.display_value(id, current)
-
+	var actual := 0.0
+	var multiplier := 1.0
+	var unit := ""
 	match id:
-		"armor": return "%d%%" % roundi(amount * 100.0)
-		"regen": return "%.1f HP/s" % amount
-		"range": return "%d units" % roundi(amount)
-		"shield_capacity", "shield_recharge": return "%.1f" % amount
-	return "%.0f" % amount
+		"damage", "max_hp", "regen":
+			multiplier = UpgradeRegistry.workshop_multiplier(id, total_levels, base)
+			actual = base * multiplier
+			unit = "HP/s" if id == "regen" else ("HP" if id == "max_hp" else "DMG")
+		"range":
+			multiplier = UpgradeRegistry.workshop_multiplier(id, total_levels, base)
+			actual = base * multiplier
+			unit = "units"
+		"crit_chance":
+			actual = base + 0.01 * float(total_levels)
+			return {"progress": "+%d pp" % roundi(actual * 100.0 - base * 100.0), "actual": "%.1f%%" % (actual * 100.0), "amount":actual, "unit":"%"}
+		"armor":
+			actual = base + 0.025 * float(total_levels)
+			return {"progress": "+%.1f rating" % (actual - base), "actual": "%.1f%% DR" % (_armor_damage_reduction_for(actual) * 100.0), "amount":_armor_damage_reduction_for(actual), "unit":"% DR"}
+		"shield_capacity", "shield_recharge":
+			if not _has_equipped_blueprint(EquipmentRegistry.SHIELD_CORE_ID):
+				return {"progress": "NO MODULE", "actual": "NO MODULE", "amount":0.0, "unit":""}
+			var module_stats := _shield_stats()
+			var stat_key := "capacity" if id == "shield_capacity" else "recharge"
+			var module_base := float(EquipmentRegistry.definition(EquipmentRegistry.SHIELD_CORE_ID).get("base_stats",{}).get(stat_key,1.0))
+			var module_factor := float(module_stats.get(stat_key, module_base)) / maxf(0.01, module_base)
+			multiplier = UpgradeRegistry.workshop_multiplier(id, total_levels)
+			actual = module_base * module_factor * multiplier
+			unit = "HP" if id == "shield_capacity" else "HP/s"
+		"cash_bonus", "coin_bonus":
+			multiplier = UpgradeRegistry.value(id, total_levels)
+			return {"progress": "×%.2f" % multiplier, "actual": "×%.2f" % multiplier, "amount":multiplier, "unit":"×"}
+		"cash_wave":
+			actual = UpgradeRegistry.value(id, total_levels)
+			# The row title already establishes this as a per-wave reward. Keeping
+			# the numeric value unitless makes the compact Workshop layout easier to scan.
+			return {"progress": "+%.1f" % actual, "actual": "+%.1f" % actual, "amount":actual, "unit":""}
+		_:
+			actual = UpgradeRegistry.value(id, total_levels)
+			return {"progress": "×%.2f" % actual, "actual": "%.1f" % actual, "amount":actual, "unit":""}
+	var show_decimal := id in ["damage", "regen", "shield_recharge"] and actual < 1000.0
+	var actual_text := ("%.1f %s" % [actual, unit] if show_decimal else "%.0f %s" % [actual, unit]) if unit != "" else "%.1f" % actual
+	return {"progress": "×%.2f" % multiplier, "actual": actual_text, "amount":actual, "unit":unit}
+
+func _upgrade_display_line(id: String, permanent_levels: int, temporary_levels: int) -> String:
+	var display := _upgrade_display_value(id, permanent_levels, temporary_levels)
+	return "%s  ·  ACTUAL %s" % [str(display.progress), str(display.actual)]
+
+func _upgrade_base_display(id: String) -> String:
+	var base := _ship_base_stat(id)
+	match id:
+		"damage": return "%.0f DMG" % base
+		"max_hp": return "%.0f HP" % base
+		"regen": return "%.1f HP/s" % base
+		"range": return "%.0f units" % base
+		"crit_chance": return "%.1f%%" % (base * 100.0)
+		"armor": return "%.1f rating" % base
+		"shield_capacity", "shield_recharge":
+			if not _has_equipped_blueprint(EquipmentRegistry.SHIELD_CORE_ID): return "NO MODULE"
+			var shield := _shield_stats()
+			var key := "capacity" if id == "shield_capacity" else "recharge"
+			return "%.0f HP" % float(shield.get(key,0.0)) if id == "shield_capacity" else "%.1f HP/s" % float(shield.get(key,0.0))
+		"cash_bonus", "coin_bonus": return "×%.2f" % UpgradeRegistry.value(id, 0)
+		"cash_wave": return "+%.1f" % UpgradeRegistry.value(id, 0)
+	return "—"
+
+func _upgrade_base_label(id: String) -> String:
+	# Shield upgrades are intentionally rooted in an equipped module. All other
+	# Workshop stat rows use the active ship's chassis value as their baseline.
+	return "MODULE BASE" if id in ["shield_capacity", "shield_recharge"] else "BASE"
+
+func _upgrade_next_hint(current: Dictionary, next: Dictionary, capped: bool) -> String:
+	if capped: return "MAX"
+	var delta := float(next.get("amount",0.0)) - float(current.get("amount",0.0))
+	var unit := str(next.get("unit", ""))
+	var change := ""
+	if unit == "%": change = "+%.1f%%" % (delta * 100.0)
+	elif unit == "% DR": change = "+%.1f%% DR" % (delta * 100.0)
+	elif unit == "×": change = "×%.2f" % float(next.get("amount",0.0))
+	elif unit in ["DMG", "HP/s"] and float(next.get("amount", 0.0)) < 1000.0: change = "+%.1f %s" % [delta, unit]
+	elif unit.is_empty(): change = "+%.1f" % delta
+	else: change = "+%.0f %s" % [delta, unit]
+	return change
 
 func _shield_stats() -> Dictionary:
 	var item: Dictionary = profile.get("equipmentItems",{}).get(EquipmentRegistry.SHIELD_CORE_INSTANCE_ID,{})
@@ -2629,6 +2823,17 @@ func _player_move_speed() -> float:
 
 func _player_radius() -> float:
 	return _ship_base_stat("collision_radius")
+
+func _player_deflector_radius() -> float:
+	return gunship.deflector_radius()
+
+func _player_deflector_surface(from: Vector2, fallback := Vector2.UP) -> Vector2:
+	var outward: Vector2 = from - player.position
+	if outward.length_squared() < 0.0001:
+		outward = fallback
+	if outward.length_squared() < 0.0001:
+		outward = Vector2.UP
+	return player.position + outward.normalized() * _player_deflector_radius()
 
 func _railgun_instance() -> Dictionary:
 	return profile.get("equipmentItems",{}).get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
@@ -2693,10 +2898,10 @@ func _separate_enemies() -> void:
 			var correction := direction * (minimum - distance) * 0.22
 			enemy.position -= correction
 			other.position += correction
-		# Pair separation must not push a body back inside the player's hull.
+		# Pair separation must not push a body back inside the player's deflector.
 	for enemy in enemies:
 		var offset: Vector2 = enemy.position - player.position
-		var minimum := float(enemy.radius) + float(player.radius)
+		var minimum := float(enemy.radius) + _player_deflector_radius()
 		if offset.length() < minimum:
 			var direction := offset.normalized() if offset.length_squared() > 0.01 else Vector2.RIGHT
 			enemy.position = player.position + direction * minimum
@@ -2740,6 +2945,7 @@ func _setup_background_events() -> void:
 func _save_run() -> void:
 	if run_id == "" or status == "dead" or status == "menu":
 		return
+	runState.encounterCursor = int(encounter_state.get("cursor", runState.get("encounterCursor", 0)))
 	var railgun_runtime_for_save: Dictionary = weapon_runtime_by_item_id.get(EquipmentRegistry.RAILGUN_INSTANCE_ID,{})
 	if not railgun_runtime_for_save.is_empty() and player.has("weapon"):
 		railgun_runtime_for_save.ammo = int(player.weapon.get("ammo",railgun_runtime_for_save.ammo)); railgun_runtime_for_save.reload_timer = float(player.weapon.get("reload_timer",railgun_runtime_for_save.reload_timer))
@@ -2757,8 +2963,10 @@ func _save_run() -> void:
 		"upgrades": run_upgrades, "player": player, "player_target": player_target,
 		"enemies": enemies, "bullets": bullets, "enemy_projectiles": enemy_projectiles,
 		"weapon_runtime": weapon_runtime_by_item_id,
-		"spawn_timer": spawn_timer, "fire_timer": fire_timer, "next_id": next_id,
+		"fire_timer": fire_timer, "next_id": next_id,
 		"last_boss_wave": last_boss_wave, "rng_state": str(rng.state),
+		"encounter_seed": encounter_seed, "encounter_state": encounter_state,
+		"presentation_signals": presentation_signals, "sector_transition": sector_transition,
 		"enemy_kills": run_enemy_kills, "discovered": run_discovered_enemies,
 		"viewport": get_viewport_rect().size, "manual_override": manual_override,
 		"playfield_position": _get_playfield_rect(get_viewport_rect().size).position,
@@ -2789,6 +2997,18 @@ func _restore_run() -> void:
 		profile_store.save_profile(profile)
 		return
 	runState = snapshot.runState
+	encounter_seed = int(snapshot.get("encounter_seed", runState.get("encounterSeed", absi(hash(run_id)))))
+	encounter_state = snapshot.get("encounter_state", {}) if snapshot.get("encounter_state", {}) is Dictionary else {}
+	if encounter_state.is_empty():
+		_prepare_encounter(int(runState.get("wave", 1)))
+		DirectorSystem.spawn_instructions_due(encounter_state, fmod(float(runState.get("elapsedSeconds", 0.0)), DirectorSystem.WAVE_SECONDS))
+	else:
+		current_sector_id = str(runState.get("sectorId", encounter_state.get("sector", {}).get("id", "dead_relay")))
+		encounter_state.cursor = int(runState.get("encounterCursor", encounter_state.get("cursor", 0)))
+	var saved_presentation_signals: Variant = snapshot.get("presentation_signals", [])
+	presentation_signals.clear()
+	if saved_presentation_signals is Array: presentation_signals.assign(saved_presentation_signals)
+	sector_transition = snapshot.get("sector_transition", sector_transition) if snapshot.get("sector_transition", sector_transition) is Dictionary else sector_transition
 	if not runState.has("realElapsedSeconds"):
 		runState.realElapsedSeconds = float(runState.get("elapsedSeconds",0.0)) / maxf(1.0,float(_game_speed()))
 	# Legacy snapshots may contain a card payload. Card choices are retired; only
@@ -2849,7 +3069,6 @@ func _restore_run() -> void:
 			bullet.remaining_distance = minf(UpgradeRegistry.value("range", 0), maxf(0.0, float(bullet.life)) * bullet.velocity.length())
 	for projectile in enemy_projectiles:
 		projectile.previous_position = projectile.position
-	spawn_timer = float(snapshot.spawn_timer)
 	fire_timer = float(snapshot.get("fire_timer",0.0))
 	next_id = int(snapshot.next_id)
 	last_boss_wave = int(snapshot.last_boss_wave)
@@ -2887,24 +3106,144 @@ func _money(amount: float) -> String:
 		return "%.1e" % amount
 	return str(int(floor(amount))) if amount < 10000 else "%.1fK" % (amount / 1000.0)
 
+## Home presentation reads the campaign route from one source. The rewards are
+## deliberately separate from the endless combat loop: clearing W100 unlocks
+## the next tier but never stops a player continuing in Fracture Field.
+func _tier_one_home_command() -> Dictionary:
+	var best_wave := maxi(1, int(profile.get("highestWave", 1)))
+	var claimed: Array = profile.get("tierRewardsClaimed", [])
+	var progress_wave := mini(best_wave, TIER_ONE_GOAL_WAVE)
+	var tier_metric_label := "NEXT TIER"
+	var tier_metric_value := "W%d" % TIER_ONE_GOAL_WAVE
+	var next_reward: Dictionary = {}
+	var claimable_rewards := 0
+	for reward in TIER_ONE_REWARDS:
+		if str(reward.get("type", "")) == "cache" and best_wave >= int(reward.get("wave", 0)) and not claimed.has(str(reward.get("id", ""))):
+			claimable_rewards += 1
+		if best_wave < int(reward.wave):
+			next_reward = reward
+			break
+	if next_reward.is_empty():
+		tier_metric_label = "CLEARANCE"
+		tier_metric_value = "READY"
+		next_reward = {
+			"title":"TIER II CLEARANCE",
+			"detail":"Tier II is reserved for a future transmission. Fracture Field remains endless.",
+			"badge":"CLEARED",
+			"art":"res://assets/ui/icons/blueprints.svg",
+		}
+	return {
+		"tier_title":"TIER I · FRACTURE FIELD",
+		"status":"ACTIVE",
+		"best_wave":best_wave,
+		"progress_wave":progress_wave,
+		"tier_goal":TIER_ONE_GOAL_WAVE,
+		"tier_metric_label":tier_metric_label,
+		"tier_metric_value":tier_metric_value,
+		"progress":float(progress_wave) / float(TIER_ONE_GOAL_WAVE),
+		"claimable_rewards":claimable_rewards,
+		"primary_label":"START EXPEDITION",
+		"primary_action":"start",
+		"objective_title":str(next_reward.get("title", "SECTOR CACHE")),
+		"objective_detail":str(next_reward.get("detail", "Continue your expedition.")),
+		"objective_badge":str(next_reward.get("badge", "W20")),
+		"objective_art":str(next_reward.get("art", "")),
+	}
+
+func _tier_one_brief_data() -> Dictionary:
+	var best_wave := maxi(1, int(profile.get("highestWave", 1)))
+	var claimed: Array = profile.get("tierRewardsClaimed", [])
+	var rewards: Array = []
+	for source in TIER_ONE_REWARDS:
+		var reward: Dictionary = source.duplicate(true)
+		var wave := int(reward.get("wave", 0))
+		var reward_type := str(reward.get("type", "cache"))
+		var reward_id := str(reward.get("id", ""))
+		var state := "locked"
+		if reward_type == "cache":
+			state = "claimed" if claimed.has(reward_id) else ("claimable" if best_wave >= wave else "locked")
+		elif best_wave >= wave:
+			state = "unlocked"
+		reward.state = state
+		rewards.append(reward)
+	return {
+		"tier":"TIER I",
+		"sector":"FRACTURE FIELD",
+		"best_wave":best_wave,
+		"goal_wave":TIER_ONE_GOAL_WAVE,
+		"rewards":rewards,
+	}
+
+func _claim_tier_reward(reward_id: String) -> void:
+	if menu_view != "tier_brief" or status not in ["menu", "dead"]:
+		return
+	var reward: Dictionary = {}
+	for source in TIER_ONE_REWARDS:
+		if str(source.get("id", "")) == reward_id:
+			reward = source
+			break
+	if reward.is_empty() or str(reward.get("type", "")) != "cache":
+		return
+	if int(profile.get("highestWave", 1)) < int(reward.get("wave", 0)):
+		return
+	var claimed: Array = profile.get("tierRewardsClaimed", [])
+	if claimed.has(reward_id):
+		return
+	claimed.append(reward_id)
+	profile.tierRewardsClaimed = claimed
+	profile.totalCoins += float(reward.get("credits", 0))
+	profile.railgunModules += int(reward.get("modules", 0))
+	save_error = not profile_store.save_profile(profile)
+
+func _fracture_field_home_backdrop() -> Texture2D:
+	if fracture_field_home_backdrop == null:
+		fracture_field_home_backdrop = _load_png_texture("res://assets/ui/home/void_drifter_home_backdrop_v1.png")
+	return fracture_field_home_backdrop
+
 func _refresh_overlay() -> void:
 	if not is_instance_valid(overlay):
 		return
 	if status == "running" or death_timer > 0.0:
 		overlay.hide()
 		return
-	if menu_view in ["railgun","railgun_catalog","railgun_detail","build","hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","ship_systems"]:
+	# The single-ship game has no fleet-selection decision. Preserve the legacy
+	# route for old saved/UI state, but land it directly on the useful screen.
+	if menu_view == "hangar":
+		menu_view = "loadout"
+	var navigation_context := "home"
+	if menu_view in ["railgun", "railgun_catalog", "railgun_detail", "build", "loadout", "equipment_picker", "equipment_detail", "blueprints", "blueprint_detail", "ship_systems"]:
+		navigation_context = "loadout"
+	elif menu_view == "workshop":
+		navigation_context = "workshop"
+	elif menu_view in ["codex", "codex_detail", "wave_intel"]:
+		navigation_context = "codex"
+	elif menu_view == "settings":
+		navigation_context = "settings"
+	overlay.set_navigation_context(navigation_context)
+	var currency_status: Array = [
+		{"id":"credits", "value":_money(float(profile.totalCoins))},
+		{"id":"boss_module", "value":str(int(profile.railgunModules))}
+	]
+	# Cash exists only inside an unfinished run. Put it first so it remains easy
+	# to scan from the paused run workshop without duplicating it in the subtitle.
+	if not profile.activeRun.is_empty():
+		currency_status.push_front({"id":"cash", "value":_money(float(runState.cash))})
+	overlay.set_currency_status(currency_status)
+	if menu_view in ["railgun","railgun_catalog","railgun_detail","build","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","ship_systems"]:
 		overlay.set_overlay_background(COMMAND_DECK_BACKDROP, true)
 		last_layout_size = Vector2.ZERO
 		_layout_buttons()
-		if menu_view in ["hangar","loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","build","ship_systems"]: overlay.show_hangar(self)
+		if menu_view in ["loadout","equipment_picker","equipment_detail","blueprints","blueprint_detail","build","ship_systems"]: overlay.show_hangar(self)
 		else: overlay.show_railgun(self)
 		# The panel builds its card grid dynamically; measure it again afterwards.
 		last_layout_size = Vector2.ZERO
 		_layout_buttons()
 		return
-	overlay.set_overlay_opacity(0.76 if status == "dead" else 0.96)
-	overlay.set_overlay_background(run_complete_background if status == "dead" else COMMAND_DECK_BACKDROP, true)
+	var overlay_alpha := 0.76 if status == "dead" else (0.86 if menu_view == "main" and status == "menu" else 0.96)
+	overlay.set_overlay_opacity(overlay_alpha)
+	var home_menu := menu_view == "main" and status == "menu"
+	var menu_backdrop: Texture2D = run_complete_background if status == "dead" else (_fracture_field_home_backdrop() if home_menu else COMMAND_DECK_BACKDROP)
+	overlay.set_overlay_background(menu_backdrop, true, 0.32 if home_menu else 0.14)
 	var entries := []
 	var actions := []
 	var tabs := []
@@ -2917,45 +3256,72 @@ func _refresh_overlay() -> void:
 		var ship_level := int(ship_state.get("upgrade_level",0))
 		var ship_cap := ShipRegistry.SHIP_LEVEL_CAP
 		title = "CHASSIS BAY"
-		summary = "%s · %s · Lv.%d/%d\nChassis levels improve hull, recovery, armor and base attack. Movement speed is a fixed ship characteristic." % [str(ship.get("name","DRIFTER")).to_upper(),str(ship.get("rarity","common")).to_upper(),ship_level,ship_cap]
+		summary = "%s · %s · Lv.%d/%d\nChassis levels improve hull, recovery, armor rating and base attack. Movement speed is a fixed ship characteristic." % [str(ship.get("name","DRIFTER")).to_upper(),str(ship.get("rarity","common")).to_upper(),ship_level,ship_cap]
 		var ship_cost := ShipRegistry.upgrade_cost(ship_level)
-		entries = [{"text":"CHASSIS CALIBRATION\nLv.%d/%d · Hull %.0f · Regen %.2f/s · Armor %.1f%% · Attack %.1f\nNext: +8 hull · +0.04 regen · +0.3%% armor · +0.5 attack" % [ship_level,ship_cap,_ship_base_stat("max_hp"),_ship_base_stat("regen"),_ship_base_stat("armor") * 100.0,_ship_base_stat("damage")],"buttons":[{"text":"MAX LEVEL" if ship_level >= ship_cap else "Upgrade / ◈ %s" % _money(float(ship_cost)),"action":"ship_upgrade","disabled":ship_level >= ship_cap or float(profile.totalCoins) < ship_cost or not profile.activeRun.is_empty()}]}]
-		actions = [{"text":"Workshop","action":"workshop"},{"text":"Back to Hangar","action":"back"}]
+		entries = [{"text":"CHASSIS CALIBRATION\nLv.%d/%d · Hull %.0f · Regen %.2f/s · Armor rating %.1f · Attack %.1f\nNext: +8 hull · +0.04 regen · +0.3 armor rating · +0.5 attack" % [ship_level,ship_cap,_ship_base_stat("max_hp"),_ship_base_stat("regen"),_armor_rating(_ship_base_stat("armor")),_ship_base_stat("damage")],"buttons":[{"text":"MAX LEVEL" if ship_level >= ship_cap else "Upgrade / ◈ %s" % _money(float(ship_cost)),"action":"ship_upgrade","disabled":ship_level >= ship_cap or float(profile.totalCoins) < ship_cost or not profile.activeRun.is_empty()}]}]
+		actions = [{"text":"Workshop","action":"workshop"},{"text":"Back to Loadout","action":"back"}]
 	elif menu_view == "shop" or menu_view == "workshop":
 		var workshop := menu_view == "workshop"
 		title = "WORKSHOP" if workshop else "RUN UPGRADES"
 		var wallet := float(profile.totalCoins) if workshop else float(runState.cash)
-		summary = ("◈ %s available · Permanent" if workshop else "CASH %s / Paused") % _money(wallet)
-		for category in ["Attack", "Defense", "Utility"]:
-			tabs.append({"text": category, "action": "tab:" + category, "selected": category == shop_category})
-		for quantity in [1, 10]:
-			quantities.append({"text": "Buy %d" % quantity, "action": "quantity:%d" % quantity, "selected": quantity == buy_quantity})
+		var currency_id := "credits" if workshop else "cash"
+		summary = "PERMANENT SHIP CALIBRATION" if workshop else "RUN LAYER / PAUSED"
+		if not workshop:
+			for category in ["Attack", "Defense", "Utility"]:
+				tabs.append({"text": category, "action": "tab:" + category, "selected": category == shop_category})
+		else:
+			entries.append({"workshop_overview": {"context_action": {"text":"RESET", "action":"reset_workshop", "disabled":profile_store.workshop_refund(profile) <= 0 or not profile.activeRun.is_empty()}, "stats": [
+				{"label":"Attack", "value":"%.1f" % _stat("damage")},
+				{"label":"Hull", "value":"%.0f" % _stat("max_hp")},
+				{"label":"Shield", "value":"%.0f" % _stat("shield_capacity")}
+			]}})
+		var section_descriptions := {
+			"Attack":"Ship-wide weapon baseline.",
+			"Defense":"Hull and Shield Core output.",
+			"Utility":"Universal ship systems."
+		}
+		var last_category := ""
 		for entry in UpgradeRegistry.CATALOG:
-			if entry.category != shop_category: continue
+			if not workshop and entry.category != shop_category: continue
+			if workshop and entry.category != last_category:
+				entries.append({"workshop_section": {"title":entry.category, "description":section_descriptions.get(entry.category,""), "accent":"#f5bd3d" if entry.category == "Attack" else ("#69e6b5" if entry.category == "Defense" else "#12d9f2")}})
+				last_category = entry.category
 			var levels := UpgradeRegistry.level(entry.id, profile.permanentUpgrades, {} if workshop else run_upgrades)
-			var quote := UpgradeRegistry.quote(entry.id, profile.permanentUpgrades, run_upgrades, wallet, buy_quantity, workshop)
-			var next_level := levels + maxi(1, int(quote.count))
-			var current_value := _workshop_display_value(entry.id, levels) if workshop else UpgradeRegistry.display_value(entry.id, levels)
-			var next_value := "MAX" if levels == int(entry.cap) else (_workshop_display_value(entry.id, next_level) if workshop else UpgradeRegistry.display_value(entry.id, next_level))
+			var quote := UpgradeRegistry.quote(entry.id, profile.permanentUpgrades, run_upgrades, wallet, 1, workshop)
+			var permanent_levels := int(profile.permanentUpgrades.get(entry.id, 0))
+			var temporary_levels := 0 if workshop else int(run_upgrades.get(entry.id, 0))
+			var current_value := _upgrade_display_line(entry.id, permanent_levels, temporary_levels)
+			var current_display := _upgrade_display_value(entry.id, permanent_levels, temporary_levels)
+			var next_permanent_levels := permanent_levels + (maxi(1, int(quote.count)) if workshop else 0)
+			var next_temporary_levels := temporary_levels + (maxi(1, int(quote.count)) if not workshop else 0)
+			var next_value := "MAX" if levels == int(entry.cap) else _upgrade_display_line(entry.id, next_permanent_levels, next_temporary_levels)
+			var next_display := _upgrade_display_value(entry.id, next_permanent_levels, next_temporary_levels)
+			var next_hint := _upgrade_next_hint(current_display, next_display, levels == int(entry.cap))
 			var price := float(quote.cost) if int(quote.count) > 0 else UpgradeRegistry.cost(levels, workshop)
-			var caption := "MAX" if levels == int(entry.cap) else "Buy %d\n%s %s" % [maxi(1, int(quote.count)), _money(price), "◈" if workshop else "cash"]
-			entries.append({"upgrade_name": entry.name, "level": levels, "cap": entry.cap, "values": "%s -> %s" % [current_value, next_value], "purchase": {"text": caption, "action": "buy:%s:%d" % [entry.id, buy_quantity], "disabled": int(quote.count) == 0 or (workshop and not profile.activeRun.is_empty())}})
+			var caption := "MAX" if levels == int(entry.cap) else "UPGRADE"
+			entries.append({"id":entry.id, "upgrade_name": entry.name, "category":entry.category, "level": levels, "cap": entry.cap, "values": "%s -> %s" % [current_value, next_value], "base_label":_upgrade_base_label(entry.id), "base_value":_upgrade_base_display(entry.id), "effective_value":str(current_display.get("actual", "0")), "multiplier_value":str(current_display.get("progress", "")), "next_hint":next_hint, "price_text":"" if levels == int(entry.cap) else _money(price), "currency_id":currency_id, "purchase": {"text": caption, "action": "buy:%s:1" % entry.id, "disabled": int(quote.count) == 0 or (workshop and not profile.activeRun.is_empty())}})
 
 		if workshop and shop_category == "Utility":
 			entries.append({"text": "AUTO-DODGE / Permanent unlock\nReach wave 30, then spend ◈ 1,000.", "buttons": [{"text": "Unlocked" if profile.autoDodgeUnlocked else "Unlock / ◈ 1,000", "action": "unlock_auto", "disabled": bool(profile.autoDodgeUnlocked) or int(profile.highestWave) < 30 or float(profile.totalCoins) < 1000.0 or not profile.activeRun.is_empty()}]})
 		actions = [{"text": "Resume Run" if not workshop else "Back", "action": "resume" if not workshop else "back"}]
 		if workshop:
-			actions = [{"text": "Reset", "action": "reset_workshop", "inline": true, "disabled": profile_store.workshop_refund(profile) <= 0 or not profile.activeRun.is_empty()}, {"text":"Chassis Bay","action":"ship_systems"}, {"text":"Back","action":"back"}]
+			actions = []
 	elif menu_view == "settings":
 		title = "SETTINGS"
 		summary = "LOCAL GAME PREFERENCES"
 		entries = [
 			{"text":"SCREEN SHAKE\nVisual impact feedback during combat.","buttons":[{"text":"ON" if bool(profile.settings.get("screenShake",true)) else "OFF","action":"settings_shake"}]},
+			{"text":"DEVELOPERS\nTest currency, modules and saved progression.","buttons":[{"text":"OPEN DEVELOPER TOOLS","action":"developers"}]},
 		]
 		actions = [{"text":"Back", "action":"back"}]
+	elif menu_view == "tier_brief":
+		title = "TIER I BRIEF"
+		summary = "FRACTURE FIELD · EXPEDITION ROUTE"
+		entries = [{"tier_brief":_tier_one_brief_data()}]
+		actions = []
 	elif menu_view == "developers":
 		title = "DEVELOPERS"
-		summary = "◈ %s / ▣ %d" % [_money(float(profile.totalCoins)),int(profile.railgunModules)]
+		summary = "DEVELOPER TOOLS"
 		entries = [
 			{"text":"Add permanent currency. Changes save immediately.","buttons":[{"text":"+1,000 ◈","action":"dev_coins_small"},{"text":"+10,000 ◈","action":"dev_coins_large"}]},
 			{"text":"Railgun upgrade ▣","buttons":[{"text":"+10 ▣","action":"dev_modules_small"},{"text":"+100 ▣","action":"dev_modules_large"}]},
@@ -2966,7 +3332,7 @@ func _refresh_overlay() -> void:
 		title = "RESET ENTIRE GAME?"
 		summary = "All local progress will be lost."
 		entries = [{"text":"◈ and ▣ return to zero. Workshop upgrades, Railgun levels, unlocks, records, Codex history, settings and any saved run return to their starting state. This cannot be undone in the game."}]
-		actions = [{"text":"Cancel","action":"developers"},{"text":"Reset entire game","action":"dev_reset_confirm"}]
+		actions = [{"text":"Cancel","action":"cancel_dev_reset"},{"text":"Reset entire game","action":"dev_reset_confirm"}]
 	elif menu_view == "reset_workshop":
 		title = "RESET WORKSHOP?"
 		summary = "Refund ◈ %s" % _money(profile_store.workshop_refund(profile))
@@ -3021,7 +3387,7 @@ func _refresh_overlay() -> void:
 			counts[group] += 1
 			if group == "active" and (_is_enemy_discovered(entry.id) or run_discovered_enemies.has(entry.id)):
 				discovered_count += 1
-		summary = "%d / %d encountered • Base stats" % [discovered_count, counts.active] if codex_tab == "active" else "Archived designs • Not spawning in this mode"
+		summary = "%d / %d encountered • Base stats" % [discovered_count, counts.active] if codex_tab == "active" else "Archived designs • Reference only"
 		for group in ["active", "archive"]:
 			tabs.append({"text": "%s / %d" % [group.capitalize(), counts[group]], "action": "codex_tab:" + group, "selected": codex_tab == group})
 		for entry in definitions:
@@ -3043,8 +3409,8 @@ func _refresh_overlay() -> void:
 		actions = [{"text": "Back", "action": "back"}]
 	elif status == "paused":
 		title = "RUN PAUSED"
-		summary = "Wave %d / %s\nCash %s / Run ◈ %s\nYour run is saved. No progress while away." % [int(runState.wave), _format_time(elapsed), _money(float(runState.cash)), _money(float(runState.coinsEarned))]
-		actions = [{"text": "Resume Run", "action": "resume"}, {"text": "Wave Intel", "action": "wave_intel"}, {"text": "Run Upgrades", "action": "shop"}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Retire Run / Bank ◈", "action": "retire"}]
+		summary = "Wave %d / %s\nYour run is saved. No progress while away." % [int(runState.wave), _format_time(elapsed)]
+		actions = [{"text": "Resume Run", "action": "resume"}, {"text": "Wave Intel", "action": "wave_intel"}, {"text": "Workshop", "action": "shop"}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Retire Run / Bank ◈", "action": "retire"}]
 	elif status == "dead":
 		title = "RUN COMPLETE"
 		summary = ""
@@ -3058,38 +3424,59 @@ func _refresh_overlay() -> void:
 		for blueprint_id in run_new_blueprints:
 			var blueprint := EquipmentRegistry.definition(str(blueprint_id))
 			if not blueprint.is_empty():
-				run_results.append({"wide":true, "label":"NEW BLUEPRINT", "value":"[b]%s[/b]\nAvailable in Hangar" % str(blueprint.name)})
+				run_results.append({"wide":true, "label":"NEW BLUEPRINT", "value":"[b]%s[/b]\nAvailable from Loadout" % str(blueprint.name)})
 		entries = [{"run_results": run_results}]
 		actions = [{"text": "Run Again", "action": "start"}, {"text": "Main Menu", "action": "menu"}]
 	else:
-		summary += "\n◈ %s / BEST WAVE %d" % [_money(float(profile.totalCoins)), int(profile.highestWave)]
-		entries = [{"text": "Defeat enemies, bank resources and improve your ship modules in the Hangar. Every five Railgun levels unlocks a permanent milestone. Bosses drop upgrade ▣."}]
-		actions = [{"text": "Start Run", "action": "start", "disabled": not profile.activeRun.is_empty()}, {"text": "Hangar", "action": "hangar"}, {"text": "Enemy Codex", "action": "codex"}, {"text": "Settings", "action": "settings"}]
+		title = "VOID DRIFTER"
+		summary = "PREPARE YOUR EXPEDITION"
+		entries = [{"home_command": _tier_one_home_command()}]
+		actions = []
 	if menu_view == "main" and status == "menu":
-		actions.append({"text":"Developers","action":"developers"})
+		# Developer tools remain reachable through their explicit route, but do not
+		# compete with the player's single campaign action on the home screen.
+		pass
 	if menu_view == "main" or menu_view == "pause":
-		if status == "menu":
+		if status == "menu" and menu_view != "main":
 			entries.append({"text":"Railgun Lv.%d · next permanent milestone at Lv.%d" % [_railgun_level(),(floori(float(_railgun_level()) / 5.0) + 1) * 5]})
 		elif status == "paused":
-			actions.insert(1,{"text":"Hangar","action":"hangar"})
+			actions.insert(1,{"text":"Loadout","action":"loadout"})
 			actions.append({"text":"Dodge ON" if profile.autoDodgeEnabled else "Dodge OFF","action":"auto","disabled":not profile.autoDodgeUnlocked})
 	if save_error and status != "dead":
 		summary += "\nSave failed. Keep this tab open and retry."
 		actions.append({"text": "Retry Save", "action": "save"})
 	overlay.scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	overlay.show_content(title, summary, tabs, entries, actions, quantities)
+	# Main and paused root screens have no parent view. Do not show a decorative
+	# back affordance that cannot perform a meaningful navigation action.
+	var can_go_back := menu_view not in ["main", "pause"]
+	overlay.show_content(title, summary, tabs, entries, actions, quantities, can_go_back)
 	if status == "dead":
 		overlay.scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		overlay.rows.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	if menu_view == "main" and status == "menu":
-		var hero: TextureRect = overlay.portrait("hero",160)
-		overlay.rows.add_child(hero)
-		overlay.rows.move_child(hero,0)
 	last_layout_size = Vector2.ZERO
 	_layout_buttons()
 
+func _navigate_menu(destination: String) -> void:
+	if destination != menu_view:
+		navigation_return_view = menu_view
+	menu_view = destination
+
 func _on_panel_action(action: String) -> void:
-	if action.begins_with("hangar_slot:"):
+	if action.begins_with("nav:"):
+		var destination := action.get_slice(":", 1)
+		match destination:
+			"home":
+				if status in ["menu", "dead", "paused"]: menu_view = "main" if status != "paused" else "pause"
+			"workshop":
+				if profile.activeRun.is_empty() and status in ["menu", "dead"]: _navigate_menu("workshop")
+			"loadout", "hangar":
+				if status in ["menu", "dead", "paused"]: _navigate_menu("loadout")
+			"codex":
+				if status in ["menu", "dead", "paused"]: _navigate_menu("codex")
+			"settings":
+				if status == "menu": _navigate_menu("settings")
+		overlay.scroll.scroll_vertical = 0
+	elif action.begins_with("hangar_slot:"):
 		hangar_selected_slot = action.get_slice(":",1)
 		var installed := LoadoutSystem.installed_instance(profile,hangar_selected_slot)
 		if installed.is_empty(): menu_view = "equipment_picker"
@@ -3121,9 +3508,13 @@ func _on_panel_action(action: String) -> void:
 			overlay.scroll.scroll_vertical = 0
 	elif action.begins_with("build_equipment:"):
 		var blueprint_id := action.get_slice(":",1)
-		_build_equipment(blueprint_id)
-		hangar_selected_equipment = blueprint_id
-		menu_view = "blueprint_detail"
+		var built_instance_id := _build_equipment(blueprint_id)
+		if not built_instance_id.is_empty():
+			hangar_selected_equipment = built_instance_id
+			menu_view = "loadout"
+		else:
+			hangar_selected_equipment = blueprint_id
+			menu_view = "blueprint_detail"
 	elif action.begins_with("equipment_details:"):
 		hangar_selected_equipment = action.get_slice(":",1)
 		menu_view = "equipment_detail"
@@ -3151,9 +3542,11 @@ func _on_panel_action(action: String) -> void:
 		menu_view = "loadout"
 		overlay.scroll.scroll_vertical = 0
 	elif action == "blueprints":
+		navigation_return_view = "loadout"
 		menu_view = "blueprints"
 		overlay.scroll.scroll_vertical = 0
 	elif action == "ship_systems":
+		navigation_return_view = "loadout"
 		menu_view = "ship_systems"
 		overlay.scroll.scroll_vertical = 0
 	elif action.begins_with("wave_intel_tab:"):
@@ -3184,6 +3577,8 @@ func _on_panel_action(action: String) -> void:
 		buy_quantity = 10 if action.get_slice(":", 1) == "10" else 1
 	elif action.begins_with("buy:"):
 		_buy_upgrade(action.get_slice(":", 1), int(action.get_slice(":", 2)))
+	elif action.begins_with("claim_tier_reward:"):
+		_claim_tier_reward(action.get_slice(":", 1))
 	elif action == "ship_upgrade":
 		_upgrade_active_ship()
 	elif action.begins_with("install_equipment:"):
@@ -3195,9 +3590,13 @@ func _on_panel_action(action: String) -> void:
 		_upgrade_equipment(action.get_slice(":",1))
 	else:
 		match action:
+			"tier_brief":
+				if status in ["menu", "dead"]:
+					_navigate_menu("tier_brief")
+					overlay.scroll.scroll_vertical = 0
 			"developers":
 				if status == "menu":
-					menu_view = "developers"
+					_navigate_menu("developers")
 					overlay.scroll.scroll_vertical = 0
 			"dev_coins_small", "dev_coins_large", "dev_modules_small", "dev_modules_large":
 				if status == "menu" and menu_view == "developers":
@@ -3208,6 +3607,8 @@ func _on_panel_action(action: String) -> void:
 					save_error = not profile_store.save_profile(profile)
 			"dev_reset":
 				if status == "menu" and menu_view == "developers": menu_view = "dev_reset"
+			"cancel_dev_reset":
+				if status == "menu" and menu_view == "dev_reset": menu_view = "developers"
 			"dev_reset_confirm":
 				if status == "menu" and menu_view == "dev_reset":
 					profile = profile_store._default_profile()
@@ -3220,16 +3621,16 @@ func _on_panel_action(action: String) -> void:
 			"railgun", "railgun_catalog":
 				if status in ["menu", "dead"]: menu_view = action
 				overlay.scroll.scroll_vertical = 0
-			"hangar":
+			"loadout", "hangar":
 				if status == "running": _pause_run()
-				if status in ["menu","dead","paused"]: menu_view = "hangar"
+				if status in ["menu","dead","paused"]: _navigate_menu("loadout")
 				overlay.scroll.scroll_vertical = 0
 			"railgun_buy": _buy_railgun()
 			"build_railgun": _build_equipment(EquipmentRegistry.RAILGUN_ID)
 			"build_micro_missile": _build_equipment(EquipmentRegistry.MICRO_MISSILE_RACK_ID)
 			"build":
 				if status == "running": _pause_run()
-				if status == "paused": menu_view = "hangar"
+				if status == "paused": menu_view = "loadout"
 			"speed":
 				if status == "running":
 					profile.settings.gameSpeed = ProfileStore.GAME_SPEEDS[(ProfileStore.GAME_SPEEDS.find(_game_speed()) + 1) % ProfileStore.GAME_SPEEDS.size()]
@@ -3260,9 +3661,9 @@ func _on_panel_action(action: String) -> void:
 					wave_intel_tab = "roster"
 			"workshop":
 				if profile.activeRun.is_empty() and status in ["menu", "dead"]:
-					menu_view = "workshop"
+					_navigate_menu("workshop")
 			"settings":
-				if status == "menu": menu_view = "settings"
+				if status == "menu": _navigate_menu("settings")
 			"settings_shake":
 				if status == "menu":
 					profile.settings.screenShake = not bool(profile.settings.get("screenShake",true))
@@ -3277,17 +3678,20 @@ func _on_panel_action(action: String) -> void:
 				if status == "paused":
 					_end_run()
 			"codex":
-				menu_view = "codex"
+				_navigate_menu("codex")
 				overlay.scroll.scroll_vertical = 0
 			"back":
-				if menu_view == "ship_systems": menu_view = "hangar"
-				elif menu_view == "workshop": menu_view = "ship_systems"
-				elif menu_view == "settings": menu_view = "main"
-				elif menu_view == "loadout": menu_view = "hangar"
+				if menu_view == "ship_systems": menu_view = "loadout"
+				elif menu_view == "workshop": menu_view = navigation_return_view
+				elif menu_view == "settings": menu_view = navigation_return_view
+				elif menu_view == "developers": menu_view = navigation_return_view
+				elif menu_view == "tier_brief": menu_view = "main"
+				elif menu_view == "loadout": menu_view = "pause" if status == "paused" else "main"
 				elif menu_view == "equipment_picker": menu_view = "loadout"
 				elif menu_view == "equipment_detail": menu_view = "loadout"
-				elif menu_view == "blueprints": menu_view = "hangar"
+				elif menu_view == "blueprints": menu_view = "loadout"
 				elif menu_view == "blueprint_detail": menu_view = "blueprints"
+				elif menu_view == "codex": menu_view = navigation_return_view
 				else: menu_view = "pause" if status == "paused" else "main"
 			"menu": reset_world("menu")
 			"auto":
@@ -3407,6 +3811,10 @@ func _update_visual_effects(delta: float) -> void:
 	screen_shake = maxf(0.0, screen_shake - delta * 8.0)
 	level_pulse = maxf(0.0, level_pulse - delta * 1.6)
 	wave_pulse = maxf(0.0, wave_pulse - delta * 1.8)
+	for presentation_signal in presentation_signals:
+		presentation_signal.remaining = maxf(0.0, float(presentation_signal.get("remaining", 0.0)) - delta)
+	presentation_signals = presentation_signals.filter(func(presentation_signal): return float(presentation_signal.get("remaining", 0.0)) > 0.0)
+	sector_transition.remaining = maxf(0.0, float(sector_transition.get("remaining", 0.0)) - delta)
 	for enemy in enemies:
 		enemy.hit_flash = maxf(0.0, float(enemy.get("hit_flash", 0.0)) - delta)
 		enemy.hit_visual_timer = maxf(0.0, float(enemy.get("hit_visual_timer", 0.0)) - delta)
@@ -3576,14 +3984,15 @@ func _projectile_travel(origin: Vector2, direction: Vector2) -> float:
 	return maxf(0,distance) if distance != INF else 0.0
 
 func _draw_icon_text(font: Font, position: Vector2, value: String, _alignment: int, width: float, pixels: int, color: Color) -> void:
-	var icons := {"◈":"coin","▣":"module","✦":"star","★":"star","☆":"star_empty"}
+	var icons := {"◈":UI.currency_path("credits"),"▣":UI.currency_path("boss_module"),"✦":"res://assets/ui/icons/star.svg","★":"res://assets/ui/icons/star.svg","☆":"res://assets/ui/icons/star_empty.svg"}
 	var cursor := position
 	for character in value:
 		if cursor.x-position.x > width: break
 		if icons.has(character):
-			if not hud_icon_textures.has(character): hud_icon_textures[character] = load("res://assets/ui/icons/%s.svg" % icons[character])
+			if not hud_icon_textures.has(character): hud_icon_textures[character] = load(str(icons[character]))
 			var texture: Texture2D = hud_icon_textures[character]
-			draw_texture_rect(texture,Rect2(cursor-Vector2(0,pixels-2),Vector2.ONE*pixels),false,color)
+			var icon_color := Color.WHITE if character in ["◈","▣"] else color
+			draw_texture_rect(texture,Rect2(cursor-Vector2(0,pixels-2),Vector2.ONE*pixels),false,icon_color)
 			cursor.x += pixels+2
 		else:
 			draw_string(font,cursor,character,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels,color)

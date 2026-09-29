@@ -11,6 +11,10 @@ const RAIL_PIVOT := Vector2(192, 206)
 const RAIL_LENGTH := 7.0
 
 static func weapon_id(enemy: Dictionary) -> String:
+	if str(enemy.get("type_id", "")) == Registry.BOSS_ID:
+		match str(enemy.get("boss_variant", "")):
+			"rail_fortress": return "tank_railgun"
+			"rift_carrier": return "enemy_railgun"
 	return str(enemy.get("attack_behavior", "contact"))
 
 static func active_rockets(game, owner_id: int) -> int:
@@ -41,6 +45,7 @@ static func eligible(game, enemy: Dictionary) -> bool:
 	return not rocket or active_rockets(game, int(enemy.id)) < 2
 
 static func update(game, enemy: Dictionary, delta: float) -> void:
+	enemy.attack_real_timer = maxf(0.0, float(enemy.get("attack_real_timer", 0.0)) - delta / float(game._game_speed()))
 	var id := weapon_id(enemy)
 	if not Weapons.CYCLES.has(id): return
 	Weapons.ensure_cycle(enemy, id)
@@ -58,12 +63,14 @@ static func update(game, enemy: Dictionary, delta: float) -> void:
 		# Lock a world-space target for the warning. Fast circling ships may move far
 		# enough during warmup that reusing their old aim angle from a new muzzle would
 		# send the round beside an otherwise stationary player.
-		enemy.attack_target = game.player.position
+		enemy.attack_target = game._player_deflector_surface(pivot(game, enemy), enemy.get("attack_direction", game._get_enemy_forward_direction(enemy)))
 		enemy.attack_direction = (Vector2(enemy.attack_target) - pivot(game, enemy)).normalized()
 		enemy.attack_warmup_timer = float(spec.warmup)
+		if str(enemy.get("type_id", "")) in [Registry.BOSS_ID, Registry.ELITE_HUNTER_ID, Registry.KAMIKAZE_ID]:
+			enemy.attack_real_timer = maxf(0.30, float(spec.warmup) / float(game._game_speed()))
 	var overshoot := maxf(0.0, remaining - float(enemy.attack_warmup_timer))
 	enemy.attack_warmup_timer = maxf(0.0, float(enemy.attack_warmup_timer) - remaining)
-	if float(enemy.attack_warmup_timer) > 0.000001: return
+	if float(enemy.attack_warmup_timer) > 0.000001 or float(enemy.get("attack_real_timer", 0.0)) > 0.000001: return
 	enemy.attack_warmup_timer = 0.0
 	fire(game, enemy)
 	Weapons.consume(enemy, id)
@@ -77,10 +84,10 @@ static func fire(game, enemy: Dictionary) -> void:
 	var rocket := id == "boss_rocket"
 	var start := origin(game, enemy)
 	var direction := aim(game, enemy).normalized()
-	if not rocket and enemy.has("attack_target"):
-		var target: Vector2 = enemy.attack_target
-		if target.distance_squared_to(start) > 0.001:
-			direction = (target - start).normalized()
+	# Reacquire the closest field surface at the muzzle after warm-up.
+	var target: Vector2 = game._player_deflector_surface(start, direction)
+	if target.distance_squared_to(start) > 0.001:
+		direction = (target - start).normalized()
 	var life := ROCKET_LIFE if rocket else 2.2
 	var base_contact := float(Registry.get_definition(str(enemy.type_id)).base_stats.contact_damage)
 	var damage := float(Weapons.cycle(id).damage)*float(enemy.contact_damage)/maxf(0.001,base_contact)
@@ -105,7 +112,7 @@ static func move_projectile(game, shot: Dictionary, delta: float) -> void:
 	var step := minf(delta, maxf(0.0, float(shot.life)))
 	if shot.get("weapon_id", "") == "boss_rocket":
 		var velocity: Vector2 = shot.velocity
-		var desired: Vector2 = game.player.position - shot.position
+		var desired: Vector2 = game._player_deflector_surface(shot.position, -velocity.normalized()) - shot.position
 		if desired.length_squared() > 0.001:
 			var turn := clampf(wrapf(desired.angle() - velocity.angle(), -PI, PI), -ROCKET_TURN * step, ROCKET_TURN * step)
 			shot.velocity = velocity.rotated(turn)

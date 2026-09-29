@@ -31,14 +31,47 @@ func run_tests() -> void:
 	expect(Upgrades.quote("damage", base, temporary, 7, 1, false).count == 0, "Insufficient cash cannot buy")
 	var quote := Upgrades.quote("damage", base, temporary, 30, 10, false)
 	expect(quote.count == 3 and is_equal_approx(quote.cost, 27.0), "Buy 10 purchases only affordable levels")
-	expect(is_equal_approx(Upgrades.workshop_multiplier("damage", 2), 1.12), "Workshop Attack uses a multiplier-only progression")
+	expect(is_equal_approx(Upgrades.workshop_multiplier("damage", 2), 1.20), "Workshop Attack uses a 10 percent per-level multiplier")
+	expect(is_equal_approx(Upgrades.workshop_multiplier("damage", 1, 8.0) * 8.0, 8.8), "First Ship Attack level applies a 10 percent increase")
 	expect(Director.phase(25.99) == "spawning" and Director.phase(26.0) == "cooldown" and Director.get_run_level(35.0) == 2, "Wave phase boundaries")
+	var sector_ids := ["dead_relay", "ion_wake", "fracture_field", "hunters_wake", "dead_relay"]
+	for index in range(sector_ids.size()):
+		expect(str(Director.sector_for_wave(1 + index * 10).id) == sector_ids[index], "Encounter sector rotation at wave %d" % (1 + index * 10))
+	var boss_variants := {10:"missile_dreadnought", 20:"rail_fortress", 30:"rift_carrier", 40:"missile_dreadnought"}
+	for wave in boss_variants:
+		expect(Director.boss_variant_for_wave(int(wave)) == boss_variants[wave], "Boss variant rotation at wave %d" % int(wave))
+	for seed in range(100):
+		for wave in range(11, 31):
+			if wave % 10 == 0:
+				continue
+			var previous_role := ""
+			var encounter := Director.build_encounter(wave, seed)
+			var due := Director.spawn_instructions_due(encounter, 25.99)
+			expect(int(encounter.cursor) == due.size() and due.size() <= 56, "Seeded encounter cursor consumes each wave once")
+			for instruction in due:
+				expect(str(instruction.enemy_id) != "void_boss" and str(instruction.edge) in ["top", "left", "right", "bottom"], "Encounter instruction has valid enemy and edge")
+				if str(instruction.primary_role) == previous_role:
+					expect(false, "Seeded deck avoids direct primary-role repetition")
+				previous_role = str(instruction.primary_role)
+	var wave_one := Director.build_encounter(1, 17)
+	var wave_two := Director.build_encounter(2, 17)
+	var opening_times := [3.0, 3.0, 11.0, 11.0, 11.0, 19.0, 19.0, 19.0]
+	expect(wave_one.instructions.size() == opening_times.size(), "Opening wave has exactly eight calibration drones")
+	for index in range(opening_times.size()):
+		var instruction: Dictionary = wave_one.instructions[index]
+		expect(str(instruction.enemy_id) == "void_drone" and not bool(instruction.weapon_enabled) and is_equal_approx(float(instruction.at), float(opening_times[index])), "Opening wave uses unarmed 2/3/3 drone groups")
+	var opening_due: Array = []
+	for elapsed_time in [2.99, 3.0, 10.99, 11.0, 18.99, 19.0, 25.99]:
+		opening_due.append_array(Director.spawn_instructions_due(wave_one, elapsed_time))
+	expect(opening_due.size() == 8 and int(wave_one.cursor) == 8, "Opening instructions are consumed once without replay")
+	expect(not bool(wave_two.instructions[0].weapon_enabled), "Second opening wave keeps drone weapons suppressed")
+	expect(not bool(Director.build_encounter(10, 17).normal_spawns), "Boss wave has no regular spawn backlog")
 	for wave in [1, 3, 5, 7, 50, 1000]:
 		for seed in range(100):
 			var id := Enemies.choose_enemy_type_id(wave, seed)
-			expect(id in ["void_drone", "red_scout", "ranged_shooter", "void_tank", "armored_drone"], "Spawn roster excludes bosses and deferred enemies")
+			expect(id in ["void_drone", "red_scout", "ranged_shooter", "void_tank", "armored_drone", "void_swarm", "splitter", "elite_hunter"], "Spawn roster excludes bosses and future Nova Dart")
 			expect(Director.spawn_interval(wave) >= 0.45, "Spawn interval floor")
-	var expected_rosters := {1:["void_drone"], 3:["void_drone","red_scout"], 5:["void_drone","red_scout","armored_drone","ranged_shooter"], 7:["void_drone","red_scout","armored_drone","ranged_shooter","void_tank"], 10:["void_drone","red_scout","armored_drone","ranged_shooter","void_tank","void_boss"]}
+	var expected_rosters := {1:["void_drone"], 3:["void_drone","red_scout","void_swarm"], 5:["void_drone","red_scout","armored_drone","ranged_shooter","void_swarm"], 7:["void_drone","red_scout","armored_drone","ranged_shooter","void_swarm","splitter","void_tank"], 10:["void_drone","red_scout","armored_drone","ranged_shooter","void_swarm","splitter","void_tank","elite_hunter","void_boss"]}
 	for wave in expected_rosters:
 		var roster := Enemies.get_wave_roster(int(wave))
 		var ids: Array[String] = []
@@ -46,7 +79,9 @@ func run_tests() -> void:
 		for entry in roster:
 			ids.append(str(entry.id))
 			if not bool(entry.guaranteed_boss): chance_total += float(entry.spawn_chance)
-		expect(ids == expected_rosters[wave], "Wave Intel roster is data-driven at wave %d" % int(wave))
+		var expected_ids: Array = expected_rosters[wave].duplicate(); expected_ids.sort()
+		var actual_ids: Array = ids.duplicate(); actual_ids.sort()
+		expect(actual_ids == expected_ids, "Wave Intel roster is data-driven at wave %d" % int(wave))
 		expect(is_equal_approx(chance_total, 1.0), "Wave Intel normal spawn chances normalize at wave %d" % int(wave))
 		if int(wave) == 10:
 			expect(bool(roster[-1].guaranteed_boss) and float(roster[-1].spawn_chance) < 0.0, "Boss is guaranteed only in tenth-wave roster")
@@ -61,6 +96,16 @@ func run_tests() -> void:
 	expect(migrated.discoveredEnemies.is_empty() and migrated.bestScore==0,"Reset discards legacy local progression")
 	expect(store.load_profile().saveVersion==Store.SAVE_VERSION,"Fresh current profile reload is stable")
 	expect(not FileAccess.file_exists(test_path+".v2.bak"),"No legacy migration backup is created")
+	# A readable but unsupported primary must not hide a valid last-good backup.
+	var recoverable := store._default_profile(); recoverable.totalCoins = 731.0; recoverable.highestWave = 14
+	store.save_profile(recoverable)
+	store.save_profile(recoverable)
+	store._write_json(test_path,{"saveVersion":99,"totalCoins":999999})
+	var recovered_unknown := store.load_profile()
+	expect(is_equal_approx(recovered_unknown.totalCoins,731.0) and recovered_unknown.highestWave == 14,"Unknown primary recovers the valid backup")
+	expect(FileAccess.file_exists(test_path+Store.RECOVERY_SUFFIX),"Unknown primary is preserved as a recovery copy")
+	expect(is_equal_approx(store.recover_profile().totalCoins,731.0),"Explicit recovery returns a safe local profile")
+	expect(not store.restore_recovered_profile(),"Recovery never overwrites a profile without explicit opt-in")
 	migrated.totalCoins = 280.0
 	migrated.permanentUpgrades.damage = 2
 	store.save_profile(migrated)
@@ -71,6 +116,11 @@ func run_tests() -> void:
 	game.profile.activeRun = {}
 	game.start_run()
 	expect(game.runState.cash == 30.0 and game.run_upgrades.damage == 0, "Fresh run has 30 cash and no temporary levels")
+	var permanent_upgrade_line: String = game._upgrade_display_line("damage", 2, 0)
+	var run_upgrade_line: String = game._upgrade_display_line("damage", 0, 2)
+	expect(permanent_upgrade_line == run_upgrade_line and permanent_upgrade_line.find("×") >= 0 and permanent_upgrade_line.find("ACTUAL") >= 0, "Workshop and run upgrade cards share multiplier plus actual-value presentation")
+	var attack_level_one: Dictionary = game._upgrade_display_value("damage", 1, 0)
+	expect(str(attack_level_one.progress) == "×1.10" and str(attack_level_one.actual).find(".") >= 0 and str(attack_level_one.actual).ends_with(" DMG"), "Workshop Attack shows one decimal below 1000")
 	game._on_panel_action("shop")
 	game._buy_upgrade("max_hp", 1)
 	expect(is_equal_approx(game.player.max_hp, 148.4) and is_equal_approx(game.player.hp, 148.4) and game.runState.cash == 22.0, "Hull purchase raises and heals hull, charges only cash")
@@ -177,7 +227,6 @@ func run_tests() -> void:
 		game._spawn_enemy_at({"position": Vector2(50, 100)}, "void_drone")
 	for index in range(4):
 		game._spawn_enemy_at({"position": Vector2(100, 100)}, "void_boss")
-	game.spawn_timer = 0
 	game._update_enemy_spawning(100000)
 	expect(game.enemies.size() == 44, "Density cap skips excess normal spawn attempts")
 	game.runState.wave = 19
@@ -383,11 +432,17 @@ func _test_range_and_visibility(game) -> void:
 	expect(edges.size() == 4, "Seeded spawns cover all four edges")
 	for wave in [1, 15]:
 		game.enemies.clear()
+		game.next_id = 1
 		game.runState.wave = wave
 		game.runState.phase = "spawning"
-		game.spawn_timer = game.FIRST_ENEMY_SPAWN_DELAY
-		for frame in range(780): game._update_enemy_spawning(1000.0 / 30)
-		expect(absi(game.enemies.size() - (23 if wave == 1 else 32)) <= 1, "Spawn counts match density at wave %d" % wave)
+		game.runState.elapsedSeconds = float(wave - 1) * 35.0
+		game.encounter_state = {}
+		for frame in range(780):
+			game.runState.elapsedSeconds += 1.0 / 30.0
+			game._update_enemy_spawning(1000.0 / 30)
+		expect(game.enemies.size() > 0 and game.enemies.size() <= Director.MAX_NORMAL, "Spawn counts remain capped at wave %d" % wave)
+		if wave == 1:
+			expect(game.next_id == 9 and int(game.encounter_state.cursor) == 8, "Opening wave spawns each scheduled drone exactly once")
 	game._end_run()
 	game.menu_view = "workshop"
 	game.profile.totalCoins = 100
@@ -510,7 +565,7 @@ func _test_workshop_speed_damage(game, store) -> void:
 	game.enemy_projectiles.append({"id": 80000, "position": center + Vector2(40, 0), "previous_position": center - Vector2(40, 0), "velocity": Vector2.RIGHT * 190, "radius": 4.8, "damage": 3.0, "life": 1.0})
 	game.run_upgrades.armor = 10
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp, 92.5), "Swept projectile collision applies doubled damage and armor exactly once")
+	expect(is_equal_approx(game.player.hp, 92.2), "Swept projectile collision applies doubled damage and asymptotic armor exactly once")
 	expect(game.enemy_projectiles.is_empty(), "Hit projectile is removed")
 	expect(not game.damage_numbers.is_empty() and game.player_damage_flash > 0 and game.hull_damage_trail > game.player.hp, "Real damage drives ship flash, numbers and hull trail")
 	var feedback_life: float = game.damage_numbers[-1].life
@@ -579,7 +634,6 @@ func _test_railgun_visuals(game, store) -> void:
 	game.profile.settings.gameSpeed = 5
 	game.status = "running"
 	game.fire_timer = 1e8
-	game.spawn_timer = 1e8
 	game.enemies.clear()
 	game._process(0.02)
 	expect(is_equal_approx(game.particles[0].life, 0.33), "5x keeps explosion lifetime in real seconds")
@@ -675,7 +729,7 @@ func _test_gunship_shield(game, store) -> void:
 	game.player.shield = 2.5
 	game.run_upgrades.armor = 10
 	result = game._apply_damage_to_player(game._get_incoming_damage(4.0), "IMPACT")
-	expect(is_equal_approx(result.hull, 0.5) and result.shield == 2.5 and result.broken, "Armor applied once before fractional shield overflow without second minimum")
+	expect(is_equal_approx(result.hull, 0.7) and result.shield == 2.5 and result.broken, "Asymptotic armor applies once before fractional shield overflow without second minimum")
 	expect(game.player.shield_delay == 3, "Every damaging hit sets three-second delay")
 	Shield.update(game.player, 2.9, 3)
 	expect(game.player.shield == 0, "No charge before delay ends")
@@ -796,8 +850,13 @@ func _test_stat_layering(game, store) -> void:
 	game.profile.permanentUpgrades.shield_capacity = 2
 	game.metaProgress = game.profile
 	var chassis_damage: float = game._ship_base_stat("damage")
-	expect(is_equal_approx(chassis_damage, 13.0), "Chassis owns the weapon damage baseline")
-	expect(is_equal_approx(game._stat("damage"), chassis_damage * 1.12), "Workshop damage is a multiplier over chassis damage")
+	expect(is_equal_approx(chassis_damage, 17.0), "Chassis owns the weapon damage baseline")
+	var level_two_damage := chassis_damage * Upgrades.workshop_multiplier("damage", 2, chassis_damage)
+	expect(is_equal_approx(game._stat("damage"), level_two_damage), "Workshop damage is a multiplier over chassis damage")
+	game.profile.permanentUpgrades.damage = 0
+	var base_attack: float = game._stat("damage")
+	game.profile.permanentUpgrades.damage = 1
+	expect(is_equal_approx(game._stat("damage"), base_attack * 1.10), "Workshop Attack applies exactly 10 percent per level")
 	var railgun_stats: Dictionary = game._weapon_runtime_stats({"item":game._railgun_instance(),"blueprint":game.EquipmentRegistry.definition(game.EquipmentRegistry.RAILGUN_ID)})
 	expect(is_equal_approx(float(railgun_stats.damage), game._stat("damage")), "Railgun module consumes the layered ship damage")
 	expect(is_equal_approx(game._stat("shield_capacity"), 30.0 * 1.10), "Shield module is the authoritative shield base before Workshop scaling")
@@ -884,7 +943,7 @@ func _test_salvos(game) -> void:
 	game._update_enemy_weapons(0.45)
 	var drone_shot: Dictionary = game.enemy_projectiles[0]
 	var shot_end: Vector2 = drone_shot.position + Vector2(drone_shot.velocity).normalized() * 200.0
-	expect(Weapons.hit_fraction(drone_shot.position, shot_end, locked_target, float(game.player.radius) + float(drone_shot.radius)) != INF, "Moving Void Drone still fires through its locked warning target")
+	expect(Weapons.hit_fraction(drone_shot.position, shot_end, game.player.position, game._player_deflector_radius() + float(drone_shot.radius)) != INF, "Moving Void Drone reacquires and fires at the nearest deflector surface")
 
 	game.enemies.clear()
 	game.enemy_projectiles.clear()
@@ -893,6 +952,7 @@ func _test_salvos(game) -> void:
 	boss.fire_cooldown = 0.0
 	game._update_enemy_weapons(0.0)
 	var origin: Vector2 = enemy_weapons.origin(game,boss)
+	game._update_visual_effects(0.6)
 	game._update_enemy_weapons(0.6)
 	expect(game.enemy_projectiles.size() == 1 and game.enemy_projectiles[0].position.is_equal_approx(origin), "Boss launch matches warned shoulder anchor")
 	expect(game.enemy_projectiles[0].visual_trail_points == [origin], "Boss rocket starts with visual-only path history")
@@ -903,9 +963,9 @@ func _test_salvos(game) -> void:
 	game._update_enemy_weapons(4.0)
 	game._update_enemy_weapons(10.0)
 	expect(game.enemy_projectiles.size() == 2 and boss.ammo == 1, "Per-boss cap waits without consuming ammunition or accumulating shots")
-	game._spawn_enemy_at({"position":game.player.position + Vector2(-80,0)}, "void_boss")
+	game._spawn_enemy_at({"position":game.player.position + Vector2(80,0)}, "void_boss")
 	game.enemies[-1].fire_cooldown = 0.0
-	game._update_enemy_weapons(0.6)
+	enemy_weapons.fire(game, game.enemies[-1])
 	expect(enemy_weapons.active_rockets(game,int(boss.id)) == 2 and game.enemy_projectiles.size() == 3, "Another boss owns an independent two-rocket allowance")
 	game.enemy_projectiles.remove_at(0)
 	game._update_enemy_weapons(0.0)
@@ -930,10 +990,10 @@ func _test_salvos(game) -> void:
 	game.player.hp = 100.0
 	game.enemy_projectiles.append({"id":999,"owner_id":999,"weapon_id":"boss_rocket","position":game.player.position+Vector2(50,0),"previous_position":game.player.position-Vector2(50,0),"radius":3.2,"velocity":Vector2.RIGHT*85,"damage":6.0,"damage_multiplier":1.0,"life":1.0})
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp,97.5) and game.player.shield == 0, "Rocket swept collision applies Armor once, then shield, then 2.5 hull damage")
+	expect(is_equal_approx(game.player.hp,97.2) and game.player.shield == 0, "Rocket swept collision applies asymptotic Armor once, then shield, then 2.8 hull damage")
 	expect(game.particles.any(func(effect): return str(effect.get("kind","")) == "enemy_missile_impact"), "Boss rocket impact uses compact enemy-colored missile feedback")
 	game._resolve_collisions()
-	expect(is_equal_approx(game.player.hp,97.5), "Rocket is consumed at first impact and cannot deal damage twice")
+	expect(is_equal_approx(game.player.hp,97.2), "Rocket is consumed at first impact and cannot deal damage twice")
 
 	game._spawn_enemy_at({"position":game.player.position + Vector2(-80,0)},"void_boss")
 	boss = game.enemies[-1]
@@ -1077,10 +1137,11 @@ func _test_fleet_navigation(game) -> void:
 		enemy.reload_timer=0.0
 		var cycle: Dictionary=Weapons.CYCLES.get(str(enemy.attack_behavior),{})
 		if cycle.is_empty():
-			expect(str(enemy.attack_behavior)=="contact","Contact-only active type has no projectile cycle: "+id)
+			expect(str(enemy.attack_behavior) in ["contact", "explode_contact"],"Contact-only active type has no projectile cycle: "+id)
 			continue
 		enemy.ammo=int(cycle.magazine)
 		game._update_enemy_weapons(0.0)
+		game._update_visual_effects(float(cycle.warmup))
 		game._update_enemy_weapons(float(cycle.warmup))
 		expect(game.enemy_projectiles.size()==1,"Every active projectile type fires: "+id)
 		var shot: Dictionary=game.enemy_projectiles[0]
@@ -1119,6 +1180,13 @@ func _test_fleet_navigation(game) -> void:
 	expect(is_equal_approx(boss.boss_orbit_time,60) and float(boss.approach_progress)>0.0 and boss.position.distance_to(center)>Navigation.safe_distance(boss),"Boss slowly contracts while continuing its orbit")
 	game._apply_damage_to_player(game._get_incoming_damage(0.1),"HIT")
 	expect(is_equal_approx(game._get_incoming_damage(0.1),0.1),"Small railgun damage is not inflated to a whole point")
+	game.run_upgrades.armor = 0
+	expect(is_equal_approx(game._armor_damage_reduction(),0.0) and is_equal_approx(game._get_incoming_damage(10.0),10.0),"Zero armor provides zero damage reduction")
+	game.run_upgrades.armor = 10
+	var medium_armor_damage: float = game._get_incoming_damage(10.0)
+	game.run_upgrades.armor = 30
+	var high_armor_damage: float = game._get_incoming_damage(10.0)
+	expect(is_equal_approx(game._armor_damage_reduction(),75.0 / 175.0) and medium_armor_damage > high_armor_damage and high_armor_damage > 0.0,"Armor rating reduces damage monotonically without reaching full immunity")
 	game.enemies.clear()
 	game._spawn_enemy_at({"position":center+Vector2(100,0)},"red_scout")
 	game.enemies[0].scout_goal=center+Vector2(-100,0)

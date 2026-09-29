@@ -44,6 +44,7 @@ func run_tests() -> void:
 	var entry := {"item":profile.equipmentItems[Equipment.MICRO_MISSILE_RACK_INSTANCE_ID],"blueprint":Equipment.definition(Equipment.MICRO_MISSILE_RACK_ID)}
 	var stats: Dictionary = game._weapon_runtime_stats(entry)
 	var missile_mount := Equipment.definition(Equipment.MICRO_MISSILE_RACK_ID)
+	var missile_runtime: Dictionary = game.weapon_runtime_by_item_id[Equipment.MICRO_MISSILE_RACK_INSTANCE_ID]
 	var volley_stats := Equipment.micro_missile_stats(10)
 	var impact_burst_stats := Equipment.micro_missile_stats(30)
 	var shatter_stats := Equipment.micro_missile_stats(35)
@@ -56,15 +57,19 @@ func run_tests() -> void:
 	expect(int(shatter_stats.fragment_count) == 4 and is_equal_approx(float(shatter_stats.fragment_damage_ratio),0.25), "Shatter Strike Core creates four impact fragments")
 	expect(is_equal_approx(float(echo_stats.echo_damage_ratio),0.6) and is_equal_approx(float(echo_stats.echo_radius_multiplier),1.5), "Echo Detonation resolves its secondary explosion payload")
 	expect(str(missile_mount.mount_art).contains("weapon_socket_cover") and not str(missile_mount.overlay_art).is_empty() and not bool(missile_mount.rotates_to_target),"Missile payload sits on the complete fixed weapon-socket cover")
-	expect(is_equal_approx(float(stats.damage),11.648),"Missile level one scales from permanent Ship Attack")
+	expect(is_equal_approx(float(stats.damage),18.72),"Missile level one scales from permanent Ship Attack")
+	expect(is_equal_approx(float(stats.reload),8.0) and is_equal_approx(float(Equipment.micro_missile_stats(10).reload),8.0),"Missile baseline reload is eight seconds without a hidden level override")
 	expect(is_equal_approx(float(stats.range), 200.0), "Missile level 1 range starts at 200 units")
 	expect(is_equal_approx(game._weapon_target_range(Equipment.MICRO_MISSILE_RACK_ID, stats), 200.0), "Missile target range uses its own baseline")
+	game.enemies = [_enemy(99, game.player.position + Vector2(0.0, -210.0))]
+	expect(int(game._runtime_target(missile_runtime).get("id", -1)) == 99, "Missile range is measured from its hardpoint instead of the ship centre")
+	game.enemies.clear()
 	profile.permanentUpgrades.range = 2
 	game.run_upgrades.range = 3
 	game.run_upgrades.damage = 3
 	game.metaProgress = profile
 	stats = game._weapon_runtime_stats(entry)
-	expect(is_equal_approx(float(stats.damage),13.74464),"Run Attack scales Micro Missiles from the same layered Ship Attack stat")
+	expect(is_equal_approx(float(stats.damage),24.336),"Run Attack scales Micro Missiles from the same layered Ship Attack stat")
 	var upgraded_range := game._weapon_target_range(Equipment.MICRO_MISSILE_RACK_ID, stats)
 	expect(is_equal_approx(upgraded_range, 215.3375), "Workshop and run range multipliers add to missile range")
 	profile.permanentUpgrades.crit_chance = 50
@@ -82,7 +87,7 @@ func run_tests() -> void:
 	for bullet in game.bullets:
 		if str(bullet.get("visual_kind", "")) == "micro_missile":
 			missile_count += 1
-			if bool(bullet.get("launched", false)): missile = bullet
+			if missile.is_empty() or bool(bullet.get("launched", false)): missile = bullet
 	expect(missile_count == 3, "Missile weapon fires a three-rocket salvo")
 	expect(game.mount_visuals.has(Equipment.MICRO_MISSILE_RACK_INSTANCE_ID) and str(game.mount_visuals[Equipment.MICRO_MISSILE_RACK_INSTANCE_ID].kind) == "missile", "Missile salvo triggers the equipped rack visual")
 	expect(is_equal_approx(float(missile.velocity.length()), 210.0), "Missile speed is 210 units per second after the 50 percent reduction")
@@ -99,14 +104,17 @@ func run_tests() -> void:
 			launch_delays.append(float(bullet.launch_delay))
 			if bool(bullet.launched): launched_count += 1
 	launch_delays.sort()
-	expect(launched_count == 1 and launch_delays == [0.0, 0.075, 0.15], "Salvo staggers rockets by a small launch delay")
-	var missile_runtime: Dictionary = game.weapon_runtime_by_item_id[Equipment.MICRO_MISSILE_RACK_INSTANCE_ID]
+	var launch_stagger_valid := launch_delays.size() == 3
+	for index in range(launch_delays.size()): launch_stagger_valid = launch_stagger_valid and is_equal_approx(float(launch_delays[index]),0.01 + float(index) * 0.075)
+	expect(launched_count == 0 and launch_stagger_valid, "Weapon slots and missile salvo stagger launches deterministically")
 	expect(int(missile_runtime.ammo) == 0 and float(missile_runtime.reload_timer) > 0.0, "Missile salvo consumes the full three-rocket magazine")
 	expect(is_equal_approx(float(missile.remaining_distance), 615.3375), "Missile flight budget is current range plus 400")
 
 	missile.position = origin
 	missile.previous_position = origin
 	missile.velocity = Vector2.RIGHT * 210.0
+	missile.launch_delay = 0.0
+	missile.launched = true
 	missile.remaining_distance = 610.0
 	missile.target_id = 101
 	missile.boost_remaining = 0.0
@@ -116,6 +124,8 @@ func run_tests() -> void:
 	missile.position = origin
 	missile.previous_position = origin
 	missile.velocity = Vector2.RIGHT * 210.0
+	missile.launch_delay = 0.0
+	missile.launched = true
 	missile.remaining_distance = 610.0
 	missile.target_id = 101
 	missile.boost_remaining = 0.0

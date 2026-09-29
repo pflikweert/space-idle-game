@@ -23,8 +23,10 @@ const SHIPS := {
 			"engine_anchors":[Vector2(0.36,0.87),Vector2(0.64,0.87)],
 			"weapon_mount_height":36.0, "system_mount_height":30.0,
 			"weapon_muzzle_offset":13.0, "shield_height_multiplier":1.52,
+			# Contact boundary sits on the solid outer hex ring, not its soft glow.
+			"deflector_radius":88.0,
 		},
-		"base_stats": {"max_hp":140.0, "regen":0.5, "armor":0.0, "attack_damage":8.0, "range":160.0, "move_speed":470.0, "collision_radius":8.64},
+		"base_stats": {"max_hp":140.0, "regen":0.5, "armor":0.0, "attack_damage":12.0, "range":160.0, "move_speed":470.0, "collision_radius":8.64},
 		"max_active_weapons": 4, "max_active_weapon_families": 4,
 		"future_caps": {"utility":0, "system":2}, "passive": {}, "unlock": {"type":"starter"},
 		"slots": [

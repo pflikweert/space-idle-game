@@ -9,6 +9,10 @@ const TYPES := {
 	"void_tank": {"radius":19.68,"band":Vector2(0.70,0.80),"top":17.5,"turn":55.0,"orbit":0.56,"approach":230.0,"delay":8.0},
 	"ranged_shooter": {"radius":12.91,"band":Vector2(0.86,0.92),"top":28.0,"turn":90.0,"orbit":0.90,"approach":180.0,"delay":5.0},
 	"void_boss": {"radius":35.63,"band":Vector2(0.90,0.96),"top":10.0,"turn":30.0,"orbit":1.0,"approach":290.0,"delay":12.0},
+	"void_swarm": {"radius":13.0,"band":Vector2(0.42,0.56),"top":82.0,"turn":130.0,"orbit":0.82,"approach":18.0,"delay":0.3},
+	"kamikaze": {"radius":18.0,"band":Vector2(0.72,0.86),"top":92.0,"turn":170.0,"orbit":0.18,"approach":7.0,"delay":0.0},
+	"splitter": {"radius":27.0,"band":Vector2(0.48,0.62),"top":36.0,"turn":75.0,"orbit":0.32,"approach":42.0,"delay":1.0},
+	"elite_hunter": {"radius":34.0,"band":Vector2(0.68,0.82),"top":54.0,"turn":115.0,"orbit":0.72,"approach":54.0,"delay":1.5},
 }
 const LOOKAHEAD := 0.75
 const GAP := 6.0
@@ -52,17 +56,17 @@ static func initialize(enemy: Dictionary, random: RandomNumberGenerator = null, 
 		enemy.flight_heading = float(enemy.get("visual_rotation",0.0))-PI/2.0
 	enemy.navigation_radius = float(spec.radius)
 
-static func safe_distance(enemy: Dictionary) -> float:
-	return PLAYER_COLLISION_RADIUS + float(enemy.radius)
+static func safe_distance(enemy: Dictionary, player_deflector_radius := PLAYER_COLLISION_RADIUS) -> float:
+	return player_deflector_radius + float(enemy.radius)
 
-static func restart_after_contact(enemy: Dictionary, player_range: float) -> void:
+static func restart_after_contact(enemy: Dictionary, player_range: float, player_deflector_radius := PLAYER_COLLISION_RADIUS) -> void:
 	enemy.approach_time = 0.0
 	enemy.approach_progress = 0.0
-	enemy.nav_target_distance = preferred_distance(enemy, player_range)
+	enemy.nav_target_distance = preferred_distance(enemy, player_range, player_deflector_radius)
 	enemy.escape_timer = 0.0
 	enemy.contact_latched = true
 
-static func preferred_distance(enemy: Dictionary, player_range: float) -> float:
+static func preferred_distance(enemy: Dictionary, player_range: float, player_deflector_radius := PLAYER_COLLISION_RADIUS) -> float:
 	var spec: Dictionary = TYPES[str(enemy.type_id)]
 	var outer := player_range*lerpf(spec.band.x,spec.band.y,float(enemy.nav_preference))
 	var progress := clampf((float(enemy.approach_time)-float(spec.delay))/float(spec.approach),0.0,1.0)
@@ -70,7 +74,7 @@ static func preferred_distance(enemy: Dictionary, player_range: float) -> float:
 	enemy.approach_progress = progress
 	# Aim slightly through the collision boundary so a completed spiral produces
 	# a real impact instead of hovering one fraction outside the hull.
-	return lerpf(outer,maxf(1.0,safe_distance(enemy)-1.5),progress)
+	return lerpf(outer,maxf(1.0,safe_distance(enemy,player_deflector_radius)-1.5),progress)
 
 static func feasible_point(point: Vector2, player: Vector2, radius: float, bounds: Rect2) -> Vector2:
 	if bounds.has_point(point): return point
@@ -86,7 +90,7 @@ static func feasible_point(point: Vector2, player: Vector2, radius: float, bound
 			chosen=candidate
 	return chosen if best<INF else Vector2(clampf(point.x,bounds.position.x,bounds.end.x),clampf(point.y,bounds.position.y,bounds.end.y))
 
-static func preferred_velocity(enemy: Dictionary, player: Vector2, player_range: float, bounds: Rect2, delta: float) -> Vector2:
+static func preferred_velocity(enemy: Dictionary, player: Vector2, player_range: float, bounds: Rect2, delta: float, player_deflector_radius := PLAYER_COLLISION_RADIUS) -> Vector2:
 	var spec: Dictionary = TYPES[str(enemy.type_id)]
 	var position: Vector2 = enemy.position
 	var offset := position-player
@@ -95,7 +99,7 @@ static func preferred_velocity(enemy: Dictionary, player: Vector2, player_range:
 	var legal := bounds.grow(-float(spec.radius)-3.0)
 	var top := minf(float(enemy.speed),float(spec.top))
 	var cruise := top*clampf(float(enemy.cruise_factor)+0.04*sin(float(enemy.nav_time)*0.65+float(enemy.variation_phase)),0.0,1.0)
-	var target := preferred_distance(enemy,player_range)
+	var target := preferred_distance(enemy,player_range,player_deflector_radius)
 	if float(enemy.nav_target_distance)<=0.0: enemy.nav_target_distance=target
 	var tracking_speed := maxf(4.0,player_range/float(spec.approach))
 	enemy.nav_target_distance=move_toward(float(enemy.nav_target_distance),target,tracking_speed*delta)
@@ -118,7 +122,7 @@ static func preferred_velocity(enemy: Dictionary, player: Vector2, player_range:
 		if tangent_speed<minimum_tangent: route+=tangent*(minimum_tangent-tangent_speed)
 	return route.limit_length(cruise)
 
-static func update(enemies: Array, player: Vector2, player_range: float, bounds: Rect2, fleet_orbit_sign: float, delta: float) -> void:
+static func update(enemies: Array, player: Vector2, player_range: float, bounds: Rect2, fleet_orbit_sign: float, delta: float, player_deflector_radius := PLAYER_COLLISION_RADIUS) -> void:
 	var desired: Array[Vector2]=[]
 	var avoidance: Array[Vector2]=[]
 	# Do not mutate positions/velocities until every steering decision is complete.
@@ -126,13 +130,13 @@ static func update(enemies: Array, player: Vector2, player_range: float, bounds:
 		initialize(enemy, null, fleet_orbit_sign)
 		enemy.nav_time=float(enemy.nav_time)+delta
 		if bool(enemy.nav_entered): enemy.approach_time=float(enemy.approach_time)+delta
-		if bool(enemy.contact_latched) and enemy.position.distance_to(player)>safe_distance(enemy)+12.0:
+		if bool(enemy.contact_latched) and enemy.position.distance_to(player)>safe_distance(enemy,player_deflector_radius)+12.0:
 			enemy.contact_latched=false
 			enemy.contact_hits_in_pass=0
 		if str(enemy.type_id)=="void_boss": enemy.boss_orbit_time=float(enemy.approach_time)
 		enemy.avoid_timer=maxf(0,float(enemy.avoid_timer)-delta)
 		enemy.orbit_edge_timer=maxf(0,float(enemy.orbit_edge_timer)-delta)
-		desired.append(preferred_velocity(enemy,player,player_range,bounds,delta))
+		desired.append(preferred_velocity(enemy,player,player_range,bounds,delta,player_deflector_radius))
 		avoidance.append(Vector2.ZERO)
 	for i in range(enemies.size()):
 		var a: Dictionary=enemies[i]
@@ -183,7 +187,7 @@ static func update(enemies: Array, player: Vector2, player_range: float, bounds:
 			route=(radial*0.5+radial.orthogonal()*float(enemy.avoid_side))*top
 		var wanted := (route+avoidance[i]).limit_length(top)
 		var outward: Vector2=enemy.position-player
-		var clearance := outward.length()-safe_distance(enemy)
+		var clearance := outward.length()-safe_distance(enemy,player_deflector_radius)
 		outward=outward.normalized()
 		var closing := -wanted.dot(outward)
 		var closing_allowed := maxf(0.0,clearance+2.0)*2.0

@@ -25,6 +25,8 @@ func run_tests() -> void:
 	expect(game.weapon_runtime_by_item_id.size()==2 and game.bullets.size()==2,"Multiple Railgun instances fire independently")
 	var sources := {}; for bullet in game.bullets: sources[str(bullet.sourceEquipmentId)] = true
 	expect(sources.has(Equipment.RAILGUN_INSTANCE_ID) and sources.has("railgun-002"),"Projectiles carry source instance metadata")
+	var delayed_projectile: Dictionary = game.bullets.filter(func(bullet): return str(bullet.sourceEquipmentId)=="railgun-002")[0]
+	expect(not bool(delayed_projectile.launched) and is_equal_approx(float(delayed_projectile.launch_delay),0.010),"Weapon slots stagger projectile launch by ten milliseconds")
 	expect(game.mount_visuals.has(Equipment.RAILGUN_INSTANCE_ID) and game.mount_visuals.has("railgun-002"),"Each firing Railgun triggers its equipped mount visual")
 	game._update_visual_effects(0.25)
 	expect(game.mount_aim_angles.size()==2 and absf(float(game.mount_aim_angles[Equipment.RAILGUN_INSTANCE_ID])-float(game.mount_aim_angles["railgun-002"])) > 0.01,"Each Railgun turret independently turns from its own hardpoint toward the target")

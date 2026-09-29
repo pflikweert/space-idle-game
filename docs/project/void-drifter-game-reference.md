@@ -38,10 +38,11 @@ a Star Trek product or visual copy.
 - The Expo home screen links into `/void-drifter`; when the Godot web export is
   present, the route embeds it in an iframe. Without an export it shows the exact
   local export command instead of a React Native gameplay fallback.
-- The Godot main menu offers **Start Run**, **Hangar**, Enemy Codex, Settings,
-  and developer-only controls. Hangar contains loadout, individual equipment
-  progression and permanent Ship Systems. A new run starts with 30 cash, base
-  stats plus permanent Ship Systems levels, a level-1
+- The Godot main menu offers **Start Run**, **Loadout**, Workshop, Enemy Codex,
+  Settings, and developer-only controls. Loadout is the direct single-ship
+  management screen; it contains equipment slots and routes to Chassis Bay and
+  Blueprints. A new run starts with 30 cash, base
+  stats plus permanent Chassis Bay and Workshop levels, a level-1
   Railgun and a fresh run-module counter.
 - An unfinished run is serialized locally and resumes **paused**. Going to the
   browser background also pauses/saves the run. There is no simulation or income
@@ -73,11 +74,22 @@ The starter ship blueprint provides these level-0 chassis values: 140 hull, 0.5 
 regeneration per second, and no armor. Shield capacity and recharge come from the
 equipped Shield Core, not from the chassis. Shield damage
 is absorbed before hull damage. Any hit delays shield recharge by 3 seconds;
-afterward the shield recharges up to its current capacity. Armor reduces incoming
-damage by its percentage while preserving a positive minimum. A first collision
+afterward the shield recharges up to its current capacity. Armor is converted to
+an armor rating (`normalized armor × 100`) and uses asymptotic damage reduction:
+`damage reduction = armor rating / (armor rating + 100)`. This gives diminishing
+returns, keeps armor useful at every value, and never reaches 100% reduction;
+the existing positive minimum damage rule remains in place. A first collision
 with an enemy deals twice its scaled contact damage; later collisions use that
 enemy's normal contact cadence. Enemy projectiles use twice their calculated base
 damage before armor.
+
+The visible Shield Core hex-ring is also the gunship's permanent physical
+deflector boundary: enemy hulls cannot enter it, even when shield energy is
+depleted. Contact and enemy projectiles resolve at the nearest point on that
+outer ring. A charged shield shows a compact cyan hex-ripple at that point; once
+depleted, the same surface receives a warm hull-impact spark instead. This changes
+impact geometry and feedback only, not incoming damage, contact cadence or shield
+recharge rules.
 
 The HUD distinguishes cyan shield absorption from warm hull damage, with local
 impact effects, short damage numbers, screen shake when enabled, hull damage art,
@@ -95,8 +107,22 @@ continue during cooldown. Wave number is `1 + floor(elapsedSeconds / 35)`.
 - Normal spawn interval: `max(0.45, 1.10 − 0.02 × (wave − 1))` seconds.
 - At most 40 normal enemies and four bosses can exist. A blocked spawn attempt is
   discarded rather than queued.
-- Active normal enemies are selected by the listed weights after their first wave.
-  A Void Dreadnought is scheduled on every tenth wave.
+- The seeded `EncounterDirector` precomputes each wave's formation, role, edge/lane,
+  weapon-enable state and presentation cue from a run-specific encounter seed.
+  Instructions blocked by the 40-normal or four-boss caps are discarded; they are
+  never queued into the next wave. Waves 1–9 use authored formations and wave 10
+  is boss-only. From wave 11, Dead Relay, Ion Wake, Fracture Field and Hunter's
+  Wake rotate every ten waves; wave 41 restarts Dead Relay without an extra stat
+  stack. The director avoids repeating a primary role in adjacent deck entries.
+- Wave 1 is a calibration encounter for every new run: eight unarmed Void Drones
+  arrive in three wing groups (2 at 3 seconds, 3 at 11 seconds, and 3 at 19
+  seconds). Its final seven spawning seconds and the nine-second cooldown give a
+  new player room to recover and use their first run upgrades. Wave 2 remains the
+  first deliberate escalation point.
+- Wave 10/20/30 rotate Missile Dreadnought, Rail Fortress and Rift Carrier, then
+  repeat. All variants retain the existing boss rewards, module drop and cap;
+  phases change at 70% and 35% hull. Wave Intel/HUD fields expose encounter,
+  formation, sector, threat tier and boss variant rather than only spawn odds.
 - Hull and contact damage begin growing after wave 10. With `E = max(0, wave −
   10)`, each type uses its own base value times `1.115^min(E,25) ×
   1.025^min(max(E−25,0),10000)` for hull, and `1.14^min(E,25) ×
@@ -129,6 +155,10 @@ the same compact visual language without changing projectile behavior.
 | Red Scout | wave 3 | 20 | 12 | 59.5 | 1 / 0.45s | 4 cash, 2 coins, 2 XP | Fast inward passes; one low-damage rail shot per 20s after 0.35s warning while approaching. |
 | Rift Shooter | wave 5 | 10 | 24 | 28 | 1 / 0.55s | 6 cash, 3 coins, 3 XP | Orbits near player range, then spirals in; three-round rail salvo, 6s reload, 0.3s warning. |
 | Void Tank | wave 7 | 10 | 80 | 17.5 | 1 / 0.75s | 8 cash, 4 coins, 4 XP | Slow armored spiral; two-round rail salvo, 1s between rounds, 14s reload, 0.5s warning. |
+| Void Swarm | wave 3 | 38 | 8 | 82 | 6 / contact | 0 cash, 1 coin, 1 XP | Cluster formation; Split Core fragments are reward-free. |
+| Nova Dart | wave 11 | 16 | 20 | 92 | 20 / contact | 0 cash, 4 coins, 4 XP | Ion Wake warned charge pass; impact remains contact-only. |
+| Split Core | wave 6 | 12 | 44 | 36 | 14 / contact | 0 cash, 6 coins, 6 XP | Priority target; death deterministically releases three reward-free Swarms. |
+| Elite Hunter | wave 8 | 4 | 130 | 54 | 28 / contact | 0 cash, 16 coins, 16 XP | Named elite hull bar and charged rail attack with a real-time warning. |
 | Void Dreadnought | waves 10, 20… | scheduled | 400 | 10 | 3 / 1.00s | 100 cash, 25 coins, 15 XP, modules | Boss spiral; guided rockets, one per 4s after 0.6s warning, maximum two live rockets per boss. |
 
 The Dreadnought has a distinct large armored hull, named hull bar, animated
@@ -153,26 +183,25 @@ neutral. Missing or unknown entries use `1.0`. Immunities currently reserve
 secondary effects and do not add stun, slow, burning or chain reactions.
 
 The current active enemy roster has empty interaction arrays, so kinetic Railgun
-damage, rewards, armor and shield behavior remain unchanged. Synthetic resistance,
+damage, rewards and shield behavior remain unchanged; armor now uses the
+asymptotic rating formula above. Synthetic resistance,
 weakness, beam, swarm and immunity fixtures exist only in automated tests; no new
 player weapon families or player-facing resistance counter-builds are shipped yet.
 
-### Archived, non-spawning roster
+### Re-activated encounter roster
 
-The Codex also retains designs that currently **do not spawn**: Void Swarm (wave
-3 design; 8 hull, 82 speed, 6 contact, 1 coin), Nova Dart (wave 5; 20 hull, 92
-speed, 20 explosive contact, 4 coins), Split Core (wave 6; 44 hull, 36 speed, 14
-contact, 6 coins), and Elite Hunter (wave 8; 130 hull, 54 speed, 28 contact, 16
-coins). Their source art and registry entries are preserved as archive/reference
-content, not enabled game features. Earlier Red Surge, elite modifiers, pickups,
-and XP systems are likewise not part of the active loop.
+Void Swarm, Nova Dart, Split Core and Elite Hunter are active in both registries.
+Their existing rewards and base values remain unchanged; only the requested
+cluster, warned-charge, split-on-death and charged-hunter behaviours are enabled.
+Earlier Red Surge, pickups and separate XP systems are not part of the active loop.
 
 ## 4. Railgun and upgrades
 
 ### Railgun
 
-Railgun is the only live player weapon. It targets the nearest visible enemy whose
-centre is within the current Range circle; shots cannot continue damaging enemies
+Railgun is the only live player weapon. Each instance targets the nearest visible
+enemy whose centre is within the current Range circle measured from that weapon's
+physical hardpoint attachment; shots cannot continue damaging enemies
 outside the visible playable area. It fires at 1,600 units/second with long,
 thin tapered cyan/white energy traces, a distinct white projectile tip, compact
 muzzle light, directed impacts, and up to two units of visual recoil. All Railgun
@@ -191,10 +220,10 @@ independent from the unchanged Railgun card artwork. Four adjacent equal-sized s
 noninteractive placeholders in this milestone; multi-weapon combat is not yet
 implemented.
 
-### Hangar and loadout architecture
+### Loadout architecture and future Fleet Hangar
 
 The current ship is the data-driven `starter_ship` blueprint. It owns its base
-stats, Hangar/combat art references, four weapon hardpoints and two system
+stats, Loadout/combat art references, four weapon hardpoints and two system
 hardpoints, normalized hardpoint anchors, per-slot equipment compatibility,
 future utility/system caps, and explicit active-weapon/family caps. The global
 design ceiling remains `MAX_ACTIVE_WEAPON_FAMILIES = 5`; the starter currently
@@ -229,28 +258,28 @@ while Micro Missile Rack uses `effectiveShipAttack × 1.3 + 2.0 × (level - 1)`.
 Module level multipliers and milestones apply afterward. Enemy resistances and additional
 player-facing weapon families remain out of scope.
 
-Hangar is a mobile-first flow: the Overview shows the active ship, its actually
-mounted equipment, core stats and navigation. The starter presentation is an
-original dark-navy modular gunship with four physical weapon cradles (W1–W4) and
-two equal circular system bays (S1–S2) on its centreline. Compact cyan/purple
-slot badges remain visible on the Hangar hull; equipped weapon and system mount
-art is drawn at those shared blueprint anchors in both Hangar and combat. Every
+Loadout is the mobile-first active-ship screen. It starts with a compact active
+Gunship card showing chassis level, hardpoints and final Hull, Shield and Attack,
+then exposes W1–W4 / S1–S2 and direct routes to Chassis Bay and Blueprints. The
+starter presentation is an original dark-navy modular gunship with four physical
+weapon cradles (W1–W4) and two equal circular system bays (S1–S2) on its
+centreline. Compact cyan/purple slot badges remain visible on the loadout hull;
+equipped weapon and system mount art is drawn at those shared blueprint anchors
+in the ship view and combat. Every
 hardpoint also declares its physical mount bounds, so installed art fills its
 cradle without per-slot render exceptions. Every weapon first places a complete
 armoured socket cover: railguns add a separately pivoted head which tracks their
 combat target, while the Missile Rack adds a fixed, cradle-filling payload. The
-Shield Core is centred and sized from the same circular S1 geometry. Hangar labels are
+Shield Core is centred and sized from the same circular S1 geometry. Loadout labels are
 deliberately subdued and all installed modules have a quiet idle pulse. In combat,
 actual rail shots and missile launches trigger short mount feedback, the Shield
 Core reacts to shield impact, and the registered engine nozzles render a stronger
 cyan plume while the ship moves. The Shield Core mounts in S1 and its hexagonal
 contour derives its size from the active ship presentation, while its shield
-mechanics remain unchanged. The Overview stat console shows
-HULL, SHIELD, DAMAGE and ARMOR using permanent Workshop values only; its five
-bar segments are continuously filled from each Workshop level divided by that
-upgrade's cap. Shield reads zero when the Shield Core is not equipped. Loadout is
-a ship-art-free W1–W4 /
-S1–S2 grid of reusable equipment bays with dedicated loadout art. Empty bays use
+mechanics remain unchanged. Loadout's summary uses final active values; Chassis
+Bay alone owns base chassis values and chassis-level growth, while Workshop alone
+owns permanent account multipliers. The slot grid is a W1–W4 / S1–S2 grid of
+reusable equipment bays with dedicated loadout art. Empty bays use
 neutral dark steel, while installed equipment uses its rarity colour (normal
 cyan-steel, advanced blue, epic violet and legendary amber). Selecting installed
 equipment keeps the player on Loadout and opens a compact selection panel below
@@ -269,12 +298,13 @@ with level-one preview, costs and owned count, while upgrades are only shown fro
 a specific equipment instance in its full detail screen. That full screen's amber Upgrade control always shows the exact
 next Credits and Boss Modules cost; it switches to a visibly muted, disabled
 variant when the item is capped, the player cannot afford either currency, or a
-run locks Hangar changes;
-and Ship Systems owns the former Workshop. Empty slots show only compatible,
+run locks Loadout mutations. Empty slots show only compatible,
 valid reserve items, and built equipment is never installed automatically. During
 an active run this flow remains readable but all mutations are locked. The
 underlying hardpoint data remains blueprint-driven rather than assuming W1–W4/S1–S2
-in the implementation. An unlocked, unbuilt Blueprint Detail shows a level-one
+in the implementation. A Fleet Hangar is deliberately not shown while only one
+ship is playable; when multiple ships exist it will become the fleet-selection
+screen that leads into each ship's Loadout. An unlocked, unbuilt Blueprint Detail shows a level-one
 stat preview, exact owned/required Credits and Boss Modules, and the remaining
 shortfall. Build is disabled until both currencies are affordable and no run is
 active. A successful build creates the next numbered reserve instance, keeps the
@@ -326,7 +356,8 @@ banked coins and are unavailable while an unfinished run exists. Both layers use
 the same multiplier contract but are tracked separately: permanent Workshop
 levels multiply the ship/module baseline and temporary Run levels multiply the
 same effective layer during a run. The shop groups upgrades into Attack, Defense
-and Utility, and supports Buy 1 or Buy 10. Run purchase price is
+and Utility. Every purchase applies exactly one level through a single Upgrade
+action; bulk Buy 1/Buy 10 controls are intentionally absent. Run purchase price is
 `ceil(8 × 1.08^level)`; Workshop price is `ceil(20 × 1.12^level)`.
 Each completed wave also grants `10 + 2×completedWave + cashWaveBonus`, then
 applies the Cash Bonus multiplier. Bosses continue to award a fixed 2 Boss
@@ -335,17 +366,20 @@ long-term module progression.
 
 | Category | Upgrade | Value at total level L | Cap |
 | --- | --- | --- | ---: |
-| Attack | Ship Attack | `shipAttackBase × (1 + 0.06L)` | 100 |
+| Attack | Ship Attack | `shipAttackBase × (1 + 0.10L)` | 100 |
 | Attack | Critical Chance | `shipCritBase + 1% × L` | 50 |
 | Attack | Range | `chassisRange + 3L` units | 30 |
 | Defense | Hull | `chassisHull × (1 + 0.06L)` | 100 |
 | Defense | Hull Regeneration | `chassisRegen × (1 + 0.06L)` HP/s | 100 |
 | Defense | Shield Capacity | `shieldCoreCapacity × (1 + 0.05L)` SP | 100 |
 | Defense | Shield Recharge | `shieldCoreRecharge × (1 + 0.05L)` SP/s | 100 |
-| Defense | Armor | `2.5% × L` | 30 |
+| Defense | Armor rating input | `0.025 normalized armor × L` (`2.5 rating × L`) | 30 |
 | Utility | Cash Bonus | `1 + 0.05L` multiplier | 100 |
 | Utility | Cash per Wave | `7.5L` cash | 100 |
 | Utility | Coin Bonus | `1 + 0.05L` multiplier | 100 |
+
+Workshop Ship Attack values below 1000 display one decimal place so the first
+upgrade remains visible as a real increase (for example `8.8 DMG`).
 
 Fire Rate is intentionally absent from Workshop. Fire Rate, reload and magazine
 belong to each weapon module. Targeting Range remains a ship sensor stat, while
@@ -366,13 +400,14 @@ critical chance         = shipCritBase + Workshop/run Critical Chance levels
 weapon fire interval   = weapon module interval at its level
 ```
 
-The chassis owns hull, regeneration, armor, base attack, critical chance and targeting range.
+The chassis owns hull, regeneration, armor rating input, base attack, critical chance and targeting range.
 Every active weapon receives the ship's effective Critical Chance; a weapon may
 still define its own critical multiplier or milestone modifier. The
 Shield Core is the only source of shield capacity and recharge. A weapon owns
 damage coefficient, fire interval, magazine, reload, projectile range and its
-own level/milestones. Percentage-point stats such as armor and critical chance
-remain additive; missing ship base stats resolve to zero and never receive a
+own level/milestones. Normalized armor and percentage-point stats such as critical
+chance remain additive; armor is converted to rating only when calculating
+mitigation. Missing ship base stats resolve to zero and never receive a
 hidden fallback baseline. Multiplier stats never use zero as their base value. The UI
 must label raw ship/module values as `Base`, calculated output as `Effective`,
 and show `NO MODULE` instead of a misleading zero when a required module is absent.
@@ -395,7 +430,7 @@ progression; there is no separate Auxiliary Railgun.
 
 Each ship has its own Chassis Bay progression from level 0 to 40. Chassis
 upgrades change the ship baseline before Workshop and run multipliers are
-applied: `+8` hull, `+0.04` hull regeneration, `+0.3` percentage points armor
+applied: `+8` hull, `+0.04` hull regeneration, `+0.3` armor rating input
 and `+0.5` base attack per level. Movement speed is a fixed ship characteristic,
 not a chassis upgrade. The next chassis level costs
 `750 + 300×L + 60×L²` coins, where `L` is the current chassis level. This
@@ -433,20 +468,37 @@ the missile milestones are:
 
 ### Interfaces
 
-- **Run HUD:** the LCARS-inspired header shows the current sector (currently
-  fixed to sector 1), wave number with progress bar, elapsed game time and
+- **Run HUD:** the LCARS-inspired header shows the current encounter sector and
+  threat tier, wave number with progress bar, elapsed game time and
   cash/coins/modules with icon assets. Hull and shield use stacked capsule bars
   above the unchanged bottom weapon strip. Pause, speed, run shop, Railgun build
   and Auto-Dodge controls are arranged in a floating, vertically
   centred right command rail that does not narrow or shift the header/footer;
   the centre wave readout remains the Wave Intel touch target. The header has
   no enclosing border so menus/popups can layer over it cleanly.
-- **Run Upgrades:** a paused cash shop with Attack, Defense and Utility tabs.
-- **Ship Systems:** permanent coin upgrades, Buy 1/10, refund/reset, Auto-Dodge
-  unlock, and an active-run lock; reached through Hangar.
-- **Hangar:** a mobile-first ship overview with separate Loadout, Blueprint and
-  equipment-detail screens. Its real Godot controls are generated from the active
-  ship blueprint, loadout and reserve inventory.
+- **Workshop:** outside a run, the Workshop is a single scrollable calibration
+  deck: a schematic overview shows effective Attack, Hull and Shield, followed by
+  Attack, Defense and Utility sections. Each upgrade row is a fixed horizontal
+  composition: a generous square stat icon on the left spanning the full card, with a bold
+  header containing upgrade name and current/max level; then `Base` (or `Module Base` for Shield Core output),
+  gold-accented `Effective` with its multiplier/progress line beneath it,
+  concrete `Next: +gain`, and an image-backed coin cost. Every value sits below
+  its label in bold. The wide `Upgrade` button contains no price and is aligned
+  to the card's right edge.
+  Each Workshop upgrade has its own generated icon asset under
+  `assets/ui/workshop/upgrade_icons`; category-generic icons are fallback-only.
+  It must never stack the icon or upgrade action into separate full-width rows.
+  The run shop keeps its temporary cash layer separate, but uses the same
+  one-level purchase card.
+- **Menu footer:** command-deck screens provide a framed persistent navigation
+  dock for Home, Loadout, Workshop, Codex and Settings. It is icon-first at phone
+  width (labels live in tooltips) to avoid wrapped text; the active destination is
+  gold-accented. Contextual actions such as reset, Back and Resume remain above it.
+- **Chassis Bay:** permanent chassis calibration for the active ship. It owns
+  chassis-level base growth and returns directly to Loadout.
+- **Loadout:** the direct active-ship management screen, with equipment slots,
+  paused-run enable/disable switches, Blueprints and Chassis Bay. A future Fleet
+  Hangar is reserved for ship selection once more than one ship is playable.
 - **Railgun screens:** upgrade roadmap, current/next stat preview, module
   milestones and loadout/build controls. They use scalable Godot controls, not
   baked screenshots.
@@ -469,13 +521,20 @@ state. Version 10 moves permanent shield capacity and recharge into the Shield C
 preserving legacy Workshop investment as a module-local bonus. Version 11 removes
 permanent Workshop Fire Rate, makes Workshop rows multiplier-only, and converts
 legacy active-run card module currency into the run module counter.
+Version 5 profiles migrate their legacy Railgun level and spend into the stable
+`railgun-001` equipment instance without resetting currencies, records or
+Workshop levels. Active-run snapshot version 3 also stores the encounter seed/id/cursor, sector
+threat tier, presentation state and per-enemy charge, boss-phase and variant
+fields. Older snapshots deterministically rebuild missing encounter fields from
+run id, wave and elapsed time without changing hull, projectiles, RNG, rewards or
+loadout.
 
 ### Progression ownership
 
 - **Workshop** remains account-wide and supplies multipliers for Ship Attack, Hull,
   regeneration and Shield Core output. It does not own weapon fire rate.
 - **Chassis Bay** upgrades each ship independently from level 0 to 40. Chassis
-  levels raise that hull's durability, recovery, armor and base attack without changing
+levels raise that hull's durability, recovery, armor rating input and base attack without changing
   its installed modules or slots.
 - **Modules** own their rarity and levels. The Railgun and Shield Core begin as
   Common modules (level 1–40), then require a matching rarity blueprint to advance.
@@ -485,8 +544,12 @@ state; an unfinished legacy run banks unbanked boss modules from its legacy card
 payload, but no card choices are restored. Versions 7–9 preserve the canonical
 `railgun`/`railgun-001` identifiers, progression,
 loadout and active-run state.
-A temporary write and same-version `.bak` backup protect the last valid current
-profile.
+Writes use a temporary file and retain rotating last-good `.bak`, `.bak.1` and
+`.bak.2` profiles. If an update leaves an unknown or damaged primary JSON, the
+backups are tried in order and the unrecognized file is preserved as a
+`.recovery` copy instead of being silently replaced. Native Android updates must
+keep the same package/user and use an in-place install; uninstalling or clearing
+app data removes local progress.
 
 The profile stores currencies and progression records, unlocked ship ids, the
 active ship id, per-ship loadout/upgrade/mastery containers, equipment instances,
@@ -526,26 +589,61 @@ font variations, typography roles, surface colours, rarity accents, clipped-corn
 panels, button states, and empty/disabled contrast. Screen scripts retain their
 navigation and data logic but use these shared helpers for presentation.
 
+#### Typography contract
+
+`assets/ui/fonts` contains the complete local Oxanium family: ExtraLight (200),
+Light (300), Regular (400), Medium (500), SemiBold (600), Bold (700), and
+ExtraBold (800), together with its OFL license. `ui_design_system.gd` is the only
+place that maps these weights: use `UI.font(false)` for standard body text
+(Medium 500), `UI.font(true)` for the shared bold treatment, and
+`UI.static_font(UI.WEIGHT_…)` only when a screen needs an exact, static font face.
+Do not preload a font file or invent a numeric weight in an individual screen.
+
+Typography roles are deliberately small and limited: `DISPLAY_LARGE` (28) and
+`DISPLAY_MEDIUM` (21) are display headings; `SECTION` (15) labels a screen
+section; `BODY` (14) is normal readable content; `META` (11) is supporting text.
+Use smaller text only for compact technical labels, never for primary gameplay
+values. In Workshop upgrade rows, the upgrade title and all three primary values
+(`Effective`, `Next`, and `Cost`) use the exact static Bold 700 face and have the
+same size. `Effective` stays gold, `Next` is white, and `Cost` stays cyan. Their
+columns expand evenly into the available row width before the fixed right-aligned
+Upgrade button. Labels such as `EFFECTIVE`, `NEXT`, and `COST` are regular and
+top-aligned above their values.
+
+#### Currency asset contract
+
+All player-facing currency uses the shared generated PNG assets under
+`assets/ui/currency`: **Credits** (gold coin), **Run Cash** (green credit-chit
+stack), and **Boss Modules** (violet reactor component). `ui_design_system.gd`
+owns their stable IDs and paths through `UI.currency_icon()` and
+`UI.currency_path()`. HUD resources, Workshop costs, equipment-upgrade costs,
+build requirements, buttons, and inline currency symbols must call those helpers;
+do not use legacy SVG currency assets or apply a colour tint to the generated
+artwork. Inline currency art in rich text must be rendered through the shared
+`_set_inline_icon_text()` helper: it supplies an explicit square size clamped to
+10–18 pixels and rebuilds from source text during responsive UI scaling. Never
+embed a raw PNG path in rich text without an explicit `[img=widthxheight]` size.
+
 The visual contract is dark navy command-deck surfaces, restrained technical grid
 texture, bold Oxanium display text, cyan active equipment, blue advanced equipment,
 violet epic equipment, gold upgrade emphasis, and steel-gray empty/unavailable
 states. Equipment frames are clean and reusable; legacy white side strips and
 decorative lines must not return. Existing weapon and system artwork is reused
-across hangar, loadout, blueprint, detail, and gameplay surfaces. A new screen
+across ship-view, loadout, blueprint, detail, and gameplay surfaces. A new screen
 should add content through the shared tokens instead of introducing local colours,
 fonts, frames, or button treatments.
 
 ## 7. Phase 11 explosive vertical slice
 
-The active roster includes one data-driven `armored_drone` from wave 4 onward.
-It has 36 hull, speed 38, contact damage 2 at 0.55s cadence, and rewards 5 cash,
-3 coins, 3 Railgun XP and 36 score. Kinetic damage is multiplied by 0.75 and
-explosive damage by 1.25; other damage types remain neutral.
+The active roster also includes the data-driven `armored_drone` from wave 4
+onward. It has 36 hull, speed 38, contact damage 2 at 0.55s cadence, and rewards
+5 cash, 3 coins, 3 Railgun XP and 36 score. Kinetic damage is multiplied by 0.75
+and explosive damage by 1.25; other damage types remain neutral.
 
 `micro_missile_rack` is a Normal `explosive` weapon with instance
 `micro-missile-rack-001`. Its base damage is
 `shipDamage × 1.3 + 2.0 × (level - 1)`, with a 1.4s interval, three-rocket salvo,
-magazine 3, 4.0s reload, range 200 (40 more than the standard Railgun) and
+magazine 3, 8.0s reload, range 200 (40 more than the standard Railgun) and
 projectile speed 210. Its level cap is 40 with milestones at levels 5, 10, 15,
 20, 25, 30, 35 and 40. The blueprint unlocks when a settled run contains an
 Armored Drone kill; building costs 2,000 coins and does not install the item.
@@ -564,8 +662,9 @@ retargets the nearest visible live enemy inside its remaining flight zone and
 curves the correction over its next 42 flight units (up to a 90-degree change).
 With no target, it keeps its course until its flight budget expires.
 
-The missile's target range is its own range plus combined permanent Workshop and
-temporary run Range upgrades. Its maximum total flight distance is that current
+The missile's target range is measured from its physical hardpoint attachment and
+is its own range plus combined permanent Workshop and temporary run Range upgrades.
+Its maximum total flight distance is that current
 range plus 400 units, so missile-specific range levels and purchased range both
 extend the flight zone.
 

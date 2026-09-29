@@ -55,9 +55,12 @@ static func value(id: String, levels: int) -> float:
 static func workshop_multiplier(id: String, levels: int, base_value := 0.0) -> float:
 	var current := maxi(0, levels)
 	match id:
-		"damage", "max_hp", "regen": return 1.0 + 0.06 * current
+		"damage": return 1.0 + 0.10 * current
+		"max_hp": return 1.0 + 0.06 * current
+		"regen": return 1.0 + 0.10 * current
 		"range": return 1.0 + (3.0 * current) / base_value if base_value > 0.0 else 1.0
-		"shield_capacity", "shield_recharge": return 1.0 + 0.05 * current
+		"shield_capacity": return 1.0 + 0.05 * current
+		"shield_recharge": return 1.0 + 0.10 * current
 	return 1.0
 
 static func display_value(id: String, levels: int) -> String:

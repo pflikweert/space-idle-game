@@ -5,6 +5,25 @@ extends RefCounted
 ## tokens and constructors so new screens do not invent a second UI language.
 
 const FONT_RESOURCE := preload("res://assets/ui/fonts/Oxanium-Variable.ttf")
+const FONT_EXTRA_LIGHT := preload("res://assets/ui/fonts/Oxanium-ExtraLight.ttf")
+const FONT_LIGHT := preload("res://assets/ui/fonts/Oxanium-Light.ttf")
+const FONT_REGULAR := preload("res://assets/ui/fonts/Oxanium-Regular.ttf")
+const FONT_MEDIUM := preload("res://assets/ui/fonts/Oxanium-Medium.ttf")
+const FONT_SEMI_BOLD := preload("res://assets/ui/fonts/Oxanium-SemiBold.ttf")
+const FONT_BOLD := preload("res://assets/ui/fonts/Oxanium-Bold.ttf")
+const FONT_EXTRA_BOLD := preload("res://assets/ui/fonts/Oxanium-ExtraBold.ttf")
+
+const CURRENCY_CREDITS_PATH := "res://assets/ui/currency/credits_v1.png"
+const CURRENCY_CASH_PATH := "res://assets/ui/currency/cash_v1.png"
+const CURRENCY_BOSS_MODULE_PATH := "res://assets/ui/currency/boss_module_v1.png"
+
+const WEIGHT_EXTRA_LIGHT := 200
+const WEIGHT_LIGHT := 300
+const WEIGHT_REGULAR := 400
+const WEIGHT_MEDIUM := 500
+const WEIGHT_SEMI_BOLD := 600
+const WEIGHT_BOLD := 700
+const WEIGHT_EXTRA_BOLD := 800
 
 const INK := Color("#050b16")
 const SURFACE := Color("#071824")
@@ -30,6 +49,7 @@ const BUTTON := 15
 
 static var _regular: FontVariation
 static var _bold: FontVariation
+static var _currency_icon_cache := {}
 
 static func font(bold := false) -> FontVariation:
 	if bold:
@@ -43,6 +63,41 @@ static func font(bold := false) -> FontVariation:
 		_regular.base_font = FONT_RESOURCE
 		_regular.variation_opentype = {"wght": 500}
 	return _regular
+
+## Returns the exact bundled static weight. Use this for player-facing emphasis
+## that must remain visually stable across Godot platforms; use font() for the
+## shared default text treatment.
+static func static_font(weight: int) -> Font:
+	match weight:
+		WEIGHT_EXTRA_LIGHT: return FONT_EXTRA_LIGHT
+		WEIGHT_LIGHT: return FONT_LIGHT
+		WEIGHT_REGULAR: return FONT_REGULAR
+		WEIGHT_MEDIUM: return FONT_MEDIUM
+		WEIGHT_SEMI_BOLD: return FONT_SEMI_BOLD
+		WEIGHT_BOLD: return FONT_BOLD
+		WEIGHT_EXTRA_BOLD: return FONT_EXTRA_BOLD
+		_: return FONT_REGULAR
+
+## Shared currency artwork. Currency IDs are stable even when an asset is revised.
+static func currency_path(currency_id: String) -> String:
+	match currency_id:
+		"cash": return CURRENCY_CASH_PATH
+		"boss_module": return CURRENCY_BOSS_MODULE_PATH
+		_: return CURRENCY_CREDITS_PATH
+
+static func currency_icon(currency_id: String, pixel_size := 32) -> Texture2D:
+	var size := maxi(1, pixel_size)
+	var cache_key := "%s:%d" % [currency_id, size]
+	if _currency_icon_cache.has(cache_key):
+		return _currency_icon_cache[cache_key]
+	var source: Texture2D = load(currency_path(currency_id))
+	if source == null:
+		return null
+	var image := source.get_image()
+	image.resize(size, size, Image.INTERPOLATE_LANCZOS)
+	var icon := ImageTexture.create_from_image(image)
+	_currency_icon_cache[cache_key] = icon
+	return icon
 
 static func rarity_color(rarity: String, empty := false) -> Color:
 	if empty: return STEEL

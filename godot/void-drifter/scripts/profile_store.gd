@@ -8,6 +8,7 @@ const Equipment := preload("res://scripts/systems/equipment_registry.gd")
 const Loadouts := preload("res://scripts/systems/loadout_system.gd")
 const Progression := preload("res://scripts/systems/module_progression.gd")
 const SAVE_VERSION := 11
+const RECOVERY_SUFFIX := ".recovery"
 const GAME_SPEEDS := [1, 2, 3, 4, 5, 10]
 
 static func valid_speed(value: int) -> int:
@@ -18,43 +19,76 @@ var last_save_ok := true
 
 func load_profile() -> Dictionary:
 	var primary = _read_json(profile_path)
-	if primary is Dictionary and int(primary.get("saveVersion", 0)) == SAVE_VERSION:
-		return _sanitize_profile(primary)
-	if primary is Dictionary and int(primary.get("saveVersion", 0)) == SAVE_VERSION - 1:
-		var migrated := _migrate_stat_architecture_profile(_migrate_shield_core_profile(primary))
-		var clean_migrated := _sanitize_profile(migrated)
-		save_profile(clean_migrated)
-		return clean_migrated
-	if primary is Dictionary and int(primary.get("saveVersion", 0)) == SAVE_VERSION - 2:
-		var upgraded := _migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(primary)))
-		var clean_upgraded := _sanitize_profile(upgraded)
-		save_profile(clean_upgraded)
-		return clean_upgraded
-	if primary is Dictionary and int(primary.get("saveVersion", 0)) == SAVE_VERSION - 3:
-		var legacy_upgraded := _migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(_migrate_progression_profile(primary))))
-		var clean_legacy_upgraded := _sanitize_profile(legacy_upgraded)
-		save_profile(clean_legacy_upgraded)
-		return clean_legacy_upgraded
-	# During development, schemas older than the immediately previous version are reset.
-	if primary is Dictionary: return _reset_to_current_profile()
-	var backup = _read_json(profile_path + ".bak")
-	if backup is Dictionary and int(backup.get("saveVersion", 0)) == SAVE_VERSION:
-		var recovered := _sanitize_profile(backup)
-		save_profile(recovered)
-		return recovered
-	if backup is Dictionary and int(backup.get("saveVersion", 0)) == SAVE_VERSION - 1:
-		var migrated_backup := _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(backup)))
-		save_profile(migrated_backup)
-		return migrated_backup
-	if backup is Dictionary and int(backup.get("saveVersion", 0)) == SAVE_VERSION - 2:
-		var upgraded_backup := _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(backup))))
-		save_profile(upgraded_backup)
-		return upgraded_backup
-	if backup is Dictionary and int(backup.get("saveVersion", 0)) == SAVE_VERSION - 3:
-		var legacy_upgraded_backup := _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(_migrate_progression_profile(backup)))))
-		save_profile(legacy_upgraded_backup)
-		return legacy_upgraded_backup
+	var loaded := _prepare_loaded_profile(primary)
+	if not loaded.is_empty():
+		if primary is Dictionary and int(primary.get("saveVersion", 0)) != SAVE_VERSION:
+			_quarantine_profile(profile_path)
+			save_profile(loaded)
+		return loaded
+	# Always try the last-good copy before resetting, even when the primary JSON
+	# is readable but has an unknown schema. This is important after interrupted
+	# Android upgrades, which can leave a valid-looking but incomplete file.
+	for backup_path in [profile_path + ".bak", profile_path + ".bak.1", profile_path + ".bak.2", profile_path + RECOVERY_SUFFIX]:
+		var backup = _read_json(backup_path)
+		loaded = _prepare_loaded_profile(backup)
+		if not loaded.is_empty():
+			if FileAccess.file_exists(profile_path): _quarantine_profile(profile_path)
+			save_profile(loaded)
+			return loaded
+	if primary is Dictionary:
+		_quarantine_profile(profile_path)
 	return _reset_to_current_profile()
+
+func recover_profile() -> Dictionary:
+	"""Return the best local recovery candidate without overwriting current data."""
+	for candidate_path in [profile_path + ".bak", profile_path + ".bak.1", profile_path + ".bak.2", profile_path + RECOVERY_SUFFIX, profile_path + ".bak" + RECOVERY_SUFFIX]:
+		var candidate := _prepare_loaded_profile(_read_json(candidate_path))
+		if not candidate.is_empty(): return candidate
+	return {}
+
+func restore_recovered_profile(force: bool = false) -> bool:
+	# Recovery is never an implicit overwrite. Callers must explicitly opt in;
+	# the current profile is copied to .bak by save_profile before replacement.
+	if not force: return false
+	var recovered := recover_profile()
+	if recovered.is_empty(): return false
+	return save_profile(recovered)
+
+func _prepare_loaded_profile(candidate: Variant) -> Dictionary:
+	if not candidate is Dictionary: return {}
+	var version := int(candidate.get("saveVersion", 0))
+	if version == SAVE_VERSION:
+		return _sanitize_profile(candidate)
+	if version == 5:
+		var migrated_v5 := _migrate_v5_profile(candidate)
+		migrated_v5 = _migrate_progression_profile(migrated_v5)
+		migrated_v5 = _migrate_cardless_profile(migrated_v5)
+		migrated_v5 = _migrate_shield_core_profile(migrated_v5)
+		migrated_v5 = _migrate_stat_architecture_profile(migrated_v5)
+		return _sanitize_profile(migrated_v5)
+	if version == SAVE_VERSION - 1:
+		return _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(candidate)))
+	if version == SAVE_VERSION - 2:
+		return _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(candidate))))
+	if version == SAVE_VERSION - 3:
+		return _sanitize_profile(_migrate_stat_architecture_profile(_migrate_shield_core_profile(_migrate_cardless_profile(_migrate_progression_profile(candidate)))))
+	return {}
+
+func _migrate_v5_profile(profile: Dictionary) -> Dictionary:
+	var migrated := profile.duplicate(true)
+	var items := Equipment.starter_instances()
+	var railgun: Dictionary = items.get(Equipment.RAILGUN_INSTANCE_ID, {})
+	railgun.level = clampi(int(profile.get("railgunLevel", 1)), 1, 40)
+	railgun.coins_spent = maxi(0, int(profile.get("railgunCoinsSpent", 0)))
+	railgun.modules_spent = maxi(0, int(profile.get("railgunModulesSpent", 0)))
+	items[Equipment.RAILGUN_INSTANCE_ID] = railgun
+	migrated.equipmentItems = items
+	migrated.equipmentInventory = items.keys()
+	migrated.unlockedEquipmentBlueprints = [Equipment.RAILGUN_ID, Equipment.SHIELD_CORE_ID]
+	migrated.activeShipId = Ships.STARTER_SHIP_ID
+	migrated.ships = {Ships.STARTER_SHIP_ID:Loadouts.starter_ship_state()}
+	migrated.saveVersion = 8
+	return migrated
 
 func _migrate_progression_profile(profile: Dictionary) -> Dictionary:
 	var migrated: Dictionary = _normalize_railgun_ids(profile.duplicate(true))
@@ -166,6 +200,13 @@ func _reset_to_current_profile() -> Dictionary:
 	if last_save_ok and OS.has_feature("web"): JavaScriptBridge.force_fs_sync()
 	return fresh
 
+func _quarantine_profile(path: String) -> void:
+	if not FileAccess.file_exists(path): return
+	var recovery_path := path + RECOVERY_SUFFIX
+	if FileAccess.file_exists(recovery_path):
+		recovery_path = "%s.%d" % [recovery_path, Time.get_ticks_usec()]
+	DirAccess.copy_absolute(path, recovery_path)
+
 func _read_json(path: String) -> Variant:
 	if not FileAccess.file_exists(path): return null
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -185,12 +226,24 @@ func save_profile(profile: Dictionary) -> bool:
 	var sanitized := _sanitize_profile(profile); var temp := profile_path + ".tmp"; last_save_ok = false
 	if not _write_json(temp, sanitized): return false
 	var current = _read_json(profile_path)
-	if current is Dictionary and int(current.get("saveVersion",0)) == SAVE_VERSION:
+	if current is Dictionary and _is_supported_version(int(current.get("saveVersion", 0))):
+		_rotate_profile_backups()
 		if DirAccess.copy_absolute(profile_path, profile_path + ".bak") != OK: return false
 	if DirAccess.rename_absolute(temp, profile_path) != OK: return false
 	last_save_ok = true
 	if OS.has_feature("web"): JavaScriptBridge.force_fs_sync()
 	return true
+
+func _is_supported_version(version: int) -> bool:
+	return version >= SAVE_VERSION - 3 and version <= SAVE_VERSION
+
+func _rotate_profile_backups() -> void:
+	for index in [2, 1]:
+		var source := profile_path + (".bak" if index == 1 else ".bak.%d" % index)
+		var target := profile_path + ".bak.%d" % (index + 1)
+		if not FileAccess.file_exists(source): continue
+		if FileAccess.file_exists(target): DirAccess.remove_absolute(target)
+		DirAccess.rename_absolute(source, target)
 
 static func encode(value: Variant) -> Variant:
 	if value is Vector2: return {"__vector2":[value.x,value.y]}
@@ -225,6 +278,7 @@ func _default_profile() -> Dictionary:
 		"unlockedShips":[Ships.STARTER_SHIP_ID],"activeShipId":Ships.STARTER_SHIP_ID,
 		"ships":{Ships.STARTER_SHIP_ID:Loadouts.starter_ship_state()},
 		"unlockedEquipmentBlueprints":[Equipment.RAILGUN_ID,Equipment.SHIELD_CORE_ID],
+		"tierRewardsClaimed":[],
 		"rarityBlueprints":{"rare_blueprint":0,"epic_blueprint":0,"legendary_blueprint":0},
 		"equipmentItems":Equipment.starter_instances(),
 		"equipmentInventory":[Equipment.RAILGUN_INSTANCE_ID,Equipment.SHIELD_CORE_INSTANCE_ID],
@@ -245,6 +299,9 @@ func _sanitize_profile(profile: Dictionary) -> Dictionary:
 		var normalized_blueprints: Array = []
 		for blueprint_id in unlocked_blueprints: normalized_blueprints.append(_canonical_railgun_id(str(blueprint_id)))
 		clean.unlockedEquipmentBlueprints = _unique_string_array(normalized_blueprints).filter(func(id): return not Equipment.definition(str(id)).is_empty())
+	var claimed_tier_rewards = profile.get("tierRewardsClaimed", [])
+	if claimed_tier_rewards is Array:
+		clean.tierRewardsClaimed = _unique_string_array(claimed_tier_rewards)
 	var rarity_blueprints = profile.get("rarityBlueprints",{})
 	if rarity_blueprints is Dictionary:
 		for rarity in Progression.BLUEPRINT_IDS:

@@ -9,6 +9,7 @@ const CYCLES := {
 	"tank_railgun": {"magazine":2,"reload":14.0,"interval":1.0,"warmup":0.5,"damage":0.25,"pivot":Vector2(192,210),"barrel":5.0},
 	"railgun": {"magazine": 6, "reload": 3.0, "interval": 0.5, "warmup": 0.0},
 	"enemy_railgun": {"magazine": 3, "reload": 6.0, "interval": 0.5, "warmup": 0.3,"damage":0.25,"pivot":Vector2(192,206),"barrel":7.0},
+	"elite_railgun": {"magazine":1,"reload":8.0,"interval":0.0,"warmup":0.75,"damage":0.55,"pivot":Vector2(192,204),"barrel":8.0},
 	"boss_rocket": {"magazine": 1, "reload": 4.0, "interval": 0.0, "warmup": 0.6,"damage":6.0},
 }
 
